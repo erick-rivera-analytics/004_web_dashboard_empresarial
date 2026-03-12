@@ -404,14 +404,6 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     setValveError(null);
   }
 
-  function closeValves() {
-    setSelectedValveCycleKey(null);
-    setSelectedValve(null);
-    setValveData(null);
-    setValvesError(null);
-    setValveError(null);
-  }
-
   function openValve(cycleKey: string, valveId: string) {
     setSelectedValve((current) => (
       current?.cycleKey === cycleKey && current?.valveId === valveId
@@ -454,7 +446,6 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     openBeds,
     closeBeds,
     openValves,
-    closeValves,
     openValve,
     openCurve,
     closeCurve,

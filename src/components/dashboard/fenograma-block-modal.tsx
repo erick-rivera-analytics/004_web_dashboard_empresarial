@@ -742,76 +742,6 @@ function ValvesSection({
   );
 }
 
-function ValvesOverlay({
-  cycleKey,
-  data,
-  loading,
-  error,
-  selectedValve,
-  valveData,
-  valveLoading,
-  valveError,
-  onOpenValve,
-  onOpenValveBedsOverlay,
-  onClose,
-}: {
-  cycleKey: string;
-  data: ValveProfilesByCyclePayload | null;
-  loading: boolean;
-  error: string | null;
-  selectedValve: { cycleKey: string; valveId: string } | null;
-  valveData: ValveProfilePayload | null;
-  valveLoading: boolean;
-  valveError: string | null;
-  onOpenValve: (cycleKey: string, valveId: string) => void;
-  onOpenValveBedsOverlay: (cycleKey: string, valveId: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/50 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1480px,calc(100vw-2rem))]">
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
-          <div className="min-w-0 space-y-2">
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="rounded-full px-3 py-1">
-                Valvulas del ciclo
-              </Badge>
-              <Badge variant="secondary" className="rounded-full px-3 py-1">
-                {cycleKey}
-              </Badge>
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-2xl font-semibold tracking-tight">Ventana flotante de valvulas</h3>
-              <p className="break-words text-sm text-muted-foreground">
-                Vista completa del ciclo con apertura de detalle y camas asociadas por valvula.
-              </p>
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="size-4" />
-          </Button>
-        </div>
-
-        <div className="overflow-y-auto px-4 py-5 sm:px-6">
-          <ValvesSection
-            cycleKey={cycleKey}
-            data={data}
-            loading={loading}
-            error={error}
-            selectedValve={selectedValve}
-            valveData={valveData}
-            valveLoading={valveLoading}
-            valveError={valveError}
-            onOpenValve={onOpenValve}
-            onOpenValveBedsOverlay={onOpenValveBedsOverlay}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function BlockProfileModal({
   row,
   data,
@@ -836,7 +766,6 @@ export function BlockProfileModal({
   onOpenBeds,
   onCloseBeds,
   onOpenValves,
-  onCloseValves,
   onOpenValve,
   onOpenCurve,
   onCloseCurve,
@@ -865,7 +794,6 @@ export function BlockProfileModal({
   onOpenBeds: (cycleKey: string) => void;
   onCloseBeds: () => void;
   onOpenValves: (cycleKey: string) => void;
-  onCloseValves: () => void;
   onOpenValve: (cycleKey: string, valveId: string) => void;
   onOpenCurve: (cycleKey: string) => void;
   onCloseCurve: () => void;
@@ -893,11 +821,6 @@ export function BlockProfileModal({
         return;
       }
 
-      if (selectedValveCycleKey) {
-        onCloseValves();
-        return;
-      }
-
       if (selectedCycleKey) {
         onCloseBeds();
         return;
@@ -912,11 +835,9 @@ export function BlockProfileModal({
     onClose,
     onCloseBeds,
     onCloseCurve,
-    onCloseValves,
     row,
     selectedCurveCycleKey,
     selectedCycleKey,
-    selectedValveCycleKey,
     selectedValveBeds,
   ]);
 
@@ -990,7 +911,7 @@ export function BlockProfileModal({
               {data.cycles.length ? (
                 <div className="grid gap-4">
                   {data.cycles.map((cycle) => {
-                    const showValvesActive = selectedValveCycleKey === cycle.cycleKey;
+                    const showValves = selectedValveCycleKey === cycle.cycleKey;
                     const showCurveActive = selectedCurveCycleKey === cycle.cycleKey;
 
                     return (
@@ -1032,7 +953,7 @@ export function BlockProfileModal({
                           <MetricPill
                             label="Valvulas"
                             value={formatNumber(cycle.valveCount)}
-                            hint="Abrir ventana flotante de valvulas"
+                            hint="Abrir detalle de valvulas"
                             onClick={() => onOpenValves(cycle.cycleKey)}
                           />
                           <MetricPill label="Pambiles" value={formatNumber(cycle.pambilesCount)} />
@@ -1050,14 +971,6 @@ export function BlockProfileModal({
 
                         <CardContent className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
                           <Button
-                            variant={showValvesActive ? "secondary" : "outline"}
-                            className="rounded-xl"
-                            onClick={() => onOpenValves(cycle.cycleKey)}
-                          >
-                            <Rows3 className="size-4" />
-                            {showValvesActive ? "Ocultar valvulas" : "Abrir valvulas"}
-                          </Button>
-                          <Button
                             variant={showCurveActive ? "secondary" : "outline"}
                             className="rounded-xl"
                             onClick={() => onOpenCurve(cycle.cycleKey)}
@@ -1066,6 +979,23 @@ export function BlockProfileModal({
                             Curva de la cosecha por cycle
                           </Button>
                         </CardContent>
+
+                        {showValves ? (
+                          <CardContent className="border-t border-border/60 pt-0">
+                            <ValvesSection
+                              cycleKey={cycle.cycleKey}
+                              data={valvesData}
+                              loading={valvesLoading}
+                              error={valvesError}
+                              selectedValve={selectedValve}
+                              valveData={valveData}
+                              valveLoading={valveLoading}
+                              valveError={valveError}
+                              onOpenValve={onOpenValve}
+                              onOpenValveBedsOverlay={openValveBedsOverlay}
+                            />
+                          </CardContent>
+                        ) : null}
                       </Card>
                     );
                   })}
@@ -1103,22 +1033,6 @@ export function BlockProfileModal({
           loading={curveLoading}
           error={curveError}
           onClose={onCloseCurve}
-        />
-      ) : null}
-
-      {selectedValveCycleKey ? (
-        <ValvesOverlay
-          cycleKey={selectedValveCycleKey}
-          data={valvesData}
-          loading={valvesLoading}
-          error={valvesError}
-          selectedValve={selectedValve}
-          valveData={valveData}
-          valveLoading={valveLoading}
-          valveError={valveError}
-          onOpenValve={onOpenValve}
-          onOpenValveBedsOverlay={openValveBedsOverlay}
-          onClose={onCloseValves}
         />
       ) : null}
 
