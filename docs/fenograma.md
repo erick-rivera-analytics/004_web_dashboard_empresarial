@@ -18,6 +18,7 @@ El modulo resuelve tres necesidades:
 - `src/app/api/fenograma/pivot/route.ts`
 - `src/app/api/fenograma/block/[parentBlock]/route.ts`
 - `src/app/api/fenograma/cycle/[cycleKey]/beds/route.ts`
+- `src/app/api/fenograma/cycle/[cycleKey]/valves/route.ts`
 - `src/app/api/fenograma/cycle/[cycleKey]/valves/[valveId]/route.ts`
 
 ### Dominio
@@ -38,7 +39,7 @@ El modulo resuelve tres necesidades:
 
 Fuente:
 
-- `gld.vw_prod_fenograma_cur`
+- `mtlz.mv_prod_fenograma_cur`
 
 Columnas utilizadas directamente o derivadas:
 
@@ -85,7 +86,7 @@ Uso:
 
 Fuente:
 
-- `gld.vw_camp_kardex_cycle_plants_cur`
+- `mtlz.mv_camp_kardex_cycle_plants_cur`
 
 Uso:
 
@@ -100,7 +101,7 @@ Uso:
 
 Fuente:
 
-- `gld.vw_camp_kardex_bed_plants_cur`
+- `mtlz.mv_camp_kardex_bed_plants_cur`
 
 Uso:
 
@@ -111,7 +112,7 @@ Uso:
 Fuentes:
 
 - `slv.camp_dim_valve_profile_scd2`
-- `gld.vw_camp_kardex_valve_plants_cur`
+- `mtlz.mv_camp_kardex_valve_plants_cur`
 
 Uso:
 
@@ -307,6 +308,9 @@ Flujo:
 3. se hace fetch a `/api/fenograma/block/[parentBlock]`
 4. se abre el modal con resumen del bloque y ciclos
 
+Si el click viene desde la tabla de `Fenograma`, el modal puede filtrarse al `cycle_key` exacto de la fila.
+Si el click viene desde el mapa de bloques, el modal muestra el historial completo del bloque.
+
 El modal muestra:
 
 - fechas principales de la fila
@@ -369,16 +373,21 @@ Cada cama muestra:
 - tipo SP
 - variedad
 
+La presentacion de camas ahora usa tabla para escalar mejor cuando el volumen es alto.
+
 ## 13. Detalle de valvulas
 
-Dentro de cada cama, el campo `Valvula` es clickeable si existe `valve_id`.
+Dentro de cada ciclo, el bloque `Valvulas` es clickeable y abre el listado de valvulas del ciclo.
+Dentro de cada cama, el campo `Valvula` tambien es clickeable si existe `valve_id`.
 
 Flujo:
 
-1. el usuario pulsa `Valvula`
-2. el cliente hace fetch a `/api/fenograma/cycle/[cycleKey]/valves/[valveId]`
-3. se abre un panel anidado con la ficha de valvula
-4. el panel tambien lista las camas que pertenecen a esa valvula
+1. el usuario pulsa `Valvulas`
+2. el cliente hace fetch a `/api/fenograma/cycle/[cycleKey]/valves`
+3. el usuario abre una valvula especifica
+4. el cliente hace fetch a `/api/fenograma/cycle/[cycleKey]/valves/[valveId]`
+5. se abre un panel anidado con la ficha de valvula
+6. el panel tambien lista las camas que pertenecen a esa valvula en tabla
 
 El detalle de valvula muestra:
 
@@ -508,7 +517,7 @@ Devuelve:
 - `Area` hoy se deriva del `cycle_key`
 - el modulo asume que `cumulative_mortality` llega como fraccion y se convierte a porcentaje
 - no hay selector de rango de semanas todavia
-- no hay exportacion ni cache aplicada aun
+- no hay exportacion
 
 ## 18. Checklist para tocar este modulo
 

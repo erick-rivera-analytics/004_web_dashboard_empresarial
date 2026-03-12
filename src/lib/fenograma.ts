@@ -4,6 +4,7 @@ import { query } from "@/lib/db";
 import { cachedAsync } from "@/lib/server-cache";
 
 type FenogramaQueryRow = {
+  cycle_key: string | null;
   area: string | null;
   block: string | null;
   variety: string | null;
@@ -103,6 +104,30 @@ type BedPlantsQueryRow = {
   mortality_cumulative: string | number | null;
 };
 
+type ValveProfileBaseQueryRow = {
+  record_id: string;
+  valve_id: string;
+  cycle_key: string;
+  block_id: string | null;
+  valid_from: string | null;
+  valid_to: string | null;
+  is_current: boolean | null;
+  attributes: string | null;
+  is_valid: boolean | null;
+  change_reason: string | null;
+};
+
+type ValvePlantsQueryRow = {
+  valve_id: string;
+  programmed_plants: string | number | null;
+  cycle_start_plants: string | number | null;
+  plants_dead: string | number | null;
+  plants_reseeded: string | number | null;
+  plants_current: string | number | null;
+  mortality_period: string | number | null;
+  mortality_cumulative: string | number | null;
+};
+
 type ValveProfileQueryRow = {
   record_id: string;
   valve_id: string;
@@ -147,6 +172,7 @@ export type FenogramaFilters = {
 
 export type BlockModalRow = {
   block: string;
+  cycleKey: string | null;
   area: string;
   variety: string;
   spType: string;
@@ -158,6 +184,7 @@ export type BlockModalRow = {
 
 export type FenogramaPivotRow = {
   id: string;
+  cycleKey: string;
   block: string;
   area: string;
   variety: string;
@@ -231,6 +258,7 @@ export type CycleProfileCard = {
 
 export type CycleProfileBlockPayload = {
   parentBlock: string;
+  filteredCycleKey: string | null;
   generatedAt: string;
   summary: {
     totalCycles: number;
@@ -321,6 +349,20 @@ export type ValveProfilePayload = {
   beds: BedProfileCard[];
 };
 
+export type ValveProfilesByCyclePayload = {
+  cycleKey: string;
+  generatedAt: string;
+  summary: {
+    totalValves: number;
+    currentValves: number;
+    validValves: number;
+    totalProgrammedPlants: number;
+    totalCycleStartPlants: number;
+    totalCurrentPlants: number;
+  };
+  valves: ValveProfileCard[];
+};
+
 export const defaultFenogramaFilters: FenogramaFilters = {
   includeActive: true,
   includePlanned: true,
@@ -339,13 +381,18 @@ const AREA_SQL = `
   end
 `;
 
+const FENOGRAMA_SOURCE = "mtlz.mv_prod_fenograma_cur";
+const BED_PLANTS_SOURCE = "mtlz.mv_camp_kardex_bed_plants_cur";
+const CYCLE_PLANTS_SOURCE = "mtlz.mv_camp_kardex_cycle_plants_cur";
+const VALVE_PLANTS_SOURCE = "mtlz.mv_camp_kardex_valve_plants_cur";
+
 const FENOGRAMA_OPTIONS_QUERY = `
   select
     array(
       select distinct area_value
       from (
         select ${AREA_SQL} as area_value
-        from gld.vw_prod_fenograma_cur
+        from ${FENOGRAMA_SOURCE}
       ) areas
       where area_value is not null
       order by area_value
@@ -354,7 +401,7 @@ const FENOGRAMA_OPTIONS_QUERY = `
       select distinct variety_value
       from (
         select nullif(variety, '') as variety_value
-        from gld.vw_prod_fenograma_cur
+        from ${FENOGRAMA_SOURCE}
       ) varieties
       where variety_value is not null
       order by variety_value
@@ -363,7 +410,7 @@ const FENOGRAMA_OPTIONS_QUERY = `
       select distinct sp_type_value
       from (
         select nullif(sp_type, '') as sp_type_value
-        from gld.vw_prod_fenograma_cur
+        from ${FENOGRAMA_SOURCE}
       ) sp_types
       where sp_type_value is not null
       order by sp_type_value
@@ -495,10 +542,11 @@ function buildVisibleWeeks(allWeeks: string[], filters: FenogramaFilters) {
 function buildRowKey(
   row: Pick<
     FenogramaPivotRow,
-    "block" | "area" | "variety" | "spType" | "spDate" | "harvestStartDate" | "harvestEndDate"
+    "cycleKey" | "block" | "area" | "variety" | "spType" | "spDate" | "harvestStartDate" | "harvestEndDate"
   >,
 ) {
   return [
+    row.cycleKey,
     row.block,
     row.area,
     row.variety,
@@ -509,7 +557,7 @@ function buildRowKey(
   ].join("|");
 }
 
-function buildBlockModalRow(row: BlockModalRowQueryRow | null | undefined) {
+function buildBlockModalRow(row: BlockModalRowQueryRow | null | undefined): BlockModalRow | null {
   const parentBlock = cleanText(row?.parent_block ?? null);
 
   if (!parentBlock) {
@@ -518,6 +566,7 @@ function buildBlockModalRow(row: BlockModalRowQueryRow | null | undefined) {
 
   return {
     block: parentBlock,
+    cycleKey: null,
     area: cleanText(row?.area ?? null),
     variety: cleanText(row?.variety ?? null),
     spType: cleanText(row?.sp_type ?? null),
@@ -525,7 +574,7 @@ function buildBlockModalRow(row: BlockModalRowQueryRow | null | undefined) {
     harvestStartDate: row?.harvest_start_date ?? null,
     harvestEndDate: row?.harvest_end_date ?? null,
     totalStems: roundValue(toNumber(row?.total_stems ?? null) ?? 0),
-  } satisfies BlockModalRow;
+  };
 }
 
 function normalizeAttributes(attributes: string | null) {
@@ -577,6 +626,36 @@ function mapBedProfileRow(row: BedProfileQueryRow): BedProfileCard {
   };
 }
 
+function mapValveProfileRow(
+  row: ValveProfileBaseQueryRow,
+  plants?: ValvePlantsQueryRow,
+): ValveProfileCard {
+  const attributes = normalizeAttributes(row.attributes);
+
+  return {
+    recordId: row.record_id,
+    valveId: row.valve_id,
+    valveName: cleanText(attributes.valve_name ?? row.valve_id),
+    cycleKey: row.cycle_key,
+    blockId: cleanText(row.block_id),
+    parentBlock: cleanText(attributes.parent_block),
+    status: cleanText(attributes.status),
+    bedCount: toNumber(attributes.bed_count ?? null),
+    validFrom: row.valid_from,
+    validTo: row.valid_to,
+    isCurrent: Boolean(row.is_current),
+    isValid: row.is_valid !== false,
+    changeReason: cleanText(row.change_reason),
+    programmedPlants: toNumber(plants?.programmed_plants ?? null),
+    cycleStartPlants: toNumber(plants?.cycle_start_plants ?? null),
+    deadPlants: toNumber(plants?.plants_dead ?? null),
+    reseededPlants: toNumber(plants?.plants_reseeded ?? null),
+    currentPlants: toNumber(plants?.plants_current ?? null),
+    mortalityPeriodPct: toPercent(plants?.mortality_period ?? null),
+    mortalityCumulativePct: toPercent(plants?.mortality_cumulative ?? null),
+  };
+}
+
 function summarizeBeds(beds: BedProfileCard[]) {
   return {
     totalBeds: beds.length,
@@ -586,6 +665,17 @@ function summarizeBeds(beds: BedProfileCard[]) {
     totalCycleStartPlants: sumNumbers(beds.map((bed) => bed.cycleStartPlants)),
     totalCurrentPlants: sumNumbers(beds.map((bed) => bed.currentPlants)),
     totalBedArea: sumNumbers(beds.map((bed) => bed.bedArea)),
+  };
+}
+
+function summarizeValves(valves: ValveProfileCard[]) {
+  return {
+    totalValves: valves.length,
+    currentValves: valves.filter((valve) => valve.isCurrent).length,
+    validValves: valves.filter((valve) => valve.isValid).length,
+    totalProgrammedPlants: sumNumbers(valves.map((valve) => valve.programmedPlants)),
+    totalCycleStartPlants: sumNumbers(valves.map((valve) => valve.cycleStartPlants)),
+    totalCurrentPlants: sumNumbers(valves.map((valve) => valve.currentPlants)),
   };
 }
 
@@ -674,7 +764,7 @@ async function getBedProfiles(
         final_plants_count as plants_current,
         mortality as mortality_period,
         cumulative_mortality as mortality_cumulative
-      from gld.vw_camp_kardex_bed_plants_cur
+      from ${BED_PLANTS_SOURCE}
       where cycle_key = $1
         and bed_id = any($2::text[])
       order by
@@ -766,6 +856,7 @@ export async function getFenogramaDashboardData(
         `
           with filtered as (
             select
+              nullif(cycle_key, '') as cycle_key,
               ${AREA_SQL} as area,
               nullif(parent_block, '') as block,
               nullif(variety, '') as variety,
@@ -780,10 +871,11 @@ export async function getFenogramaDashboardData(
               end as lifecycle_status,
               iso_week_id,
               coalesce(stems_count, 0) as stems_count
-            from gld.vw_prod_fenograma_cur
+            from ${FENOGRAMA_SOURCE}
             ${whereClause}
           )
           select
+            cycle_key,
             area,
             block,
             variety,
@@ -795,7 +887,7 @@ export async function getFenogramaDashboardData(
             iso_week_id,
             sum(stems_count) as stems_count
           from filtered
-          group by 1, 2, 3, 4, 5, 6, 7, 8, 9
+          group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
           order by
             harvest_start_date asc nulls last,
             sp_date asc nulls last,
@@ -822,6 +914,7 @@ export async function getFenogramaDashboardData(
 
         const stemsCount = roundValue(Number(entry.stems_count ?? 0));
         const normalizedRow: Omit<FenogramaPivotRow, "id" | "totalStems" | "weekValues"> = {
+          cycleKey: cleanText(entry.cycle_key),
           block: cleanText(entry.block),
           area: cleanText(entry.area),
           variety: cleanText(entry.variety),
@@ -935,7 +1028,7 @@ export async function getBlockModalRowsByParentBlocks(parentBlocks: string[]) {
               nullif(variety, '') asc nulls last,
               nullif(sp_type, '') asc nulls last
           ) as rn
-        from gld.vw_prod_fenograma_cur
+        from ${FENOGRAMA_SOURCE}
         where nullif(parent_block, '') = any($1::text[])
       )
       select
@@ -1018,9 +1111,15 @@ export async function getBlockModalRowsByParentBlocks(parentBlocks: string[]) {
 
 export async function getCycleProfilesByBlock(
   parentBlock: string,
+  options: { cycleKey?: string | null } = {},
 ): Promise<CycleProfileBlockPayload> {
   const normalizedBlock = parentBlock.trim();
-  return cachedAsync(`fenograma:block:${normalizedBlock}`, FENOGRAMA_BLOCK_TTL_MS, async () => {
+  const normalizedCycleKey = cleanText(options.cycleKey ?? null) || null;
+  const cacheKey = normalizedCycleKey
+    ? `fenograma:block:${normalizedBlock}:cycle:${normalizedCycleKey}`
+    : `fenograma:block:${normalizedBlock}`;
+
+  return cachedAsync(cacheKey, FENOGRAMA_BLOCK_TTL_MS, async () => {
     const result = await query<CycleProfileQueryRow>(
       `
         select
@@ -1064,18 +1163,19 @@ export async function getCycleProfilesByBlock(
             final_plants_count as plants_current,
             mortality as mortality_period,
             cumulative_mortality as mortality_cumulative
-          from gld.vw_camp_kardex_cycle_plants_cur
+          from ${CYCLE_PLANTS_SOURCE}
           where cycle_key = cp.cycle_key
           order by valid_from desc nulls last
           limit 1
         ) plants on true
         where cp.parent_block = $1
+          and ($2::text is null or cp.cycle_key = $2)
         order by
           cp.is_current desc,
           cp.valid_from desc nulls last,
           cp.cycle_key asc
       `,
-      [normalizedBlock],
+      [normalizedBlock, normalizedCycleKey],
     );
 
     const cycles = result.rows.map((row) => ({
@@ -1107,6 +1207,7 @@ export async function getCycleProfilesByBlock(
 
     return {
       parentBlock: normalizedBlock,
+      filteredCycleKey: normalizedCycleKey,
       generatedAt: new Date().toISOString(),
       summary: {
         totalCycles: cycles.length,
@@ -1132,6 +1233,82 @@ export async function getBedProfilesByCycleKey(
       generatedAt: new Date().toISOString(),
       summary: summarizeBeds(beds),
       beds,
+    };
+  });
+}
+
+export async function getValveProfilesByCycleKey(
+  cycleKey: string,
+): Promise<ValveProfilesByCyclePayload> {
+  const normalizedCycleKey = cycleKey.trim();
+
+  return cachedAsync(`fenograma:valves:${normalizedCycleKey}`, FENOGRAMA_VALVE_TTL_MS, async () => {
+    const baseResult = await query<ValveProfileBaseQueryRow>(
+      `
+        select distinct on (vp.valve_id)
+          vp.record_id,
+          vp.valve_id,
+          vp.cycle_key,
+          vp.block_id,
+          to_char(vp.valid_from, 'YYYY-MM-DD') as valid_from,
+          to_char(vp.valid_to, 'YYYY-MM-DD') as valid_to,
+          vp.is_current,
+          vp.attributes,
+          vp.is_valid,
+          vp.change_reason
+        from slv.camp_dim_valve_profile_scd2 vp
+        where vp.cycle_key = $1
+        order by
+          vp.valve_id asc,
+          vp.is_current desc,
+          vp.valid_from desc nulls last
+      `,
+      [normalizedCycleKey],
+    );
+
+    if (!baseResult.rows.length) {
+      return {
+        cycleKey: normalizedCycleKey,
+        generatedAt: new Date().toISOString(),
+        summary: summarizeValves([]),
+        valves: [],
+      };
+    }
+
+    const valveIds = Array.from(
+      new Set(baseResult.rows.map((row) => row.valve_id).filter(Boolean)),
+    );
+    const plantsResult = await query<ValvePlantsQueryRow>(
+      `
+        select distinct on (valve_id)
+          valve_id,
+          initial_plants as programmed_plants,
+          initial_plants_cycle as cycle_start_plants,
+          dead_plants_count as plants_dead,
+          reseed_plants_count as plants_reseeded,
+          final_plants_count as plants_current,
+          mortality as mortality_period,
+          cumulative_mortality as mortality_cumulative
+        from ${VALVE_PLANTS_SOURCE}
+        where cycle_key = $1
+          and valve_id = any($2::text[])
+        order by
+          valve_id,
+          valid_from desc nulls last
+      `,
+      [normalizedCycleKey, valveIds],
+    );
+
+    const plantsByValveId = new Map(
+      plantsResult.rows.map((row) => [row.valve_id, row] as const),
+    );
+    const valves = baseResult.rows.map((row) => mapValveProfileRow(row, plantsByValveId.get(row.valve_id)));
+
+    return {
+      cycleKey: normalizedCycleKey,
+      generatedAt: new Date().toISOString(),
+      summary: summarizeValves(valves),
+      valves,
     };
   });
 }
@@ -1169,15 +1346,15 @@ export async function getValveProfileByCycleAndValve(
               plants.mortality_cumulative
             from slv.camp_dim_valve_profile_scd2 vp
             left join lateral (
-              select
-                initial_plants as programmed_plants,
+            select
+              initial_plants as programmed_plants,
                 initial_plants_cycle as cycle_start_plants,
                 dead_plants_count as plants_dead,
                 reseed_plants_count as plants_reseeded,
-                final_plants_count as plants_current,
-                mortality as mortality_period,
-                cumulative_mortality as mortality_cumulative
-              from gld.vw_camp_kardex_valve_plants_cur
+              final_plants_count as plants_current,
+              mortality as mortality_period,
+              cumulative_mortality as mortality_cumulative
+              from ${VALVE_PLANTS_SOURCE}
               where cycle_key = vp.cycle_key
                 and valve_id = vp.valve_id
               order by valid_from desc nulls last

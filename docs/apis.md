@@ -295,17 +295,55 @@ Reemplaza `AREA-0001` por un `cycle_key` real del entorno.
 
 Ruta:
 
+- `GET /api/fenograma/cycle/[cycleKey]/valves`
+
+Archivo:
+
+- `src/app/api/fenograma/cycle/[cycleKey]/valves/route.ts`
+
+## 6.1. Proposito
+
+Resolver el listado visible de valvulas para un `cycle_key` especifico.
+
+## 6.2. Respuesta
+
+Campos principales:
+
+- `cycleKey`
+- `generatedAt`
+- `summary`
+- `valves`
+
+### `summary`
+
+- `totalValves`
+- `currentValves`
+- `validValves`
+- `totalProgrammedPlants`
+- `totalCycleStartPlants`
+- `totalCurrentPlants`
+
+## 6.3. Ejemplo PowerShell
+
+```powershell
+Invoke-RestMethod "http://localhost:3000/api/fenograma/cycle/MH1-329-GYPXLE-P2-29122025/valves"
+```
+
+## 7. Detalle de valvula por ciclo
+
+Ruta:
+
 - `GET /api/fenograma/cycle/[cycleKey]/valves/[valveId]`
 
 Archivo:
 
 - `src/app/api/fenograma/cycle/[cycleKey]/valves/[valveId]/route.ts`
 
-## 6.1. Proposito
+## 7.1. Proposito
 
 Resolver la ficha de una valvula dentro de un ciclo y devolver tambien las camas asociadas a esa valvula.
 
-## 6.2. Respuesta
+## 7.2. Respuesta
 
 Campos principales:
 
@@ -348,13 +386,13 @@ Campos principales:
 - `totalCycleStartPlants`
 - `totalCurrentPlants`
 
-## 6.3. Ejemplo PowerShell
+## 7.3. Ejemplo PowerShell
 
 ```powershell
 Invoke-RestMethod "http://localhost:3000/api/fenograma/cycle/MH1-305-GYPXLE-P2-11032026/valves/305-305A"
 ```
 
-## 7. Patron de errores del proyecto
+## 8. Patron de errores del proyecto
 
 El patron actual es deliberadamente simple.
 
@@ -372,7 +410,7 @@ El patron actual es deliberadamente simple.
 - la UI puede mostrar mensajes directos
 - si mas adelante se quiere trazabilidad, se puede evolucionar a `code`, `details` y `requestId`
 
-## 8. Recomendaciones al agregar una API nueva
+## 9. Recomendaciones al agregar una API nueva
 
 1. poner la logica pesada en `src/lib/`, no en la ruta
 2. normalizar query params antes de usarlos

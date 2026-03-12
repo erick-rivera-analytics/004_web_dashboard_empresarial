@@ -240,11 +240,16 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
         bedData={blockModal.bedData}
         bedLoading={blockModal.bedLoading}
         bedError={blockModal.bedError}
+        selectedValveCycleKey={blockModal.selectedValveCycleKey}
+        valvesData={blockModal.valvesData}
+        valvesLoading={blockModal.valvesLoading}
+        valvesError={blockModal.valvesError}
         selectedValve={blockModal.selectedValve}
         valveData={blockModal.valveData}
         valveLoading={blockModal.valveLoading}
         valveError={blockModal.valveError}
         onOpenBeds={blockModal.openBeds}
+        onOpenValves={blockModal.openValves}
         onOpenValve={blockModal.openValve}
         onClose={() => setSelectedRow(null)}
       />

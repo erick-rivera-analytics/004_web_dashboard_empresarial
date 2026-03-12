@@ -50,6 +50,7 @@ El proyecto ya no funciona como una plantilla generica. Hoy tiene una estructura
 
 - `/login`
 - `/dashboard`
+- `/dashboard/campo`
 - `/dashboard/fenograma`
 - `/dashboard/comparacion`
 
@@ -59,6 +60,7 @@ El proyecto ya no funciona como una plantilla generica. Hoy tiene una estructura
 - `/api/fenograma/pivot`
 - `/api/fenograma/block/[parentBlock]`
 - `/api/fenograma/cycle/[cycleKey]/beds`
+- `/api/fenograma/cycle/[cycleKey]/valves`
 - `/api/fenograma/cycle/[cycleKey]/valves/[valveId]`
 
 ## 4. Inicio rapido
@@ -118,11 +120,17 @@ DATABASE_SSL=false
 
 ### Fenograma
 
-- `gld.vw_prod_fenograma_cur`
+- `mtlz.mv_prod_fenograma_cur`
 - `slv.camp_dim_cycle_profile_scd2`
 - `slv.camp_dim_bed_profile_scd2`
-- `gld.vw_camp_kardex_cycle_plants_cur`
-- `gld.vw_camp_kardex_bed_plants_cur`
+- `mtlz.mv_camp_kardex_cycle_plants_cur`
+- `mtlz.mv_camp_kardex_bed_plants_cur`
+- `mtlz.mv_camp_kardex_valve_plants_cur`
+
+### Campo
+
+- shape transformado a `src/data/campo-blocks-map.json`
+- historial espacial de bloques usando match por `parent_block`
 
 ### Comparacion
 
@@ -174,11 +182,13 @@ docs/
 
 - `src/lib/db.ts`
 - `src/lib/fenograma.ts`
+- `src/lib/campo.ts`
 - `src/lib/dashboard-seed.ts`
 
 ### UI de negocio
 
 - `src/components/dashboard/fenograma-explorer.tsx`
+- `src/components/dashboard/campo-explorer.tsx`
 - `src/components/dashboard/fenograma-pivot-table.tsx`
 - `src/components/dashboard/fenograma-weekly-bars-panel.tsx`
 - `src/components/dashboard/comparison-radar-panel.tsx`
@@ -189,6 +199,8 @@ docs/
 - `src/app/api/fenograma/pivot/route.ts`
 - `src/app/api/fenograma/block/[parentBlock]/route.ts`
 - `src/app/api/fenograma/cycle/[cycleKey]/beds/route.ts`
+- `src/app/api/fenograma/cycle/[cycleKey]/valves/route.ts`
+- `sql/materialized_views_dashboard.sql`
 
 ## 9. Validacion
 

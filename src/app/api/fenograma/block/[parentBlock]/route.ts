@@ -5,12 +5,16 @@ import { getCycleProfilesByBlock } from "@/lib/fenograma";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ parentBlock: string }> },
 ) {
   try {
     const { parentBlock } = await context.params;
-    const data = await getCycleProfilesByBlock(decodeURIComponent(parentBlock));
+    const url = new URL(request.url);
+    const cycleKey = url.searchParams.get("cycleKey");
+    const data = await getCycleProfilesByBlock(decodeURIComponent(parentBlock), {
+      cycleKey: cycleKey ? decodeURIComponent(cycleKey) : null,
+    });
 
     return NextResponse.json(data, {
       headers: {

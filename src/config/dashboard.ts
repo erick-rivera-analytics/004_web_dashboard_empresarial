@@ -5,6 +5,7 @@ import {
   Gauge,
   GitCompareArrows,
   LayoutDashboard,
+  Map,
   Sprout,
 } from "lucide-react";
 
@@ -27,6 +28,14 @@ export type SidebarNode = {
 export const starterName = "Atlas Empresarial";
 
 export const dashboardViews: DashboardView[] = [
+  {
+    slug: "campo",
+    title: "Mapa de bloques",
+    eyebrow: "Indicadores / Produccion / Campo",
+    summary: "Historial espacial de bloques con apertura por parent_block.",
+    href: "/dashboard/campo",
+    icon: Map,
+  },
   {
     slug: "fenograma",
     title: "Fenograma",
