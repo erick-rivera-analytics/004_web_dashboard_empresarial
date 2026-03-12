@@ -37,6 +37,7 @@ function buildQueryString(filters: FenogramaFilters) {
   params.set("area", filters.area);
   params.set("variety", filters.variety);
   params.set("spType", filters.spType);
+  params.set("visibleWeeks", String(filters.visibleWeeks));
   return params.toString();
 }
 
@@ -167,7 +168,7 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 space-y-2">
               <Badge variant="outline" className="rounded-full px-3 py-1">
-                Default: Activos + Planificados / maximo 24 semanas visibles
+                Default: Activos + Planificados / rango visible configurable
               </Badge>
               <CardTitle className="text-2xl">Fenograma operativo</CardTitle>
             </div>
@@ -191,8 +192,22 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
             <SelectField id="fenograma-variety" label="Variedad" value={filters.variety} options={data.options.varieties} onChange={(value) => updateFilter("variety", value)} />
             <SelectField id="fenograma-sp-type" label="SP" value={filters.spType} options={data.options.spTypes} onChange={(value) => updateFilter("spType", value)} />
             <div className="min-w-0 space-y-2">
-              <Label>Rango visible</Label>
-              <div className="rounded-xl border border-input bg-background px-3 py-2.5 text-sm text-muted-foreground">{data.summary.firstWeek ?? "-"} a {data.summary.lastWeek ?? "-"}</div>
+              <Label htmlFor="fenograma-visible-weeks">Rango visible</Label>
+              <select
+                id="fenograma-visible-weeks"
+                value={String(filters.visibleWeeks)}
+                onChange={(event) => updateFilter("visibleWeeks", Number(event.target.value))}
+                className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                <option value="12">12 semanas</option>
+                <option value="24">24 semanas</option>
+                <option value="36">36 semanas</option>
+                <option value="52">52 semanas</option>
+                <option value="0">Todo el rango</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Visible ahora: {data.summary.firstWeek ?? "-"} a {data.summary.lastWeek ?? "-"}
+              </p>
             </div>
             <div className="flex items-end">
               <Button variant="outline" className="w-full rounded-xl" onClick={resetFilters}>
@@ -255,6 +270,7 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
         onOpenBeds={blockModal.openBeds}
         onCloseBeds={blockModal.closeBeds}
         onOpenValves={blockModal.openValves}
+        onCloseValves={blockModal.closeValves}
         onOpenValve={blockModal.openValve}
         onOpenCurve={blockModal.openCurve}
         onCloseCurve={blockModal.closeCurve}
