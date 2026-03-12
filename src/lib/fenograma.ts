@@ -1003,16 +1003,31 @@ export async function getBlockModalRowsByParentBlocks(parentBlocks: string[]) {
 
   const result = await query<BlockModalRowQueryRow>(
     `
-      with ranked as (
+      with cycles as (
         select
           nullif(parent_block, '') as parent_block,
+          nullif(cycle_key, '') as cycle_key,
           ${AREA_SQL} as area,
           nullif(variety, '') as variety,
           nullif(sp_type, '') as sp_type,
-          to_char(sp_date, 'YYYY-MM-DD') as sp_date,
-          to_char(harvest_start_date, 'YYYY-MM-DD') as harvest_start_date,
-          to_char(harvest_end_date, 'YYYY-MM-DD') as harvest_end_date,
-          sum(coalesce(stems_count, 0)) over (partition by parent_block) as total_stems,
+          sp_date,
+          harvest_start_date,
+          harvest_end_date,
+          sum(coalesce(stems_count, 0)) as total_stems
+        from ${FENOGRAMA_SOURCE}
+        where nullif(parent_block, '') = any($1::text[])
+        group by 1, 2, 3, 4, 5, 6, 7, 8
+      ),
+      ranked as (
+        select
+          parent_block,
+          area,
+          variety,
+          sp_type,
+          sp_date,
+          harvest_start_date,
+          harvest_end_date,
+          total_stems,
           row_number() over (
             partition by parent_block
             order by
@@ -1026,19 +1041,19 @@ export async function getBlockModalRowsByParentBlocks(parentBlocks: string[]) {
               coalesce(harvest_end_date, harvest_start_date, sp_date) desc nulls last,
               sp_date desc nulls last,
               nullif(variety, '') asc nulls last,
-              nullif(sp_type, '') asc nulls last
+              nullif(sp_type, '') asc nulls last,
+              cycle_key asc nulls last
           ) as rn
-        from ${FENOGRAMA_SOURCE}
-        where nullif(parent_block, '') = any($1::text[])
+        from cycles
       )
       select
         parent_block,
         area,
         variety,
         sp_type,
-        sp_date,
-        harvest_start_date,
-        harvest_end_date,
+        to_char(sp_date, 'YYYY-MM-DD') as sp_date,
+        to_char(harvest_start_date, 'YYYY-MM-DD') as harvest_start_date,
+        to_char(harvest_end_date, 'YYYY-MM-DD') as harvest_end_date,
         total_stems
       from ranked
       where rn = 1

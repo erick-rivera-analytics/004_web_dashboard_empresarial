@@ -28,7 +28,7 @@ export default function DashboardPage() {
               <h1 className="text-4xl font-semibold tracking-tight">
                 Indicadores de campo
               </h1>
-              <p className="text-sm text-muted-foreground">Mapa de bloques, fenograma y comparacion.</p>
+              <p className="text-sm text-muted-foreground">Mapa, fenograma y comparacion.</p>
             </div>
           </div>
 

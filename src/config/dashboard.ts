@@ -30,7 +30,7 @@ export const starterName = "Atlas Empresarial";
 export const dashboardViews: DashboardView[] = [
   {
     slug: "campo",
-    title: "Mapa de bloques",
+    title: "Mapa",
     eyebrow: "Indicadores / Produccion / Campo",
     summary: "Historial espacial de bloques con apertura por parent_block.",
     href: "/dashboard/campo",

@@ -319,6 +319,11 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     setBedError(null);
   }
 
+  function closeBeds() {
+    setSelectedCycleKey(null);
+    setBedError(null);
+  }
+
   function openValves(cycleKey: string) {
     setSelectedValveCycleKey((current) => (current === cycleKey ? null : cycleKey));
     setSelectedValve(null);
@@ -353,6 +358,7 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     valveLoading,
     valveError,
     openBeds,
+    closeBeds,
     openValves,
     openValve,
   };

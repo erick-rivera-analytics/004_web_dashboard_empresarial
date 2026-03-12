@@ -15,41 +15,32 @@ export function Logo({ size = 24, className, ...props }: LogoProps) {
       className={className}
       {...props}
     >
+      <circle cx="16" cy="18" r="1.8" fill="currentColor" opacity="0.2" />
       <path
-        d="M15.5 25.5V19.5M15.5 19.5L11.25 15M15.5 19.5L20 16.25M15.5 16L14 10.25M15.5 16L9 12.5M15.5 16L22.5 11"
+        d="M16 24.25V18M16 18L11.3 13.3M16 18L20.7 13.3M16 18V10.6"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M12.25 26.75C13.3546 26.75 14.25 25.8546 14.25 24.75C14.25 23.6454 13.3546 22.75 12.25 22.75C11.1454 22.75 10.25 23.6454 10.25 24.75C10.25 25.8546 11.1454 26.75 12.25 26.75Z"
+        d="M16 10.75C16 8.35 17.85 6.4 20.15 6.4C20.15 8.8 18.3 10.75 16 10.75Z"
         fill="currentColor"
         opacity="0.18"
       />
       <path
-        d="M18.75 27.25C20.2688 27.25 21.5 26.0188 21.5 24.5C21.5 22.9812 20.2688 21.75 18.75 21.75C17.2312 21.75 16 22.9812 16 24.5C16 26.0188 17.2312 27.25 18.75 27.25Z"
+        d="M11.25 13.2C11.25 10.95 9.45 9.1 7.25 9.1C7.25 11.35 9.05 13.2 11.25 13.2Z"
         fill="currentColor"
-        opacity="0.1"
+        opacity="0.14"
       />
-      <g stroke="currentColor" strokeWidth="1.35" strokeLinecap="round">
-        <path d="M8.5 12.5V10.9" />
-        <path d="M7.7 11.7H9.3" />
-        <path d="M13.9 10.15V8.55" />
-        <path d="M13.1 9.35H14.7" />
-        <path d="M22.5 11V9.4" />
-        <path d="M21.7 10.2H23.3" />
-        <path d="M11.25 15V13.4" />
-        <path d="M10.45 14.2H12.05" />
-        <path d="M20 16.25V14.65" />
-        <path d="M19.2 15.45H20.8" />
-      </g>
-      <circle cx="8.5" cy="12.5" r="2.1" stroke="currentColor" strokeWidth="1.1" opacity="0.6" />
-      <circle cx="14" cy="10.15" r="2.1" stroke="currentColor" strokeWidth="1.1" opacity="0.6" />
-      <circle cx="22.5" cy="11" r="2.1" stroke="currentColor" strokeWidth="1.1" opacity="0.6" />
-      <circle cx="11.25" cy="15" r="2.1" stroke="currentColor" strokeWidth="1.1" opacity="0.6" />
-      <circle cx="20" cy="16.25" r="2.1" stroke="currentColor" strokeWidth="1.1" opacity="0.6" />
-      <circle cx="15.5" cy="19.5" r="1.65" fill="currentColor" opacity="0.14" />
+      <path
+        d="M20.75 13.2C20.75 10.95 22.55 9.1 24.75 9.1C24.75 11.35 22.95 13.2 20.75 13.2Z"
+        fill="currentColor"
+        opacity="0.14"
+      />
+      <circle cx="16" cy="10.7" r="1.25" stroke="currentColor" strokeWidth="1.15" opacity="0.72" />
+      <circle cx="11.3" cy="13.3" r="1.25" stroke="currentColor" strokeWidth="1.15" opacity="0.62" />
+      <circle cx="20.7" cy="13.3" r="1.25" stroke="currentColor" strokeWidth="1.15" opacity="0.62" />
     </svg>
   );
 }

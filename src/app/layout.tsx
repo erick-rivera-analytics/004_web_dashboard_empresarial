@@ -5,9 +5,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { manrope } from "@/lib/fonts";
 
 export const metadata: Metadata = {
-  title: "Dashboard Empresarial Starter",
+  title: "Atlas Empresarial",
   description:
-    "Base limpia en Next.js para comenzar un dashboard empresarial conectado a PostgreSQL.",
+    "Dashboard empresarial conectado a PostgreSQL para indicadores operativos de campo.",
 };
 
 export default function RootLayout({

@@ -110,7 +110,7 @@ function BedsTable({
   onOpenValve?: (valveId: string) => void;
 }) {
   return (
-    <div className="mt-4 overflow-x-auto rounded-2xl border border-border/70">
+    <div className="overflow-auto rounded-2xl border border-border/70">
       <table className="min-w-full border-separate border-spacing-0 text-sm">
         <thead className="bg-card/95">
           <tr>
@@ -188,6 +188,124 @@ function BedsTable({
   );
 }
 
+function BedsOverlay({
+  cycleKey,
+  data,
+  loading,
+  error,
+  selectedValve,
+  valveData,
+  valveLoading,
+  valveError,
+  onOpenValve,
+  onClose,
+}: {
+  cycleKey: string;
+  data: BedProfilePayload | null;
+  loading: boolean;
+  error: string | null;
+  selectedValve: { cycleKey: string; valveId: string } | null;
+  valveData: ValveProfilePayload | null;
+  valveLoading: boolean;
+  valveError: string | null;
+  onOpenValve: (cycleKey: string, valveId: string) => void;
+  onClose: () => void;
+}) {
+  const selectedValveId = selectedValve?.cycleKey === cycleKey ? selectedValve.valveId : null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/46 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="starter-panel relative z-10 flex max-h-[90vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/22 sm:w-[min(1480px,calc(100vw-2rem))]">
+        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="rounded-full px-3 py-1">
+                Tabla de camas
+              </Badge>
+              <Badge variant="secondary" className="rounded-full px-3 py-1">
+                {cycleKey}
+              </Badge>
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-2xl font-semibold tracking-tight">Detalle de camas</h3>
+              <p className="break-words text-sm text-muted-foreground">
+                Vista completa del ciclo con acceso directo al detalle de valvulas por cama.
+              </p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="overflow-y-auto px-4 py-5 sm:px-6">
+          {loading ? (
+            <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
+              <LoaderCircle className="size-4 animate-spin" />
+              Cargando detalle de camas.
+            </div>
+          ) : error ? (
+            <div className="py-8 text-sm text-destructive">{error}</div>
+          ) : data && data.cycleKey === cycleKey ? (
+            data.beds.length ? (
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <DetailBadges
+                    items={[
+                      `${data.summary.totalBeds} camas`,
+                      `${formatNumber(data.summary.totalProgrammedPlants)} programadas`,
+                      `${formatNumber(data.summary.totalCurrentPlants)} vigentes`,
+                      `${formatNumber(data.summary.totalBedArea)} superficie`,
+                    ]}
+                  />
+                </div>
+
+                <div className="max-h-[54vh] overflow-auto rounded-[24px] border border-border/70 bg-background/72 p-3">
+                  <BedsTable
+                    beds={data.beds}
+                    selectedValveId={selectedValveId}
+                    onOpenValve={(valveId) => onOpenValve(cycleKey, valveId)}
+                  />
+                </div>
+
+                {selectedValveId ? (
+                  <div className="rounded-[22px] border border-border/70 bg-card/90 p-4">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                          Detalle de valvula
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">{selectedValveId}</p>
+                      </div>
+                      <Button variant="outline" className="rounded-xl" onClick={() => onOpenValve(cycleKey, selectedValveId)}>
+                        Ocultar detalle
+                      </Button>
+                    </div>
+                    <ValveDetailPanel
+                      data={valveData}
+                      loading={valveLoading}
+                      error={valveError}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="py-8 text-sm text-muted-foreground">
+                No hay detalle de camas para este ciclo.
+              </div>
+            )
+          ) : (
+            <div className="py-8 text-sm text-muted-foreground">
+              No hay detalle de camas disponible para esta seleccion.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ValveDetailPanel({
   data,
   loading,
@@ -253,7 +371,9 @@ function ValveDetailPanel({
         </div>
 
         {data.beds.length ? (
-          <BedsTable beds={data.beds} />
+          <div className="mt-4">
+            <BedsTable beds={data.beds} />
+          </div>
         ) : (
           <div className="py-4 text-sm text-muted-foreground">
             No hay camas relacionadas con esta valvula.
@@ -405,6 +525,7 @@ export function BlockProfileModal({
   valveLoading,
   valveError,
   onOpenBeds,
+  onCloseBeds,
   onOpenValves,
   onOpenValve,
   onClose,
@@ -426,6 +547,7 @@ export function BlockProfileModal({
   valveLoading: boolean;
   valveError: string | null;
   onOpenBeds: (cycleKey: string) => void;
+  onCloseBeds: () => void;
   onOpenValves: (cycleKey: string) => void;
   onOpenValve: (cycleKey: string, valveId: string) => void;
   onClose: () => void;
@@ -437,13 +559,18 @@ export function BlockProfileModal({
 
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        if (selectedCycleKey) {
+          onCloseBeds();
+          return;
+        }
+
         onClose();
       }
     }
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose, row]);
+  }, [onClose, onCloseBeds, row, selectedCycleKey]);
 
   if (!row) {
     return null;
@@ -510,11 +637,7 @@ export function BlockProfileModal({
               {data.cycles.length ? (
                 <div className="grid gap-4">
                   {data.cycles.map((cycle) => {
-                    const showBeds = selectedCycleKey === cycle.cycleKey;
                     const showValves = selectedValveCycleKey === cycle.cycleKey;
-                    const showValveUnderBeds =
-                      selectedValve?.cycleKey === cycle.cycleKey
-                      && selectedValveCycleKey !== cycle.cycleKey;
 
                     return (
                       <Card
@@ -547,7 +670,7 @@ export function BlockProfileModal({
                           <MetricPill
                             label="Camas"
                             value={formatNumber(cycle.bedCount)}
-                            hint="Abrir detalle de camas"
+                            hint="Abrir tabla flotante de camas"
                             onClick={() => onOpenBeds(cycle.cycleKey)}
                           />
                           <MetricPill
@@ -584,68 +707,6 @@ export function BlockProfileModal({
                             />
                           </CardContent>
                         ) : null}
-
-                        {showBeds ? (
-                          <CardContent className="border-t border-border/60 pt-0">
-                            <div className="rounded-[22px] border border-border/70 bg-card/88 p-4">
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                  <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                                    Detalle de camas
-                                  </p>
-                                  <p className="mt-1 text-sm text-muted-foreground">{cycle.cycleKey}</p>
-                                </div>
-                                {bedData && bedData.cycleKey === cycle.cycleKey ? (
-                                  <DetailBadges
-                                    items={[
-                                      `${bedData.summary.totalBeds} camas`,
-                                      `${formatNumber(bedData.summary.totalProgrammedPlants)} programadas`,
-                                      `${formatNumber(bedData.summary.totalCurrentPlants)} vigentes`,
-                                    ]}
-                                  />
-                                ) : null}
-                              </div>
-
-                              {bedLoading ? (
-                                <div className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
-                                  <LoaderCircle className="size-4 animate-spin" />
-                                  Cargando detalle de camas.
-                                </div>
-                              ) : bedError ? (
-                                <div className="py-6 text-sm text-destructive">{bedError}</div>
-                              ) : bedData && bedData.cycleKey === cycle.cycleKey ? (
-                                bedData.beds.length ? (
-                                  <>
-                                    <BedsTable
-                                      beds={bedData.beds}
-                                      selectedValveId={selectedValve?.cycleKey === cycle.cycleKey ? selectedValve.valveId : null}
-                                      onOpenValve={(valveId) => onOpenValve(cycle.cycleKey, valveId)}
-                                    />
-                                    {showValveUnderBeds ? (
-                                      <div className="mt-4 rounded-[20px] border border-border/70 bg-card/92 p-4">
-                                        <div className="mb-4">
-                                          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                                            Detalle de valvula
-                                          </p>
-                                          <p className="mt-1 text-sm text-muted-foreground">{selectedValve?.valveId}</p>
-                                        </div>
-                                        <ValveDetailPanel
-                                          data={valveData}
-                                          loading={valveLoading}
-                                          error={valveError}
-                                        />
-                                      </div>
-                                    ) : null}
-                                  </>
-                                ) : (
-                                  <div className="py-6 text-sm text-muted-foreground">
-                                    No hay detalle de camas para este ciclo.
-                                  </div>
-                                )
-                              ) : null}
-                            </div>
-                          </CardContent>
-                        ) : null}
                       </Card>
                     );
                   })}
@@ -659,6 +720,21 @@ export function BlockProfileModal({
           ) : null}
         </div>
       </div>
+
+      {selectedCycleKey ? (
+        <BedsOverlay
+          cycleKey={selectedCycleKey}
+          data={bedData}
+          loading={bedLoading}
+          error={bedError}
+          selectedValve={selectedValve}
+          valveData={valveData}
+          valveLoading={valveLoading}
+          valveError={valveError}
+          onOpenValve={onOpenValve}
+          onClose={onCloseBeds}
+        />
+      ) : null}
     </div>
   );
 }
