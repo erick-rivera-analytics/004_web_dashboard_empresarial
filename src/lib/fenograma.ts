@@ -176,6 +176,7 @@ export type FenogramaFilters = {
   area: string;
   variety: string;
   spType: string;
+  visibleWeeks: number;
 };
 
 export type BlockModalRow = {
@@ -405,6 +406,7 @@ export const defaultFenogramaFilters: FenogramaFilters = {
   area: "all",
   variety: "all",
   spType: "all",
+  visibleWeeks: 24,
 };
 
 const AREA_SQL = `
@@ -453,7 +455,6 @@ const FENOGRAMA_OPTIONS_QUERY = `
     ) as sp_types
 `;
 
-const DEFAULT_VISIBLE_WEEKS = 24;
 const FENOGRAMA_OPTIONS_TTL_MS = 5 * 60 * 1000;
 const FENOGRAMA_DASHBOARD_TTL_MS = 30 * 1000;
 const FENOGRAMA_BLOCK_TTL_MS = 60 * 1000;
@@ -491,6 +492,24 @@ function parseSelectValue(value: string | undefined) {
   }
 
   return value;
+}
+
+function parseVisibleWeeks(value: string | number | undefined, fallback: number) {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return fallback;
+  }
+
+  if (numericValue <= 0) {
+    return 0;
+  }
+
+  return Math.min(Math.max(Math.trunc(numericValue), 4), 104);
 }
 
 function roundValue(value: number) {
@@ -537,6 +556,7 @@ function serializeFilters(filters: FenogramaFilters) {
     filters.area,
     filters.variety,
     filters.spType,
+    String(filters.visibleWeeks),
   ].join("|");
 }
 
@@ -559,7 +579,11 @@ function shouldUseCurrentWeekWindow(filters: FenogramaFilters) {
 }
 
 function getVisibleWeekLimit(filters: FenogramaFilters) {
-  return shouldUseCurrentWeekWindow(filters) ? DEFAULT_VISIBLE_WEEKS : null;
+  if (filters.visibleWeeks <= 0) {
+    return null;
+  }
+
+  return filters.visibleWeeks;
 }
 
 function buildVisibleWeeks(allWeeks: string[], filters: FenogramaFilters) {
@@ -567,6 +591,10 @@ function buildVisibleWeeks(allWeeks: string[], filters: FenogramaFilters) {
 
   if (!visibleWeekLimit) {
     return allWeeks;
+  }
+
+  if (!shouldUseCurrentWeekWindow(filters)) {
+    return allWeeks.slice(-visibleWeekLimit);
   }
 
   const currentIsoWeekId = getCurrentIsoWeekId();
@@ -825,15 +853,36 @@ async function getBedProfiles(
 }
 
 export function normalizeFenogramaFilters(
-  input: Partial<Record<keyof FenogramaFilters, string | boolean | undefined>> = {},
+  input: Partial<Record<keyof FenogramaFilters, string | boolean | number | undefined>> = {},
 ): FenogramaFilters {
   return {
-    includeActive: parseBoolean(input.includeActive, defaultFenogramaFilters.includeActive),
-    includePlanned: parseBoolean(input.includePlanned, defaultFenogramaFilters.includePlanned),
-    includeHistory: parseBoolean(input.includeHistory, defaultFenogramaFilters.includeHistory),
+    includeActive: parseBoolean(
+      typeof input.includeActive === "boolean" || typeof input.includeActive === "string"
+        ? input.includeActive
+        : undefined,
+      defaultFenogramaFilters.includeActive,
+    ),
+    includePlanned: parseBoolean(
+      typeof input.includePlanned === "boolean" || typeof input.includePlanned === "string"
+        ? input.includePlanned
+        : undefined,
+      defaultFenogramaFilters.includePlanned,
+    ),
+    includeHistory: parseBoolean(
+      typeof input.includeHistory === "boolean" || typeof input.includeHistory === "string"
+        ? input.includeHistory
+        : undefined,
+      defaultFenogramaFilters.includeHistory,
+    ),
     area: parseSelectValue(typeof input.area === "string" ? input.area : undefined),
     variety: parseSelectValue(typeof input.variety === "string" ? input.variety : undefined),
     spType: parseSelectValue(typeof input.spType === "string" ? input.spType : undefined),
+    visibleWeeks: parseVisibleWeeks(
+      typeof input.visibleWeeks === "number" || typeof input.visibleWeeks === "string"
+        ? input.visibleWeeks
+        : undefined,
+      defaultFenogramaFilters.visibleWeeks,
+    ),
   };
 }
 
@@ -886,7 +935,7 @@ function buildWhereClause(filters: FenogramaFilters) {
 }
 
 export async function getFenogramaDashboardData(
-  rawFilters: Partial<Record<keyof FenogramaFilters, string | boolean | undefined>> = {},
+  rawFilters: Partial<Record<keyof FenogramaFilters, string | boolean | number | undefined>> = {},
 ): Promise<FenogramaDashboardData> {
   const filters = normalizeFenogramaFilters(rawFilters);
   return cachedAsync(
