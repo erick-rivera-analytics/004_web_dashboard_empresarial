@@ -1,7 +1,7 @@
 "use client";
 
 import { MapPinned, Move, Plus, RefreshCcw, Sprout, ZoomOut } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BlockProfileModal } from "@/components/dashboard/fenograma-block-modal";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ type AreaLabel = {
 
 const MIN_MAP_SCALE = 1;
 const MAX_MAP_SCALE = 3.4;
+const BLOCK_LABEL_MIN_SCALE = 1.6;
 const DEFAULT_VIEWPORT: ViewportState = {
   scale: 1,
   x: 0,
@@ -84,11 +85,7 @@ function buildPreviewLines(feature: CampoMapFeature) {
   };
 }
 
-function clampViewport(
-  viewport: ViewportState,
-  width: number,
-  height: number,
-) {
+function clampViewport(viewport: ViewportState, width: number, height: number) {
   const scale = clamp(viewport.scale, MIN_MAP_SCALE, MAX_MAP_SCALE);
   const overflowX = Math.max(0, ((scale - 1) * width) / 2);
   const overflowY = Math.max(0, ((scale - 1) * height) / 2);
@@ -168,6 +165,10 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
   );
 
   function updateHoverPreview(feature: CampoMapFeature, clientX: number, clientY: number) {
+    if (isDragging) {
+      return;
+    }
+
     const container = mapRef.current;
 
     if (!container) {
@@ -175,8 +176,8 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
     }
 
     const bounds = container.getBoundingClientRect();
-    const x = Math.min(Math.max(clientX - bounds.left + 18, 18), bounds.width - 320);
-    const y = Math.min(Math.max(clientY - bounds.top + 18, 18), bounds.height - 150);
+    const x = Math.min(Math.max(clientX - bounds.left + 18, 18), Math.max(bounds.width - 320, 18));
+    const y = Math.min(Math.max(clientY - bounds.top + 18, 18), Math.max(bounds.height - 150, 18));
 
     setHoverPreview({
       feature,
@@ -204,43 +205,60 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
       moved: false,
     };
     setIsDragging(true);
-    (event.currentTarget as SVGSVGElement).setPointerCapture(event.pointerId);
   }
 
-  function handlePointerMove(event: React.PointerEvent<SVGSVGElement>) {
-    const dragState = dragStateRef.current;
-
-    if (!dragState) {
+  useEffect(() => {
+    if (!isDragging) {
       return;
     }
 
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const deltaX = (event.clientX - dragState.clientX) * (initialData.map.width / bounds.width);
-    const deltaY = (event.clientY - dragState.clientY) * (initialData.map.height / bounds.height);
-    const moved = Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3;
+    function handlePointerMove(event: PointerEvent) {
+      const dragState = dragStateRef.current;
+      const container = mapRef.current;
 
-    dragState.moved = dragState.moved || moved;
+      if (!dragState || !container) {
+        return;
+      }
 
-    if (dragState.moved) {
-      suppressClickRef.current = true;
-      setHoverPreview(null);
-      updateViewport({
-        ...viewport,
-        x: dragState.x + deltaX,
-        y: dragState.y + deltaY,
-      });
+      const bounds = container.getBoundingClientRect();
+      const deltaX = (event.clientX - dragState.clientX) * (initialData.map.width / bounds.width);
+      const deltaY = (event.clientY - dragState.clientY) * (initialData.map.height / bounds.height);
+      const moved = Math.abs(deltaX) > 6 || Math.abs(deltaY) > 6;
+
+      dragState.moved = dragState.moved || moved;
+
+      if (dragState.moved) {
+        setHoverPreview(null);
+        setViewport(clampViewport({
+          scale: viewport.scale,
+          x: dragState.x + deltaX,
+          y: dragState.y + deltaY,
+        }, initialData.map.width, initialData.map.height));
+      }
     }
-  }
 
-  function handlePointerUp(event: React.PointerEvent<SVGSVGElement>) {
-    if (dragStateRef.current?.moved) {
-      suppressClickRef.current = true;
+    function handlePointerUp() {
+      const didMove = Boolean(dragStateRef.current?.moved);
+
+      dragStateRef.current = null;
+      setIsDragging(false);
+
+      if (didMove) {
+        suppressClickRef.current = true;
+        window.setTimeout(() => {
+          suppressClickRef.current = false;
+        }, 0);
+      }
     }
 
-    dragStateRef.current = null;
-    setIsDragging(false);
-    (event.currentTarget as SVGSVGElement).releasePointerCapture(event.pointerId);
-  }
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [initialData.map.height, initialData.map.width, isDragging, viewport.scale]);
 
   const selectedPreview = selectedFeature ? buildPreviewLines(selectedFeature) : null;
   const mapTransform = buildMapTransform(viewport, initialData.map.width, initialData.map.height);
@@ -317,50 +335,70 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
               <svg
                 viewBox={`0 0 ${initialData.map.width} ${initialData.map.height}`}
                 className={cn(
-                  "h-[76vh] min-h-[560px] w-full touch-none",
+                  "h-[82vh] min-h-[640px] w-full touch-none",
                   isDragging ? "cursor-grabbing" : "cursor-grab",
                 )}
                 onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
                 onPointerLeave={() => {
-                  dragStateRef.current = null;
-                  setIsDragging(false);
+                  if (!isDragging) {
+                    setHoverPreview(null);
+                  }
                 }}
                 onWheel={handleWheel}
               >
                 <g transform={mapTransform}>
                   {initialData.features.map((feature) => {
-                    const preview = buildPreviewLines(feature);
                     const isSelected = selectedFeature?.block === feature.block;
                     const isHovered = hoverPreview?.feature.block === feature.block;
+                    const showBlockLabel = viewport.scale >= BLOCK_LABEL_MIN_SCALE || isSelected || isHovered;
 
                     return (
-                      <path
-                        key={feature.block}
-                        d={feature.path}
-                        fill={getFeatureFill(feature, selectedFeature?.block ?? null, hoverPreview?.feature.block ?? null)}
-                        stroke={isSelected ? "hsl(152 62% 22%)" : isHovered ? "hsl(153 56% 28%)" : "rgba(15,23,42,0.24)"}
-                        strokeWidth={isSelected ? 3.2 : isHovered ? 2.4 : 1.2}
-                        className="transition-all duration-150"
-                        onClick={() => {
-                          if (suppressClickRef.current) {
-                            suppressClickRef.current = false;
-                            return;
-                          }
+                      <g key={feature.block}>
+                        <path
+                          d={feature.path}
+                          fill={getFeatureFill(feature, selectedFeature?.block ?? null, hoverPreview?.feature.block ?? null)}
+                          stroke={isSelected ? "hsl(152 62% 22%)" : isHovered ? "hsl(153 56% 28%)" : "rgba(15,23,42,0.24)"}
+                          strokeWidth={isSelected ? 3.2 : isHovered ? 2.4 : 1.2}
+                          className="transition-all duration-150"
+                          onClick={() => {
+                            if (suppressClickRef.current) {
+                              return;
+                            }
 
-                          setSelectedFeature(feature);
-                        }}
-                        onMouseEnter={(event) => updateHoverPreview(feature, event.clientX, event.clientY)}
-                        onMouseMove={(event) => updateHoverPreview(feature, event.clientX, event.clientY)}
-                        onMouseLeave={() => setHoverPreview((current) => (
-                          current?.feature.block === feature.block ? null : current
-                        ))}
-                      >
-                        <title>
-                          {`Bloque ${feature.block} | Area actual: ${preview.area} | Tallos ultimo ciclo: ${preview.stems}`}
-                        </title>
-                      </path>
+                            setSelectedFeature(feature);
+                          }}
+                          onMouseEnter={(event) => updateHoverPreview(feature, event.clientX, event.clientY)}
+                          onMouseMove={(event) => updateHoverPreview(feature, event.clientX, event.clientY)}
+                          onMouseLeave={() => setHoverPreview((current) => (
+                            current?.feature.block === feature.block ? null : current
+                          ))}
+                        />
+
+                        {showBlockLabel ? (
+                          <g className="pointer-events-none" transform={`translate(${feature.center[0]} ${feature.center[1]})`}>
+                            <rect
+                              x={-22}
+                              y={-11}
+                              width={44}
+                              height={22}
+                              rx={10}
+                              fill={isSelected ? "rgba(15,23,42,0.88)" : "rgba(255,255,255,0.92)"}
+                              stroke={isSelected ? "rgba(103,232,249,0.42)" : "rgba(15,23,42,0.14)"}
+                              strokeWidth={1}
+                            />
+                            <text
+                              x="0"
+                              y="4"
+                              fill={isSelected ? "white" : "rgba(15,23,42,0.92)"}
+                              fontSize={viewport.scale >= 2.2 ? "11" : "9.5"}
+                              fontWeight="700"
+                              textAnchor="middle"
+                            >
+                              {feature.block}
+                            </text>
+                          </g>
+                        ) : null}
+                      </g>
                     );
                   })}
 

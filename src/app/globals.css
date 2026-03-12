@@ -108,13 +108,15 @@
 
 .dashboard-scale-shell {
   zoom: var(--dashboard-scale);
-  transform-origin: top center;
+  transform-origin: top left;
+  width: calc(100% / var(--dashboard-scale));
+  min-height: calc(100vh / var(--dashboard-scale));
 }
 
 @supports not (zoom: 1) {
   .dashboard-scale-shell {
     transform: scale(var(--dashboard-scale));
-    width: calc(100% / var(--dashboard-scale));
+    transform-origin: top left;
   }
 }
 

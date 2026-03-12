@@ -104,6 +104,9 @@ function MetricPill({ label, value }: { label: string; value: string }) {
 
 export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashboardData }) {
   const [filters, setFilters] = useState<FenogramaFilters>(initialData.filters);
+  const [visibleWeeksInput, setVisibleWeeksInput] = useState(
+    String(initialData.filters.visibleWeeks),
+  );
   const [data, setData] = useState<FenogramaDashboardData>(initialData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,8 +160,28 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
     setFilters((current) => ({ ...current, [key]: value }));
   }
 
+  function commitVisibleWeeksInput(rawValue: string) {
+    const normalizedValue = rawValue.trim();
+
+    if (!normalizedValue) {
+      setVisibleWeeksInput(String(filters.visibleWeeks));
+      return;
+    }
+
+    const numericValue = Number(normalizedValue);
+
+    if (!Number.isFinite(numericValue) || numericValue < 0) {
+      setVisibleWeeksInput(String(filters.visibleWeeks));
+      return;
+    }
+
+    updateFilter("visibleWeeks", Math.trunc(numericValue));
+    setVisibleWeeksInput(String(Math.trunc(numericValue)));
+  }
+
   function resetFilters() {
     setFilters(initialData.filters);
+    setVisibleWeeksInput(String(initialData.filters.visibleWeeks));
   }
 
   return (
@@ -193,20 +216,25 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
             <SelectField id="fenograma-sp-type" label="SP" value={filters.spType} options={data.options.spTypes} onChange={(value) => updateFilter("spType", value)} />
             <div className="min-w-0 space-y-2">
               <Label htmlFor="fenograma-visible-weeks">Rango visible</Label>
-              <select
+              <input
                 id="fenograma-visible-weeks"
-                value={String(filters.visibleWeeks)}
-                onChange={(event) => updateFilter("visibleWeeks", Number(event.target.value))}
+                type="number"
+                min="0"
+                max="104"
+                inputMode="numeric"
+                value={visibleWeeksInput}
+                onChange={(event) => setVisibleWeeksInput(event.target.value)}
+                onBlur={(event) => commitVisibleWeeksInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    commitVisibleWeeksInput(visibleWeeksInput);
+                  }
+                }}
                 className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                <option value="12">12 semanas</option>
-                <option value="24">24 semanas</option>
-                <option value="36">36 semanas</option>
-                <option value="52">52 semanas</option>
-                <option value="0">Todo el rango</option>
-              </select>
+                placeholder="0 = todo el rango"
+              />
               <p className="text-xs text-muted-foreground">
-                Visible ahora: {data.summary.firstWeek ?? "-"} a {data.summary.lastWeek ?? "-"}
+                Escribe cuantas semanas quieres ver. Usa 0 para mostrar todo el rango. Visible ahora: {data.summary.firstWeek ?? "-"} a {data.summary.lastWeek ?? "-"}
               </p>
             </div>
             <div className="flex items-end">

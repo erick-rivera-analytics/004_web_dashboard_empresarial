@@ -8,8 +8,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { FenogramaDashboardData, FenogramaPivotRow } from "@/lib/fenograma";
 
+const SUMMARY_COLUMN_WIDTH = 220;
+
 const fixedColumns = [
-  { key: "block", label: "Bloque", width: 92, hideable: false },
+  { key: "block", label: "Bloque", width: 96, hideable: true },
   { key: "area", label: "Area", width: 110, hideable: true },
   { key: "variety", label: "Variedad", width: 156, hideable: true },
   { key: "spType", label: "SP", width: 92, hideable: true },
@@ -27,10 +29,12 @@ const groupOptions = [
 
 type FixedColumnKey = (typeof fixedColumns)[number]["key"];
 type GroupKey = (typeof groupOptions)[number]["key"];
+type VisibleFixedColumn = (typeof fixedColumns)[number] & { offset: number };
 
-type VisibleFixedColumn = (typeof fixedColumns)[number] & {
-  offset: number;
-};
+type TableEntry =
+  | { kind: "detail"; key: string; row: FenogramaPivotRow }
+  | { kind: "groupHeader"; key: string; label: string }
+  | { kind: "subtotal"; key: string; label: string; weekValues: Record<string, number | null> };
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -76,10 +80,7 @@ function getStickyStyle(offset: number, width: number) {
   };
 }
 
-function isLastFixedColumn(
-  key: FixedColumnKey,
-  visibleColumns: VisibleFixedColumn[],
-) {
+function isLastFixedColumn(key: FixedColumnKey, visibleColumns: VisibleFixedColumn[]) {
   return key === visibleColumns[visibleColumns.length - 1]?.key;
 }
 
@@ -97,18 +98,6 @@ function getFixedCellValue(row: FenogramaPivotRow, key: FixedColumnKey) {
   }
 
   return row[key] ?? "";
-}
-
-function getTotalLabel(key: FixedColumnKey) {
-  if (key === "block") {
-    return "Total";
-  }
-
-  if (key === "area") {
-    return "Semanal";
-  }
-
-  return "";
 }
 
 function lifecycleTone(status: FenogramaPivotRow["lifecycleStatus"]) {
@@ -139,40 +128,88 @@ function getGroupValue(row: FenogramaPivotRow, groupBy: GroupKey) {
   return row.spType || "Sin SP";
 }
 
-function buildGroupedRows(rows: FenogramaPivotRow[], groupBy: GroupKey) {
-  if (groupBy === "none") {
-    return rows.map((row) => ({ type: "row" as const, row }));
+function sortRows(left: FenogramaPivotRow, right: FenogramaPivotRow) {
+  const byArea = left.area.localeCompare(right.area, "en-US", { sensitivity: "base" });
+
+  if (byArea !== 0) {
+    return byArea;
   }
 
-  const sortedRows = [...rows].sort((left, right) => {
-    const leftGroup = getGroupValue(left, groupBy);
-    const rightGroup = getGroupValue(right, groupBy);
+  const byBlock = left.block.localeCompare(right.block, "en-US", { numeric: true });
 
-    if (leftGroup !== rightGroup) {
-      return leftGroup.localeCompare(rightGroup, "en-US", { sensitivity: "base" });
+  if (byBlock !== 0) {
+    return byBlock;
+  }
+
+  return left.cycleKey.localeCompare(right.cycleKey, "en-US", { numeric: true });
+}
+
+function summarizeRowsByWeeks(rows: FenogramaPivotRow[], weeks: string[]) {
+  return Object.fromEntries(
+    weeks.map((week) => [
+      week,
+      rows.reduce<number>((sum, row) => sum + (row.weekValues[week] ?? 0), 0),
+    ]),
+  ) as Record<string, number>;
+}
+
+function buildTableEntries(
+  rows: FenogramaPivotRow[],
+  groupBy: GroupKey,
+  showDetailRows: boolean,
+  weeks: string[],
+) {
+  const sortedRows = [...rows].sort(sortRows);
+
+  if (groupBy === "none") {
+    if (!showDetailRows) {
+      return [] as TableEntry[];
     }
 
-    return left.block.localeCompare(right.block, "en-US", { numeric: true });
-  });
+    return sortedRows.map((row) => ({
+      kind: "detail" as const,
+      key: row.id,
+      row,
+    }));
+  }
 
-  const result: Array<
-    | { type: "group"; value: string }
-    | { type: "row"; row: FenogramaPivotRow }
-  > = [];
-  let currentGroup = "";
+  const groupedRows = new Map<string, FenogramaPivotRow[]>();
 
   for (const row of sortedRows) {
     const groupValue = getGroupValue(row, groupBy);
-
-    if (groupValue !== currentGroup) {
-      currentGroup = groupValue;
-      result.push({ type: "group", value: currentGroup });
-    }
-
-    result.push({ type: "row", row });
+    const currentRows = groupedRows.get(groupValue) ?? [];
+    currentRows.push(row);
+    groupedRows.set(groupValue, currentRows);
   }
 
-  return result;
+  const entries: TableEntry[] = [];
+
+  for (const [groupValue, currentRows] of groupedRows.entries()) {
+    if (showDetailRows) {
+      entries.push({
+        kind: "groupHeader",
+        key: `group-${groupValue}`,
+        label: groupValue,
+      });
+
+      for (const row of currentRows) {
+        entries.push({
+          kind: "detail",
+          key: row.id,
+          row,
+        });
+      }
+    }
+
+    entries.push({
+      kind: "subtotal",
+      key: `subtotal-${groupValue}`,
+      label: `Subtotal ${groupOptions.find((option) => option.key === groupBy)?.label}: ${groupValue}`,
+      weekValues: summarizeRowsByWeeks(currentRows, weeks),
+    });
+  }
+
+  return entries;
 }
 
 export const FenogramaPivotTable = memo(function FenogramaPivotTable({
@@ -191,9 +228,11 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
     () => buildVisibleFixedColumns(new Set(visibleColumnKeys)),
     [visibleColumnKeys],
   );
-  const groupedRows = useMemo(
-    () => buildGroupedRows(data.rows, groupBy),
-    [data.rows, groupBy],
+  const showDetailRows = visibleColumns.length > 0;
+  const needsSummaryColumn = visibleColumns.length === 0;
+  const tableEntries = useMemo(
+    () => buildTableEntries(data.rows, groupBy, showDetailRows, data.weeks),
+    [data.rows, data.weeks, groupBy, showDetailRows],
   );
 
   function handleRowSelect(row: FenogramaPivotRow) {
@@ -205,22 +244,14 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
   }
 
   function toggleFixedColumn(columnKey: FixedColumnKey) {
-    const column = fixedColumns.find((item) => item.key === columnKey);
-
-    if (!column?.hideable) {
-      return;
-    }
-
     setVisibleColumnKeys((current) => {
-      const nextKeys = current.includes(columnKey)
-        ? current.filter((key) => key !== columnKey)
-        : fixedColumns
-          .map((item) => item.key)
-          .filter((key) => key === "block" || current.includes(key) || key === columnKey);
+      if (current.includes(columnKey)) {
+        return current.filter((key) => key !== columnKey);
+      }
 
       return fixedColumns
-        .map((item) => item.key)
-        .filter((key) => nextKeys.includes(key));
+        .map((column) => column.key)
+        .filter((key) => current.includes(key) || key === columnKey);
     });
   }
 
@@ -260,7 +291,6 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
                     variant={isVisible ? "secondary" : "outline"}
                     className="rounded-full"
                     onClick={() => toggleFixedColumn(column.key)}
-                    disabled={!column.hideable}
                   >
                     {column.label}
                   </Button>
@@ -272,7 +302,7 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
 
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline" className="rounded-full px-3 py-1">
-            {data.rows.length} filas visibles
+            {data.rows.length} filas base
           </Badge>
           <Badge variant="outline" className="rounded-full px-3 py-1">
             {visibleColumns.length} columnas fijas activas
@@ -286,6 +316,14 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
           <table className="min-w-full w-max border-separate border-spacing-0 text-sm">
             <thead className="sticky top-0 z-30 bg-card/95 backdrop-blur">
               <tr>
+                {needsSummaryColumn ? (
+                  <th
+                    className="sticky top-0 border-b border-r border-border/70 bg-card px-3 py-3 text-left font-semibold text-foreground"
+                    style={{ minWidth: `${SUMMARY_COLUMN_WIDTH}px`, width: `${SUMMARY_COLUMN_WIDTH}px` }}
+                  >
+                    Resumen
+                  </th>
+                ) : null}
                 {visibleColumns.map((column) => (
                   <th
                     key={column.key}
@@ -309,16 +347,46 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
               </tr>
             </thead>
             <tbody>
-              {groupedRows.map((entry, rowIndex) => {
-                if (entry.type === "group") {
+              {tableEntries.map((entry, rowIndex) => {
+                if (entry.kind === "groupHeader") {
                   return (
-                    <tr key={`group-${entry.value}`}>
+                    <tr key={entry.key}>
                       <td
                         colSpan={visibleColumns.length + data.weeks.length}
                         className="sticky top-[49px] z-20 border-b border-t border-border/60 bg-primary/8 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-primary backdrop-blur"
                       >
-                        {entry.value}
+                        {entry.label}
                       </td>
+                    </tr>
+                  );
+                }
+
+                if (entry.kind === "subtotal") {
+                  return (
+                    <tr key={entry.key} className="bg-primary/7">
+                      {needsSummaryColumn ? (
+                        <td
+                          className="border-b border-r border-border/60 px-3 py-2.5 font-semibold text-foreground"
+                          style={{ minWidth: `${SUMMARY_COLUMN_WIDTH}px`, width: `${SUMMARY_COLUMN_WIDTH}px` }}
+                        >
+                          {entry.label}
+                        </td>
+                      ) : (
+                        <td
+                          colSpan={visibleColumns.length}
+                          className="border-b border-r border-border/60 px-3 py-2.5 font-semibold text-foreground"
+                        >
+                          {entry.label}
+                        </td>
+                      )}
+                      {data.weeks.map((week) => (
+                        <td
+                          key={`${entry.key}-${week}`}
+                          className="border-b border-r border-border/60 px-3 py-2.5 text-right font-semibold tabular-nums text-foreground"
+                        >
+                          <div className="min-w-[92px]">{formatCellValue(entry.weekValues[week])}</div>
+                        </td>
+                      ))}
                     </tr>
                   );
                 }
@@ -327,7 +395,7 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
 
                 return (
                   <tr
-                    key={row.id}
+                    key={entry.key}
                     className={cn(
                       rowIndex % 2 === 0 ? "bg-background/84" : "bg-background/70",
                       lifecycleTone(row.lifecycleStatus),
@@ -382,7 +450,15 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
             </tbody>
             <tfoot className="sticky bottom-0 z-30 bg-card/96 backdrop-blur">
               <tr>
-                {visibleColumns.map((column) => (
+                {needsSummaryColumn ? (
+                  <td
+                    className="sticky bottom-0 border-t border-r border-border/70 bg-card px-3 py-3 text-left font-semibold text-foreground"
+                    style={{ minWidth: `${SUMMARY_COLUMN_WIDTH}px`, width: `${SUMMARY_COLUMN_WIDTH}px` }}
+                  >
+                    Total general
+                  </td>
+                ) : null}
+                {visibleColumns.map((column, index) => (
                   <td
                     key={`total-${column.key}`}
                     style={getStickyStyle(column.offset, column.width)}
@@ -391,7 +467,7 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
                       isLastFixedColumn(column.key, visibleColumns) && "shadow-[14px_0_20px_-16px_rgba(15,23,42,0.28)]",
                     )}
                   >
-                    {getTotalLabel(column.key)}
+                    {index === 0 ? "Total general" : ""}
                   </td>
                 ))}
                 {data.weeklyTotals.map((entry) => (
