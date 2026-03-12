@@ -1,0 +1,1234 @@
+import { getISOWeek, getISOWeekYear } from "date-fns";
+
+import { query } from "@/lib/db";
+import { cachedAsync } from "@/lib/server-cache";
+
+type FenogramaQueryRow = {
+  area: string | null;
+  block: string | null;
+  variety: string | null;
+  sp_type: string | null;
+  sp_date: string | null;
+  harvest_start_date: string | null;
+  harvest_end_date: string | null;
+  lifecycle_status: FenogramaLifecycle;
+  iso_week_id: string;
+  stems_count: number | string | null;
+};
+
+type FenogramaOptionsRow = {
+  areas: string[] | null;
+  varieties: string[] | null;
+  sp_types: string[] | null;
+};
+
+type CycleProfileQueryRow = {
+  record_id: string;
+  cycle_key: string;
+  valid_from: string | null;
+  valid_to: string | null;
+  is_current: boolean | null;
+  bed_count: string | number | null;
+  valve_count: string | number | null;
+  pambiles_count: string | number | null;
+  bed_area: number | string | null;
+  variety: string | null;
+  sp_type: string | null;
+  light_type: string | null;
+  greenhouse: boolean | null;
+  parent_block: string | null;
+  block_id: string | null;
+  is_valid: boolean | null;
+  change_reason: string | null;
+  programmed_plants: string | number | null;
+  cycle_start_plants: string | number | null;
+  plants_dead: string | number | null;
+  plants_reseeded: string | number | null;
+  plants_current: string | number | null;
+  mortality_period: string | number | null;
+  mortality_cumulative: string | number | null;
+};
+
+type BedProfileQueryRow = {
+  record_id: string;
+  bed_id: string;
+  cycle_key: string;
+  valve_id: string | null;
+  valid_from: string | null;
+  valid_to: string | null;
+  is_current: boolean | null;
+  length: number | string | null;
+  width: number | string | null;
+  pambiles_count: string | number | null;
+  variety: string | null;
+  sp_type: string | null;
+  attributes: string | null;
+  is_valid: boolean | null;
+  change_reason: string | null;
+  programmed_plants: string | number | null;
+  cycle_start_plants: string | number | null;
+  plants_dead: string | number | null;
+  plants_reseeded: string | number | null;
+  plants_current: string | number | null;
+  mortality_period: string | number | null;
+  mortality_cumulative: string | number | null;
+};
+
+type BedProfileBaseQueryRow = {
+  record_id: string;
+  bed_id: string;
+  cycle_key: string;
+  valve_id: string | null;
+  valid_from: string | null;
+  valid_to: string | null;
+  is_current: boolean | null;
+  length: number | string | null;
+  width: number | string | null;
+  pambiles_count: string | number | null;
+  variety: string | null;
+  sp_type: string | null;
+  attributes: string | null;
+  is_valid: boolean | null;
+  change_reason: string | null;
+};
+
+type BedPlantsQueryRow = {
+  bed_id: string;
+  programmed_plants: string | number | null;
+  cycle_start_plants: string | number | null;
+  plants_dead: string | number | null;
+  plants_reseeded: string | number | null;
+  plants_current: string | number | null;
+  mortality_period: string | number | null;
+  mortality_cumulative: string | number | null;
+};
+
+type ValveProfileQueryRow = {
+  record_id: string;
+  valve_id: string;
+  cycle_key: string;
+  block_id: string | null;
+  valid_from: string | null;
+  valid_to: string | null;
+  is_current: boolean | null;
+  attributes: string | null;
+  is_valid: boolean | null;
+  change_reason: string | null;
+  programmed_plants: string | number | null;
+  cycle_start_plants: string | number | null;
+  plants_dead: string | number | null;
+  plants_reseeded: string | number | null;
+  plants_current: string | number | null;
+  mortality_period: string | number | null;
+  mortality_cumulative: string | number | null;
+};
+
+type BlockModalRowQueryRow = {
+  parent_block: string | null;
+  area: string | null;
+  variety: string | null;
+  sp_type: string | null;
+  sp_date: string | null;
+  harvest_start_date: string | null;
+  harvest_end_date: string | null;
+  total_stems: number | string | null;
+};
+
+export type FenogramaLifecycle = "active" | "planned" | "history";
+
+export type FenogramaFilters = {
+  includeActive: boolean;
+  includePlanned: boolean;
+  includeHistory: boolean;
+  area: string;
+  variety: string;
+  spType: string;
+};
+
+export type BlockModalRow = {
+  block: string;
+  area: string;
+  variety: string;
+  spType: string;
+  spDate: string | null;
+  harvestStartDate: string | null;
+  harvestEndDate: string | null;
+  totalStems: number;
+};
+
+export type FenogramaPivotRow = {
+  id: string;
+  block: string;
+  area: string;
+  variety: string;
+  spType: string;
+  spDate: string | null;
+  harvestStartDate: string | null;
+  harvestEndDate: string | null;
+  lifecycleStatus: FenogramaLifecycle;
+  totalStems: number;
+  weekValues: Record<string, number | null>;
+};
+
+export type FenogramaWeeklyTotal = {
+  week: string;
+  stems: number;
+};
+
+export type FenogramaFilterOptions = {
+  areas: string[];
+  varieties: string[];
+  spTypes: string[];
+};
+
+export type FenogramaDashboardData = {
+  generatedAt: string;
+  today: string;
+  filters: FenogramaFilters;
+  options: FenogramaFilterOptions;
+  weeks: string[];
+  rows: FenogramaPivotRow[];
+  weeklyTotals: FenogramaWeeklyTotal[];
+  summary: {
+    rowCount: number;
+    weekCount: number;
+    totalRecords: number;
+    totalStems: number;
+    firstWeek: string | null;
+    lastWeek: string | null;
+    activeRows: number;
+    plannedRows: number;
+    historyRows: number;
+  };
+};
+
+export type CycleProfileCard = {
+  recordId: string;
+  cycleKey: string;
+  validFrom: string | null;
+  validTo: string | null;
+  isCurrent: boolean;
+  isValid: boolean;
+  bedCount: number | null;
+  valveCount: number | null;
+  pambilesCount: number | null;
+  bedArea: number | null;
+  variety: string;
+  spType: string;
+  lightType: string;
+  greenhouse: boolean;
+  parentBlock: string;
+  blockId: string;
+  changeReason: string;
+  programmedPlants: number | null;
+  cycleStartPlants: number | null;
+  deadPlants: number | null;
+  reseededPlants: number | null;
+  currentPlants: number | null;
+  mortalityPeriodPct: number | null;
+  mortalityCumulativePct: number | null;
+};
+
+export type CycleProfileBlockPayload = {
+  parentBlock: string;
+  generatedAt: string;
+  summary: {
+    totalCycles: number;
+    currentCycles: number;
+    validCycles: number;
+    varieties: string[];
+    spTypes: string[];
+  };
+  cycles: CycleProfileCard[];
+};
+
+export type BedProfileCard = {
+  recordId: string;
+  bedId: string;
+  cycleKey: string;
+  valveId: string;
+  validFrom: string | null;
+  validTo: string | null;
+  isCurrent: boolean;
+  isValid: boolean;
+  length: number | null;
+  width: number | null;
+  bedArea: number | null;
+  pambilesCount: number | null;
+  variety: string;
+  spType: string;
+  changeReason: string;
+  programmedPlants: number | null;
+  cycleStartPlants: number | null;
+  deadPlants: number | null;
+  reseededPlants: number | null;
+  currentPlants: number | null;
+  mortalityPeriodPct: number | null;
+  mortalityCumulativePct: number | null;
+};
+
+export type BedProfilePayload = {
+  cycleKey: string;
+  generatedAt: string;
+  summary: {
+    totalBeds: number;
+    currentBeds: number;
+    validBeds: number;
+    totalProgrammedPlants: number;
+    totalCycleStartPlants: number;
+    totalCurrentPlants: number;
+    totalBedArea: number;
+  };
+  beds: BedProfileCard[];
+};
+
+export type ValveProfileCard = {
+  recordId: string;
+  valveId: string;
+  valveName: string;
+  cycleKey: string;
+  blockId: string;
+  parentBlock: string;
+  status: string;
+  bedCount: number | null;
+  validFrom: string | null;
+  validTo: string | null;
+  isCurrent: boolean;
+  isValid: boolean;
+  changeReason: string;
+  programmedPlants: number | null;
+  cycleStartPlants: number | null;
+  deadPlants: number | null;
+  reseededPlants: number | null;
+  currentPlants: number | null;
+  mortalityPeriodPct: number | null;
+  mortalityCumulativePct: number | null;
+};
+
+export type ValveProfilePayload = {
+  cycleKey: string;
+  valveId: string;
+  generatedAt: string;
+  valve: ValveProfileCard | null;
+  summary: {
+    totalBeds: number;
+    currentBeds: number;
+    validBeds: number;
+    totalProgrammedPlants: number;
+    totalCycleStartPlants: number;
+    totalCurrentPlants: number;
+  };
+  beds: BedProfileCard[];
+};
+
+export const defaultFenogramaFilters: FenogramaFilters = {
+  includeActive: true,
+  includePlanned: true,
+  includeHistory: false,
+  area: "all",
+  variety: "all",
+  spType: "all",
+};
+
+const AREA_SQL = `
+  case
+    when nullif(parent_block, '') is not null
+      and position(concat('-', nullif(parent_block, ''), '-') in coalesce(cycle_key, '')) > 0
+      then nullif(split_part(coalesce(cycle_key, ''), concat('-', nullif(parent_block, ''), '-'), 1), '')
+    else nullif(split_part(coalesce(cycle_key, ''), '-', 1), '')
+  end
+`;
+
+const FENOGRAMA_OPTIONS_QUERY = `
+  select
+    array(
+      select distinct area_value
+      from (
+        select ${AREA_SQL} as area_value
+        from gld.vw_prod_fenograma_cur
+      ) areas
+      where area_value is not null
+      order by area_value
+    ) as areas,
+    array(
+      select distinct variety_value
+      from (
+        select nullif(variety, '') as variety_value
+        from gld.vw_prod_fenograma_cur
+      ) varieties
+      where variety_value is not null
+      order by variety_value
+    ) as varieties,
+    array(
+      select distinct sp_type_value
+      from (
+        select nullif(sp_type, '') as sp_type_value
+        from gld.vw_prod_fenograma_cur
+      ) sp_types
+      where sp_type_value is not null
+      order by sp_type_value
+    ) as sp_types
+`;
+
+const DEFAULT_VISIBLE_WEEKS = 24;
+const FENOGRAMA_OPTIONS_TTL_MS = 5 * 60 * 1000;
+const FENOGRAMA_DASHBOARD_TTL_MS = 30 * 1000;
+const FENOGRAMA_BLOCK_TTL_MS = 60 * 1000;
+const FENOGRAMA_BEDS_TTL_MS = 60 * 1000;
+const FENOGRAMA_VALVE_TTL_MS = 60 * 1000;
+
+function cleanText(value: string | null) {
+  return value?.trim() ?? "";
+}
+
+function parseBoolean(value: string | boolean | undefined, fallback: boolean) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  return fallback;
+}
+
+function parseSelectValue(value: string | undefined) {
+  if (!value || value === "all") {
+    return "all";
+  }
+
+  return value;
+}
+
+function roundValue(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function toNumber(value: string | number | null) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+function sumNumbers(values: Array<number | null | undefined>) {
+  return roundValue(values.reduce<number>((sum, value) => sum + (value ?? 0), 0));
+}
+
+function toPercent(value: string | number | null) {
+  const numericValue = toNumber(value);
+
+  if (numericValue === null) {
+    return null;
+  }
+
+  return roundValue(numericValue * 100);
+}
+
+function formatToday() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function serializeFilters(filters: FenogramaFilters) {
+  return [
+    filters.includeActive ? "1" : "0",
+    filters.includePlanned ? "1" : "0",
+    filters.includeHistory ? "1" : "0",
+    filters.area,
+    filters.variety,
+    filters.spType,
+  ].join("|");
+}
+
+function getCurrentIsoWeekId() {
+  const today = new Date();
+  const isoYear = String(getISOWeekYear(today)).slice(-2);
+  const isoWeek = String(getISOWeek(today)).padStart(2, "0");
+  return `${isoYear}${isoWeek}`;
+}
+
+function shouldUseCurrentWeekWindow(filters: FenogramaFilters) {
+  return (
+    filters.includeActive
+    && filters.includePlanned
+    && !filters.includeHistory
+    && filters.area === "all"
+    && filters.variety === "all"
+    && filters.spType === "all"
+  );
+}
+
+function getVisibleWeekLimit(filters: FenogramaFilters) {
+  return shouldUseCurrentWeekWindow(filters) ? DEFAULT_VISIBLE_WEEKS : null;
+}
+
+function buildVisibleWeeks(allWeeks: string[], filters: FenogramaFilters) {
+  const visibleWeekLimit = getVisibleWeekLimit(filters);
+
+  if (!visibleWeekLimit) {
+    return allWeeks;
+  }
+
+  const currentIsoWeekId = getCurrentIsoWeekId();
+  const visibleWeeks = allWeeks
+    .filter((week) => Number(week) >= Number(currentIsoWeekId))
+    .slice(0, visibleWeekLimit);
+
+  if (visibleWeeks.length) {
+    return visibleWeeks;
+  }
+
+  return allWeeks.slice(-visibleWeekLimit);
+}
+
+function buildRowKey(
+  row: Pick<
+    FenogramaPivotRow,
+    "block" | "area" | "variety" | "spType" | "spDate" | "harvestStartDate" | "harvestEndDate"
+  >,
+) {
+  return [
+    row.block,
+    row.area,
+    row.variety,
+    row.spType,
+    row.spDate ?? "",
+    row.harvestStartDate ?? "",
+    row.harvestEndDate ?? "",
+  ].join("|");
+}
+
+function buildBlockModalRow(row: BlockModalRowQueryRow | null | undefined) {
+  const parentBlock = cleanText(row?.parent_block ?? null);
+
+  if (!parentBlock) {
+    return null;
+  }
+
+  return {
+    block: parentBlock,
+    area: cleanText(row?.area ?? null),
+    variety: cleanText(row?.variety ?? null),
+    spType: cleanText(row?.sp_type ?? null),
+    spDate: row?.sp_date ?? null,
+    harvestStartDate: row?.harvest_start_date ?? null,
+    harvestEndDate: row?.harvest_end_date ?? null,
+    totalStems: roundValue(toNumber(row?.total_stems ?? null) ?? 0),
+  } satisfies BlockModalRow;
+}
+
+function normalizeAttributes(attributes: string | null) {
+  if (!attributes) {
+    return {} as Record<string, string>;
+  }
+
+  try {
+    const parsed = JSON.parse(attributes) as Record<string, unknown>;
+
+    return Object.fromEntries(
+      Object.entries(parsed).map(([key, value]) => [key, String(value ?? "")]),
+    );
+  } catch {
+    return {} as Record<string, string>;
+  }
+}
+
+function toBedArea(attributes: Record<string, string>) {
+  return toNumber(attributes.bed_area ?? null);
+}
+
+function mapBedProfileRow(row: BedProfileQueryRow): BedProfileCard {
+  const attributes = normalizeAttributes(row.attributes);
+
+  return {
+    recordId: row.record_id,
+    bedId: row.bed_id,
+    cycleKey: row.cycle_key,
+    valveId: cleanText(row.valve_id),
+    validFrom: row.valid_from,
+    validTo: row.valid_to,
+    isCurrent: Boolean(row.is_current),
+    isValid: row.is_valid !== false,
+    length: toNumber(row.length),
+    width: toNumber(row.width),
+    bedArea: toBedArea(attributes),
+    pambilesCount: toNumber(row.pambiles_count),
+    variety: cleanText(row.variety),
+    spType: cleanText(row.sp_type),
+    changeReason: cleanText(row.change_reason),
+    programmedPlants: toNumber(row.programmed_plants),
+    cycleStartPlants: toNumber(row.cycle_start_plants),
+    deadPlants: toNumber(row.plants_dead),
+    reseededPlants: toNumber(row.plants_reseeded),
+    currentPlants: toNumber(row.plants_current),
+    mortalityPeriodPct: toPercent(row.mortality_period),
+    mortalityCumulativePct: toPercent(row.mortality_cumulative),
+  };
+}
+
+function summarizeBeds(beds: BedProfileCard[]) {
+  return {
+    totalBeds: beds.length,
+    currentBeds: beds.filter((bed) => bed.isCurrent).length,
+    validBeds: beds.filter((bed) => bed.isValid).length,
+    totalProgrammedPlants: sumNumbers(beds.map((bed) => bed.programmedPlants)),
+    totalCycleStartPlants: sumNumbers(beds.map((bed) => bed.cycleStartPlants)),
+    totalCurrentPlants: sumNumbers(beds.map((bed) => bed.currentPlants)),
+    totalBedArea: sumNumbers(beds.map((bed) => bed.bedArea)),
+  };
+}
+
+async function loadFenogramaFilterOptions(): Promise<FenogramaFilterOptions> {
+  const result = await query<FenogramaOptionsRow>(FENOGRAMA_OPTIONS_QUERY);
+  const row = result.rows[0];
+
+  return {
+    areas: row?.areas ?? [],
+    varieties: row?.varieties ?? [],
+    spTypes: row?.sp_types ?? [],
+  };
+}
+
+async function getFenogramaFilterOptions(): Promise<FenogramaFilterOptions> {
+  return cachedAsync("fenograma:options", FENOGRAMA_OPTIONS_TTL_MS, loadFenogramaFilterOptions);
+}
+
+function mergeBedProfileRows(
+  baseRows: BedProfileBaseQueryRow[],
+  plantRowsByBedId: Map<string, BedPlantsQueryRow>,
+) {
+  return baseRows.map((row) => {
+    const plants = plantRowsByBedId.get(row.bed_id);
+
+    return mapBedProfileRow({
+      ...row,
+      programmed_plants: plants?.programmed_plants ?? null,
+      cycle_start_plants: plants?.cycle_start_plants ?? null,
+      plants_dead: plants?.plants_dead ?? null,
+      plants_reseeded: plants?.plants_reseeded ?? null,
+      plants_current: plants?.plants_current ?? null,
+      mortality_period: plants?.mortality_period ?? null,
+      mortality_cumulative: plants?.mortality_cumulative ?? null,
+    });
+  });
+}
+
+async function getBedProfiles(
+  cycleKey: string,
+  valveId?: string,
+) {
+  const baseValues = valveId ? [cycleKey, valveId] : [cycleKey];
+  const baseWhereClause = valveId ? "where bp.cycle_key = $1 and bp.valve_id = $2" : "where bp.cycle_key = $1";
+  const baseResult = await query<BedProfileBaseQueryRow>(
+    `
+      select
+        bp.record_id,
+        bp.bed_id,
+        bp.cycle_key,
+        bp.valve_id,
+        to_char(bp.valid_from, 'YYYY-MM-DD') as valid_from,
+        to_char(bp.valid_to, 'YYYY-MM-DD') as valid_to,
+        bp.is_current,
+        bp.length,
+        bp.width,
+        bp.pambiles_count,
+        bp.variety,
+        bp.sp_type,
+        bp.attributes,
+        bp.is_valid,
+        bp.change_reason
+      from slv.camp_dim_bed_profile_scd2 bp
+      ${baseWhereClause}
+      order by
+        bp.is_current desc,
+        bp.valid_from desc nulls last,
+        bp.bed_id asc
+    `,
+    baseValues,
+  );
+
+  if (!baseResult.rows.length) {
+    return [] as BedProfileCard[];
+  }
+
+  const bedIds = Array.from(new Set(baseResult.rows.map((row) => row.bed_id).filter(Boolean)));
+  const plantsResult = await query<BedPlantsQueryRow>(
+    `
+      select distinct on (bed_id)
+        bed_id,
+        initial_plants as programmed_plants,
+        initial_plants_cycle as cycle_start_plants,
+        dead_plants_count as plants_dead,
+        reseed_plants_count as plants_reseeded,
+        final_plants_count as plants_current,
+        mortality as mortality_period,
+        cumulative_mortality as mortality_cumulative
+      from gld.vw_camp_kardex_bed_plants_cur
+      where cycle_key = $1
+        and bed_id = any($2::text[])
+      order by
+        bed_id,
+        valid_from desc nulls last
+    `,
+    [cycleKey, bedIds],
+  );
+
+  const plantsByBedId = new Map(
+    plantsResult.rows.map((row) => [row.bed_id, row] as const),
+  );
+
+  return mergeBedProfileRows(baseResult.rows, plantsByBedId);
+}
+
+export function normalizeFenogramaFilters(
+  input: Partial<Record<keyof FenogramaFilters, string | boolean | undefined>> = {},
+): FenogramaFilters {
+  return {
+    includeActive: parseBoolean(input.includeActive, defaultFenogramaFilters.includeActive),
+    includePlanned: parseBoolean(input.includePlanned, defaultFenogramaFilters.includePlanned),
+    includeHistory: parseBoolean(input.includeHistory, defaultFenogramaFilters.includeHistory),
+    area: parseSelectValue(typeof input.area === "string" ? input.area : undefined),
+    variety: parseSelectValue(typeof input.variety === "string" ? input.variety : undefined),
+    spType: parseSelectValue(typeof input.spType === "string" ? input.spType : undefined),
+  };
+}
+
+function buildWhereClause(filters: FenogramaFilters) {
+  const conditions: string[] = [];
+  const values: unknown[] = [];
+  const statusConditions: string[] = [];
+
+  if (filters.includePlanned) {
+    statusConditions.push("sp_date >= current_date");
+  }
+
+  if (filters.includeActive) {
+    statusConditions.push(
+      "(sp_date < current_date and coalesce(harvest_end_date, harvest_start_date, sp_date) >= current_date)",
+    );
+  }
+
+  if (filters.includeHistory) {
+    statusConditions.push(
+      "coalesce(harvest_end_date, harvest_start_date, sp_date) < current_date",
+    );
+  }
+
+  if (statusConditions.length) {
+    conditions.push(`(${statusConditions.join(" or ")})`);
+  } else {
+    conditions.push("1 = 0");
+  }
+
+  if (filters.area !== "all") {
+    values.push(filters.area);
+    conditions.push(`${AREA_SQL} = $${values.length}`);
+  }
+
+  if (filters.variety !== "all") {
+    values.push(filters.variety);
+    conditions.push(`nullif(variety, '') = $${values.length}`);
+  }
+
+  if (filters.spType !== "all") {
+    values.push(filters.spType);
+    conditions.push(`nullif(sp_type, '') = $${values.length}`);
+  }
+
+  return {
+    whereClause: `where ${conditions.join(" and ")}`,
+    values,
+  };
+}
+
+export async function getFenogramaDashboardData(
+  rawFilters: Partial<Record<keyof FenogramaFilters, string | boolean | undefined>> = {},
+): Promise<FenogramaDashboardData> {
+  const filters = normalizeFenogramaFilters(rawFilters);
+  return cachedAsync(
+    `fenograma:dashboard:${serializeFilters(filters)}`,
+    FENOGRAMA_DASHBOARD_TTL_MS,
+    async () => {
+      const { whereClause, values } = buildWhereClause(filters);
+      const optionsPromise = getFenogramaFilterOptions();
+      const result = await query<FenogramaQueryRow>(
+        `
+          with filtered as (
+            select
+              ${AREA_SQL} as area,
+              nullif(parent_block, '') as block,
+              nullif(variety, '') as variety,
+              nullif(sp_type, '') as sp_type,
+              to_char(sp_date, 'YYYY-MM-DD') as sp_date,
+              to_char(harvest_start_date, 'YYYY-MM-DD') as harvest_start_date,
+              to_char(harvest_end_date, 'YYYY-MM-DD') as harvest_end_date,
+              case
+                when sp_date >= current_date then 'planned'
+                when coalesce(harvest_end_date, harvest_start_date, sp_date) >= current_date then 'active'
+                else 'history'
+              end as lifecycle_status,
+              iso_week_id,
+              coalesce(stems_count, 0) as stems_count
+            from gld.vw_prod_fenograma_cur
+            ${whereClause}
+          )
+          select
+            area,
+            block,
+            variety,
+            sp_type,
+            sp_date,
+            harvest_start_date,
+            harvest_end_date,
+            lifecycle_status,
+            iso_week_id,
+            sum(stems_count) as stems_count
+          from filtered
+          group by 1, 2, 3, 4, 5, 6, 7, 8, 9
+          order by
+            harvest_start_date asc nulls last,
+            sp_date asc nulls last,
+            area asc nulls last,
+            block asc nulls last,
+            variety asc nulls last,
+            sp_type asc nulls last,
+            iso_week_id asc
+        `,
+        values,
+      );
+
+      const options = await optionsPromise;
+      const weeksSet = new Set<string>();
+      const rowsMap = new Map<string, FenogramaPivotRow>();
+      const weeklyTotalsMap = new Map<string, number>();
+
+      for (const entry of result.rows) {
+        const isoWeek = cleanText(entry.iso_week_id);
+
+        if (!isoWeek) {
+          continue;
+        }
+
+        const stemsCount = roundValue(Number(entry.stems_count ?? 0));
+        const normalizedRow: Omit<FenogramaPivotRow, "id" | "totalStems" | "weekValues"> = {
+          block: cleanText(entry.block),
+          area: cleanText(entry.area),
+          variety: cleanText(entry.variety),
+          spType: cleanText(entry.sp_type),
+          spDate: entry.sp_date,
+          harvestStartDate: entry.harvest_start_date,
+          harvestEndDate: entry.harvest_end_date,
+          lifecycleStatus: entry.lifecycle_status,
+        };
+        const rowKey = buildRowKey(normalizedRow);
+
+        weeksSet.add(isoWeek);
+        weeklyTotalsMap.set(isoWeek, roundValue((weeklyTotalsMap.get(isoWeek) ?? 0) + stemsCount));
+
+        if (!rowsMap.has(rowKey)) {
+          rowsMap.set(rowKey, {
+            id: rowKey,
+            ...normalizedRow,
+            totalStems: 0,
+            weekValues: {},
+          });
+        }
+
+        const currentRow = rowsMap.get(rowKey)!;
+        const currentWeekValue = currentRow.weekValues[isoWeek] ?? 0;
+        currentRow.weekValues[isoWeek] = roundValue(currentWeekValue + stemsCount);
+      }
+
+      const allWeeks = Array.from(weeksSet).sort((left, right) => Number(left) - Number(right));
+      const weeks = buildVisibleWeeks(allWeeks, filters);
+      const visibleWeekLimit = getVisibleWeekLimit(filters);
+      const rows = Array.from(rowsMap.values())
+        .map((row) => {
+          const visibleWeekValues = Object.fromEntries(
+            weeks.map((week) => [week, row.weekValues[week] ?? null]),
+          ) as Record<string, number | null>;
+          const totalStems = sumNumbers(weeks.map((week) => visibleWeekValues[week]));
+
+          return {
+            ...row,
+            totalStems,
+            weekValues: visibleWeekValues,
+          };
+        })
+        .filter((row) => !visibleWeekLimit || row.totalStems > 0);
+      const weeklyTotals = weeks.map((week) => ({
+        week,
+        stems: roundValue(weeklyTotalsMap.get(week) ?? 0),
+      }));
+      const activeRows = rows.filter((row) => row.lifecycleStatus === "active").length;
+      const plannedRows = rows.filter((row) => row.lifecycleStatus === "planned").length;
+      const historyRows = rows.filter((row) => row.lifecycleStatus === "history").length;
+
+      return {
+        generatedAt: new Date().toISOString(),
+        today: formatToday(),
+        filters,
+        options,
+        weeks,
+        rows,
+        weeklyTotals,
+        summary: {
+          rowCount: rows.length,
+          weekCount: weeks.length,
+          totalRecords: result.rowCount ?? result.rows.length,
+          totalStems: sumNumbers(weeklyTotals.map((entry) => entry.stems)),
+          firstWeek: weeks[0] ?? null,
+          lastWeek: weeks.length ? weeks[weeks.length - 1] : null,
+          activeRows,
+          plannedRows,
+          historyRows,
+        },
+      };
+    },
+  );
+}
+
+export async function getBlockModalRowsByParentBlocks(parentBlocks: string[]) {
+  const normalizedBlocks = Array.from(
+    new Set(parentBlocks.map((parentBlock) => cleanText(parentBlock)).filter(Boolean)),
+  );
+
+  if (!normalizedBlocks.length) {
+    return {} as Record<string, BlockModalRow>;
+  }
+
+  const result = await query<BlockModalRowQueryRow>(
+    `
+      with ranked as (
+        select
+          nullif(parent_block, '') as parent_block,
+          ${AREA_SQL} as area,
+          nullif(variety, '') as variety,
+          nullif(sp_type, '') as sp_type,
+          to_char(sp_date, 'YYYY-MM-DD') as sp_date,
+          to_char(harvest_start_date, 'YYYY-MM-DD') as harvest_start_date,
+          to_char(harvest_end_date, 'YYYY-MM-DD') as harvest_end_date,
+          sum(coalesce(stems_count, 0)) over (partition by parent_block) as total_stems,
+          row_number() over (
+            partition by parent_block
+            order by
+              case
+                when sp_date < current_date
+                  and coalesce(harvest_end_date, harvest_start_date, sp_date) >= current_date
+                  then 0
+                when sp_date >= current_date then 1
+                else 2
+              end,
+              coalesce(harvest_end_date, harvest_start_date, sp_date) desc nulls last,
+              sp_date desc nulls last,
+              nullif(variety, '') asc nulls last,
+              nullif(sp_type, '') asc nulls last
+          ) as rn
+        from gld.vw_prod_fenograma_cur
+        where nullif(parent_block, '') = any($1::text[])
+      )
+      select
+        parent_block,
+        area,
+        variety,
+        sp_type,
+        sp_date,
+        harvest_start_date,
+        harvest_end_date,
+        total_stems
+      from ranked
+      where rn = 1
+    `,
+    [normalizedBlocks],
+  );
+
+  const rowsByParentBlock = Object.fromEntries(
+    result.rows
+      .map((row) => buildBlockModalRow(row))
+      .filter((row): row is BlockModalRow => Boolean(row))
+      .map((row) => [row.block, row]),
+  ) as Record<string, BlockModalRow>;
+
+  const missingBlocks = normalizedBlocks.filter((parentBlock) => !rowsByParentBlock[parentBlock]);
+
+  if (!missingBlocks.length) {
+    return rowsByParentBlock;
+  }
+
+  const fallbackResult = await query<BlockModalRowQueryRow>(
+    `
+      with ranked as (
+        select
+          nullif(bp.parent_block, '') as parent_block,
+          nullif(bp.area_id, '') as area,
+          nullif(cp.variety, '') as variety,
+          nullif(cp.sp_type, '') as sp_type,
+          to_char(bp.valid_from, 'YYYY-MM-DD') as sp_date,
+          nullif(bp.attributes::jsonb ->> 'projected_harvest_start_date', 'NaT') as harvest_start_date,
+          nullif(bp.attributes::jsonb ->> 'projected_harvest_end_date', 'NaT') as harvest_end_date,
+          0::numeric as total_stems,
+          row_number() over (
+            partition by bp.parent_block
+            order by
+              bp.is_current desc,
+              bp.valid_from desc nulls last,
+              bp.block_id asc
+          ) as rn
+        from slv.camp_dim_block_profile_scd2 bp
+        left join slv.camp_dim_cycle_profile_scd2 cp
+          on cp.cycle_key = bp.cycle_key
+        where nullif(bp.parent_block, '') = any($1::text[])
+      )
+      select
+        parent_block,
+        area,
+        variety,
+        sp_type,
+        sp_date,
+        harvest_start_date,
+        harvest_end_date,
+        total_stems
+      from ranked
+      where rn = 1
+    `,
+    [missingBlocks],
+  );
+
+  for (const row of fallbackResult.rows) {
+    const blockRow = buildBlockModalRow(row);
+
+    if (blockRow) {
+      rowsByParentBlock[blockRow.block] = blockRow;
+    }
+  }
+
+  return rowsByParentBlock;
+}
+
+export async function getCycleProfilesByBlock(
+  parentBlock: string,
+): Promise<CycleProfileBlockPayload> {
+  const normalizedBlock = parentBlock.trim();
+  return cachedAsync(`fenograma:block:${normalizedBlock}`, FENOGRAMA_BLOCK_TTL_MS, async () => {
+    const result = await query<CycleProfileQueryRow>(
+      `
+        select
+          cp.record_id,
+          cp.cycle_key,
+          to_char(cp.valid_from, 'YYYY-MM-DD') as valid_from,
+          to_char(cp.valid_to, 'YYYY-MM-DD') as valid_to,
+          cp.is_current,
+          cp.bed_count,
+          valves.valve_count,
+          cp.pambiles_count,
+          cp.bed_area,
+          cp.variety,
+          cp.sp_type,
+          cp.light_type,
+          cp.greenhouse,
+          cp.parent_block,
+          cp.block_id,
+          cp.is_valid,
+          cp.change_reason,
+          plants.programmed_plants,
+          plants.cycle_start_plants,
+          plants.plants_dead,
+          plants.plants_reseeded,
+          plants.plants_current,
+          plants.mortality_period,
+          plants.mortality_cumulative
+        from slv.camp_dim_cycle_profile_scd2 cp
+        left join lateral (
+          select
+            count(distinct valve_id) as valve_count
+          from slv.camp_dim_valve_profile_scd2
+          where cycle_key = cp.cycle_key
+        ) valves on true
+        left join lateral (
+          select
+            initial_plants as programmed_plants,
+            initial_plants_cycle as cycle_start_plants,
+            dead_plants_count as plants_dead,
+            reseed_plants_count as plants_reseeded,
+            final_plants_count as plants_current,
+            mortality as mortality_period,
+            cumulative_mortality as mortality_cumulative
+          from gld.vw_camp_kardex_cycle_plants_cur
+          where cycle_key = cp.cycle_key
+          order by valid_from desc nulls last
+          limit 1
+        ) plants on true
+        where cp.parent_block = $1
+        order by
+          cp.is_current desc,
+          cp.valid_from desc nulls last,
+          cp.cycle_key asc
+      `,
+      [normalizedBlock],
+    );
+
+    const cycles = result.rows.map((row) => ({
+      recordId: row.record_id,
+      cycleKey: row.cycle_key,
+      validFrom: row.valid_from,
+      validTo: row.valid_to,
+      isCurrent: Boolean(row.is_current),
+      isValid: row.is_valid !== false,
+      bedCount: toNumber(row.bed_count),
+      valveCount: toNumber(row.valve_count),
+      pambilesCount: toNumber(row.pambiles_count),
+      bedArea: toNumber(row.bed_area),
+      variety: cleanText(row.variety),
+      spType: cleanText(row.sp_type),
+      lightType: cleanText(row.light_type),
+      greenhouse: Boolean(row.greenhouse),
+      parentBlock: cleanText(row.parent_block),
+      blockId: cleanText(row.block_id),
+      changeReason: cleanText(row.change_reason),
+      programmedPlants: toNumber(row.programmed_plants),
+      cycleStartPlants: toNumber(row.cycle_start_plants),
+      deadPlants: toNumber(row.plants_dead),
+      reseededPlants: toNumber(row.plants_reseeded),
+      currentPlants: toNumber(row.plants_current),
+      mortalityPeriodPct: toPercent(row.mortality_period),
+      mortalityCumulativePct: toPercent(row.mortality_cumulative),
+    }));
+
+    return {
+      parentBlock: normalizedBlock,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalCycles: cycles.length,
+        currentCycles: cycles.filter((cycle) => cycle.isCurrent).length,
+        validCycles: cycles.filter((cycle) => cycle.isValid).length,
+        varieties: Array.from(new Set(cycles.map((cycle) => cycle.variety).filter(Boolean))).sort(),
+        spTypes: Array.from(new Set(cycles.map((cycle) => cycle.spType).filter(Boolean))).sort(),
+      },
+      cycles,
+    };
+  });
+}
+
+export async function getBedProfilesByCycleKey(
+  cycleKey: string,
+): Promise<BedProfilePayload> {
+  const normalizedCycleKey = cycleKey.trim();
+  return cachedAsync(`fenograma:beds:${normalizedCycleKey}`, FENOGRAMA_BEDS_TTL_MS, async () => {
+    const beds = await getBedProfiles(normalizedCycleKey);
+
+    return {
+      cycleKey: normalizedCycleKey,
+      generatedAt: new Date().toISOString(),
+      summary: summarizeBeds(beds),
+      beds,
+    };
+  });
+}
+
+export async function getValveProfileByCycleAndValve(
+  cycleKey: string,
+  valveId: string,
+): Promise<ValveProfilePayload> {
+  const normalizedCycleKey = cycleKey.trim();
+  const normalizedValveId = valveId.trim();
+  return cachedAsync(
+    `fenograma:valve:${normalizedCycleKey}:${normalizedValveId}`,
+    FENOGRAMA_VALVE_TTL_MS,
+    async () => {
+      const [valveResult, beds] = await Promise.all([
+        query<ValveProfileQueryRow>(
+          `
+            select
+              vp.record_id,
+              vp.valve_id,
+              vp.cycle_key,
+              vp.block_id,
+              to_char(vp.valid_from, 'YYYY-MM-DD') as valid_from,
+              to_char(vp.valid_to, 'YYYY-MM-DD') as valid_to,
+              vp.is_current,
+              vp.attributes,
+              vp.is_valid,
+              vp.change_reason,
+              plants.programmed_plants,
+              plants.cycle_start_plants,
+              plants.plants_dead,
+              plants.plants_reseeded,
+              plants.plants_current,
+              plants.mortality_period,
+              plants.mortality_cumulative
+            from slv.camp_dim_valve_profile_scd2 vp
+            left join lateral (
+              select
+                initial_plants as programmed_plants,
+                initial_plants_cycle as cycle_start_plants,
+                dead_plants_count as plants_dead,
+                reseed_plants_count as plants_reseeded,
+                final_plants_count as plants_current,
+                mortality as mortality_period,
+                cumulative_mortality as mortality_cumulative
+              from gld.vw_camp_kardex_valve_plants_cur
+              where cycle_key = vp.cycle_key
+                and valve_id = vp.valve_id
+              order by valid_from desc nulls last
+              limit 1
+            ) plants on true
+            where vp.cycle_key = $1
+              and vp.valve_id = $2
+            order by
+              vp.is_current desc,
+              vp.valid_from desc nulls last
+            limit 1
+          `,
+          [normalizedCycleKey, normalizedValveId],
+        ),
+        getBedProfiles(normalizedCycleKey, normalizedValveId),
+      ]);
+
+      const row = valveResult.rows[0];
+      const attributes = normalizeAttributes(row?.attributes ?? null);
+
+      return {
+        cycleKey: normalizedCycleKey,
+        valveId: normalizedValveId,
+        generatedAt: new Date().toISOString(),
+        valve: row
+          ? {
+            recordId: row.record_id,
+            valveId: row.valve_id,
+            valveName: cleanText(attributes.valve_name ?? row.valve_id),
+            cycleKey: row.cycle_key,
+            blockId: cleanText(row.block_id),
+            parentBlock: cleanText(attributes.parent_block),
+            status: cleanText(attributes.status),
+            bedCount: toNumber(attributes.bed_count ?? null),
+            validFrom: row.valid_from,
+            validTo: row.valid_to,
+            isCurrent: Boolean(row.is_current),
+            isValid: row.is_valid !== false,
+            changeReason: cleanText(row.change_reason),
+            programmedPlants: toNumber(row.programmed_plants),
+            cycleStartPlants: toNumber(row.cycle_start_plants),
+            deadPlants: toNumber(row.plants_dead),
+            reseededPlants: toNumber(row.plants_reseeded),
+            currentPlants: toNumber(row.plants_current),
+            mortalityPeriodPct: toPercent(row.mortality_period),
+            mortalityCumulativePct: toPercent(row.mortality_cumulative),
+          }
+          : null,
+        summary: summarizeBeds(beds),
+        beds,
+      };
+    },
+  );
+}
