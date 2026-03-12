@@ -28,7 +28,7 @@ export default async function CampoPage() {
     return (
       <Card className="starter-panel border-border/70 bg-card/80">
         <CardHeader>
-          <CardTitle>No se pudo cargar el mapa de bloques</CardTitle>
+          <CardTitle>No se pudo cargar el mapa</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">{error}</p>

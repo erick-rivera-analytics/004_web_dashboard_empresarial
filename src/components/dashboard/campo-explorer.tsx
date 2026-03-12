@@ -250,10 +250,16 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
         valveData={blockModal.valveData}
         valveLoading={blockModal.valveLoading}
         valveError={blockModal.valveError}
+        selectedCurveCycleKey={blockModal.selectedCurveCycleKey}
+        curveData={blockModal.curveData}
+        curveLoading={blockModal.curveLoading}
+        curveError={blockModal.curveError}
         onOpenBeds={blockModal.openBeds}
         onCloseBeds={blockModal.closeBeds}
         onOpenValves={blockModal.openValves}
         onOpenValve={blockModal.openValve}
+        onOpenCurve={blockModal.openCurve}
+        onCloseCurve={blockModal.closeCurve}
         onClose={() => setSelectedFeature(null)}
       />
     </div>

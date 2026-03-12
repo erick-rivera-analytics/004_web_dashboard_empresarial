@@ -148,6 +148,11 @@ type ValveProfileQueryRow = {
   mortality_cumulative: string | number | null;
 };
 
+type HarvestCurveQueryRow = {
+  event_date: string | null;
+  stems_count: number | string | null;
+};
+
 type BlockModalRowQueryRow = {
   parent_block: string | null;
   area: string | null;
@@ -363,6 +368,30 @@ export type ValveProfilesByCyclePayload = {
   valves: ValveProfileCard[];
 };
 
+export type HarvestCurvePoint = {
+  eventDate: string;
+  eventDay: number;
+  dailyStems: number;
+  cumulativeStems: number;
+  observedCumulativeStems: number | null;
+  projectedCumulativeStems: number | null;
+  isProjected: boolean;
+};
+
+export type HarvestCurvePayload = {
+  cycleKey: string;
+  generatedAt: string;
+  projectionStartDay: number | null;
+  projectionStartDate: string | null;
+  summary: {
+    totalStems: number;
+    observedStems: number;
+    projectedStems: number;
+    totalDays: number;
+  };
+  points: HarvestCurvePoint[];
+};
+
 export const defaultFenogramaFilters: FenogramaFilters = {
   includeActive: true,
   includePlanned: true,
@@ -382,6 +411,7 @@ const AREA_SQL = `
 `;
 
 const FENOGRAMA_SOURCE = "mtlz.mv_prod_fenograma_cur";
+const FENOGRAMA_DAY_SOURCE = "mtlz.mv_prod_fenograma_day_cur";
 const BED_PLANTS_SOURCE = "mtlz.mv_camp_kardex_bed_plants_cur";
 const CYCLE_PLANTS_SOURCE = "mtlz.mv_camp_kardex_cycle_plants_cur";
 const VALVE_PLANTS_SOURCE = "mtlz.mv_camp_kardex_valve_plants_cur";
@@ -423,6 +453,7 @@ const FENOGRAMA_DASHBOARD_TTL_MS = 30 * 1000;
 const FENOGRAMA_BLOCK_TTL_MS = 60 * 1000;
 const FENOGRAMA_BEDS_TTL_MS = 60 * 1000;
 const FENOGRAMA_VALVE_TTL_MS = 60 * 1000;
+const FENOGRAMA_CURVE_TTL_MS = 60 * 1000;
 
 function cleanText(value: string | null) {
   return value?.trim() ?? "";
@@ -481,6 +512,11 @@ function toPercent(value: string | number | null) {
   }
 
   return roundValue(numericValue * 100);
+}
+
+function isMultipleOfTwenty(value: number) {
+  const remainder = value % 20;
+  return Math.abs(remainder) < 0.000001 || Math.abs(remainder - 20) < 0.000001;
 }
 
 function formatToday() {
@@ -1423,4 +1459,63 @@ export async function getValveProfileByCycleAndValve(
       };
     },
   );
+}
+
+export async function getHarvestCurveByCycleKey(
+  cycleKey: string,
+): Promise<HarvestCurvePayload> {
+  const normalizedCycleKey = cycleKey.trim();
+
+  return cachedAsync(`fenograma:curve:${normalizedCycleKey}`, FENOGRAMA_CURVE_TTL_MS, async () => {
+    const result = await query<HarvestCurveQueryRow>(
+      `
+        select
+          to_char(event_date::date, 'YYYY-MM-DD') as event_date,
+          coalesce(stems_count, 0) as stems_count
+        from ${FENOGRAMA_DAY_SOURCE}
+        where cycle_key = $1
+        order by event_date asc
+      `,
+      [normalizedCycleKey],
+    );
+
+    let cumulativeStems = 0;
+    const rawPoints = result.rows.map((row, index) => {
+      const dailyStems = roundValue(Number(row.stems_count ?? 0));
+      cumulativeStems = roundValue(cumulativeStems + dailyStems);
+
+      return {
+        eventDate: row.event_date ?? "",
+        eventDay: index + 1,
+        dailyStems,
+        cumulativeStems,
+      };
+    });
+
+    const projectionStartIndex = rawPoints.findIndex((point) => !isMultipleOfTwenty(point.dailyStems));
+    const points = rawPoints.map((point, index) => {
+      const isProjected = projectionStartIndex !== -1 && index >= projectionStartIndex;
+
+      return {
+        ...point,
+        observedCumulativeStems: !isProjected ? point.cumulativeStems : null,
+        projectedCumulativeStems: isProjected ? point.cumulativeStems : null,
+        isProjected,
+      } satisfies HarvestCurvePoint;
+    });
+
+    return {
+      cycleKey: normalizedCycleKey,
+      generatedAt: new Date().toISOString(),
+      projectionStartDay: projectionStartIndex === -1 ? null : rawPoints[projectionStartIndex]?.eventDay ?? null,
+      projectionStartDate: projectionStartIndex === -1 ? null : rawPoints[projectionStartIndex]?.eventDate ?? null,
+      summary: {
+        totalStems: sumNumbers(points.map((point) => point.dailyStems)),
+        observedStems: sumNumbers(points.filter((point) => !point.isProjected).map((point) => point.dailyStems)),
+        projectedStems: sumNumbers(points.filter((point) => point.isProjected).map((point) => point.dailyStems)),
+        totalDays: points.length,
+      },
+      points,
+    };
+  });
 }

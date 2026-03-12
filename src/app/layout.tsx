@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: "Atlas Empresarial",
   description:
     "Dashboard empresarial conectado a PostgreSQL para indicadores operativos de campo.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

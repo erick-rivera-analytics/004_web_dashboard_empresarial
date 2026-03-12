@@ -6,6 +6,7 @@ import type {
   BedProfilePayload,
   BlockModalRow,
   CycleProfileBlockPayload,
+  HarvestCurvePayload,
   ValveProfilePayload,
   ValveProfilesByCyclePayload,
 } from "@/lib/fenograma";
@@ -37,6 +38,7 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
   const bedCacheRef = useRef(new Map<string, BedProfilePayload>());
   const valvesCacheRef = useRef(new Map<string, ValveProfilesByCyclePayload>());
   const valveCacheRef = useRef(new Map<string, ValveProfilePayload>());
+  const curveCacheRef = useRef(new Map<string, HarvestCurvePayload>());
 
   const [blockData, setBlockData] = useState<CycleProfileBlockPayload | null>(null);
   const [blockLoading, setBlockLoading] = useState(false);
@@ -57,6 +59,11 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
   const [valveLoading, setValveLoading] = useState(false);
   const [valveError, setValveError] = useState<string | null>(null);
 
+  const [selectedCurveCycleKey, setSelectedCurveCycleKey] = useState<string | null>(null);
+  const [curveData, setCurveData] = useState<HarvestCurvePayload | null>(null);
+  const [curveLoading, setCurveLoading] = useState(false);
+  const [curveError, setCurveError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!selectedRow) {
       setBlockData(null);
@@ -70,6 +77,10 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
       setSelectedValve(null);
       setValveData(null);
       setValveError(null);
+      setSelectedCurveCycleKey(null);
+      setCurveData(null);
+      setCurveLoading(false);
+      setCurveError(null);
       return;
     }
 
@@ -86,6 +97,10 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     setSelectedValve(null);
     setValveData(null);
     setValveError(null);
+    setSelectedCurveCycleKey(null);
+    setCurveData(null);
+    setCurveLoading(false);
+    setCurveError(null);
 
     const cachedBlock = blockCacheRef.current.get(blockCacheKey);
 
@@ -314,6 +329,63 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     return () => controller.abort();
   }, [selectedValve]);
 
+  useEffect(() => {
+    if (!selectedCurveCycleKey) {
+      setCurveData(null);
+      setCurveError(null);
+      return;
+    }
+
+    const currentCycleKey = selectedCurveCycleKey;
+    const controller = new AbortController();
+    const cachedCurve = curveCacheRef.current.get(currentCycleKey);
+
+    if (cachedCurve) {
+      setCurveData(cachedCurve);
+      setCurveLoading(false);
+      setCurveError(null);
+      return () => controller.abort();
+    }
+
+    setCurveData(null);
+
+    async function loadCurve() {
+      setCurveLoading(true);
+      setCurveError(null);
+
+      try {
+        const response = await fetch(
+          `/api/fenograma/cycle/${encodeURIComponent(currentCycleKey)}/curve`,
+          { signal: controller.signal },
+        );
+
+        if (!response.ok) {
+          const payload = (await response.json()) as { message?: string };
+          throw new Error(payload.message ?? "No se pudo cargar la curva de cosecha.");
+        }
+
+        const payload = (await response.json()) as HarvestCurvePayload;
+        curveCacheRef.current.set(currentCycleKey, payload);
+        setCurveData(payload);
+      } catch (fetchError) {
+        if (!controller.signal.aborted) {
+          setCurveError(
+            fetchError instanceof Error
+              ? fetchError.message
+              : "No se pudo cargar la curva de cosecha.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setCurveLoading(false);
+        }
+      }
+    }
+
+    void loadCurve();
+    return () => controller.abort();
+  }, [selectedCurveCycleKey]);
+
   function openBeds(cycleKey: string) {
     setSelectedCycleKey((current) => (current === cycleKey ? null : cycleKey));
     setBedError(null);
@@ -341,6 +413,16 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     setValveError(null);
   }
 
+  function openCurve(cycleKey: string) {
+    setSelectedCurveCycleKey((current) => (current === cycleKey ? null : cycleKey));
+    setCurveError(null);
+  }
+
+  function closeCurve() {
+    setSelectedCurveCycleKey(null);
+    setCurveError(null);
+  }
+
   return {
     blockData,
     blockLoading,
@@ -357,9 +439,15 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     valveData,
     valveLoading,
     valveError,
+    selectedCurveCycleKey,
+    curveData,
+    curveLoading,
+    curveError,
     openBeds,
     closeBeds,
     openValves,
     openValve,
+    openCurve,
+    closeCurve,
   };
 }

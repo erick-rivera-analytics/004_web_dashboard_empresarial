@@ -6,10 +6,14 @@ type RadarPoint = {
   label: string;
   left: number;
   right: number;
+  leftDisplay?: string;
+  rightDisplay?: string;
 };
 
 type ComparisonRadarPanelProps = {
   data: RadarPoint[];
+  leftLabel: string;
+  rightLabel: string;
 };
 
 const ComparisonRadarChart = dynamic(
@@ -20,6 +24,10 @@ const ComparisonRadarChart = dynamic(
   { ssr: false },
 );
 
-export function ComparisonRadarPanel({ data }: ComparisonRadarPanelProps) {
-  return <ComparisonRadarChart data={data} />;
+export function ComparisonRadarPanel({
+  data,
+  leftLabel,
+  rightLabel,
+}: ComparisonRadarPanelProps) {
+  return <ComparisonRadarChart data={data} leftLabel={leftLabel} rightLabel={rightLabel} />;
 }

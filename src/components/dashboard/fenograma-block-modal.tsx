@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
-import { LoaderCircle, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { LineChart, LoaderCircle, Rows3, X } from "lucide-react";
 
+import { HarvestCurvePanel } from "@/components/dashboard/harvest-curve-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +18,7 @@ import type {
   BedProfilePayload,
   BlockModalRow,
   CycleProfileBlockPayload,
+  HarvestCurvePayload,
   ValveProfilePayload,
   ValveProfilesByCyclePayload,
 } from "@/lib/fenograma";
@@ -198,6 +200,7 @@ function BedsOverlay({
   valveLoading,
   valveError,
   onOpenValve,
+  onOpenValveBedsOverlay,
   onClose,
 }: {
   cycleKey: string;
@@ -209,6 +212,7 @@ function BedsOverlay({
   valveLoading: boolean;
   valveError: string | null;
   onOpenValve: (cycleKey: string, valveId: string) => void;
+  onOpenValveBedsOverlay: (cycleKey: string, valveId: string) => void;
   onClose: () => void;
 }) {
   const selectedValveId = selectedValve?.cycleKey === cycleKey ? selectedValve.valveId : null;
@@ -278,14 +282,25 @@ function BedsOverlay({
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">{selectedValveId}</p>
                       </div>
-                      <Button variant="outline" className="rounded-xl" onClick={() => onOpenValve(cycleKey, selectedValveId)}>
-                        Ocultar detalle
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => onOpenValveBedsOverlay(cycleKey, selectedValveId)}
+                        >
+                          <Rows3 className="size-4" />
+                          Abrir tabla flotante de camas
+                        </Button>
+                        <Button variant="outline" className="rounded-xl" onClick={() => onOpenValve(cycleKey, selectedValveId)}>
+                          Ocultar detalle
+                        </Button>
+                      </div>
                     </div>
                     <ValveDetailPanel
                       data={valveData}
                       loading={valveLoading}
                       error={valveError}
+                      onOpenBedsOverlay={() => onOpenValveBedsOverlay(cycleKey, selectedValveId)}
                     />
                   </div>
                 ) : null}
@@ -306,14 +321,177 @@ function BedsOverlay({
   );
 }
 
-function ValveDetailPanel({
+function ValveBedsOverlay({
   data,
   loading,
   error,
+  onClose,
 }: {
   data: ValveProfilePayload | null;
   loading: boolean;
   error: string | null;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))]">
+        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="rounded-full px-3 py-1">
+                Camas de la valvula
+              </Badge>
+              {data?.valve ? (
+                <Badge variant="secondary" className="rounded-full px-3 py-1">
+                  {data.valve.valveName || data.valve.valveId}
+                </Badge>
+              ) : null}
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-2xl font-semibold tracking-tight">Tabla flotante de camas</h3>
+              <p className="break-words text-sm text-muted-foreground">
+                Solo las camas asignadas a la valvula seleccionada.
+              </p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="overflow-y-auto px-4 py-5 sm:px-6">
+          {loading ? (
+            <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
+              <LoaderCircle className="size-4 animate-spin" />
+              Cargando camas de la valvula.
+            </div>
+          ) : error ? (
+            <div className="py-8 text-sm text-destructive">{error}</div>
+          ) : data?.valve ? (
+            data.beds.length ? (
+              <div className="space-y-5">
+                <DetailBadges
+                  items={[
+                    `${data.summary.totalBeds} camas`,
+                    `${formatNumber(data.summary.totalProgrammedPlants)} programadas`,
+                    `${formatNumber(data.summary.totalCurrentPlants)} vigentes`,
+                  ]}
+                />
+                <div className="max-h-[56vh] overflow-auto rounded-[24px] border border-border/70 bg-background/72 p-3">
+                  <BedsTable beds={data.beds} selectedValveId={data.valve.valveId} />
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-sm text-muted-foreground">
+                No hay camas relacionadas con esta valvula.
+              </div>
+            )
+          ) : (
+            <div className="py-8 text-sm text-muted-foreground">
+              No hay detalle de valvula disponible.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HarvestCurveOverlay({
+  cycleKey,
+  data,
+  loading,
+  error,
+  onClose,
+}: {
+  cycleKey: string;
+  data: HarvestCurvePayload | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))]">
+        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="rounded-full px-3 py-1">
+                Curva de la cosecha
+              </Badge>
+              <Badge variant="secondary" className="rounded-full px-3 py-1">
+                {cycleKey}
+              </Badge>
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-2xl font-semibold tracking-tight">Curva acumulada por dia</h3>
+              <p className="break-words text-sm text-muted-foreground">
+                Acumulado diario de tallos con separacion visual entre dato real y proyectado.
+              </p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="overflow-y-auto px-4 py-5 sm:px-6">
+          {loading ? (
+            <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
+              <LoaderCircle className="size-4 animate-spin" />
+              Cargando curva de cosecha.
+            </div>
+          ) : error ? (
+            <div className="py-8 text-sm text-destructive">{error}</div>
+          ) : data && data.cycleKey === cycleKey ? (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricPill label="Tallos acumulados" value={formatNumber(data.summary.totalStems)} />
+                <MetricPill label="Tallos reales" value={formatNumber(data.summary.observedStems)} />
+                <MetricPill label="Tallos proyectados" value={formatNumber(data.summary.projectedStems)} />
+                <MetricPill
+                  label="Inicio proyeccion"
+                  value={data.projectionStartDay ? `Dia ${data.projectionStartDay}` : "Sin proyeccion"}
+                  hint={data.projectionStartDate ? formatDate(data.projectionStartDate) : undefined}
+                />
+              </div>
+
+              {data.points.length ? (
+                <div className="rounded-[24px] border border-border/70 bg-background/72 p-4">
+                  <HarvestCurvePanel
+                    data={data.points}
+                    projectionStartDay={data.projectionStartDay}
+                  />
+                </div>
+              ) : (
+                <div className="rounded-[22px] border border-border/70 bg-background/72 p-6 text-sm text-muted-foreground">
+                  No hay datos diarios para graficar este ciclo.
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="py-8 text-sm text-muted-foreground">
+              No hay curva disponible para esta seleccion.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ValveDetailPanel({
+  data,
+  loading,
+  error,
+  onOpenBedsOverlay,
+}: {
+  data: ValveProfilePayload | null;
+  loading: boolean;
+  error: string | null;
+  onOpenBedsOverlay?: () => void;
 }) {
   if (loading) {
     return (
@@ -361,24 +539,22 @@ function ValveDetailPanel({
             </p>
             <p className="mt-1 text-sm text-muted-foreground">{data.valve.valveId}</p>
           </div>
-          <DetailBadges
-            items={[
-              `${data.summary.totalBeds} camas`,
-              `${formatNumber(data.summary.totalProgrammedPlants)} programadas`,
-              `${formatNumber(data.summary.totalCurrentPlants)} vigentes`,
-            ]}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <DetailBadges
+              items={[
+                `${data.summary.totalBeds} camas`,
+                `${formatNumber(data.summary.totalProgrammedPlants)} programadas`,
+                `${formatNumber(data.summary.totalCurrentPlants)} vigentes`,
+              ]}
+            />
+            {data.beds.length && onOpenBedsOverlay ? (
+              <Button variant="outline" className="rounded-xl" onClick={onOpenBedsOverlay}>
+                <Rows3 className="size-4" />
+                Abrir tabla flotante de camas
+              </Button>
+            ) : null}
+          </div>
         </div>
-
-        {data.beds.length ? (
-          <div className="mt-4">
-            <BedsTable beds={data.beds} />
-          </div>
-        ) : (
-          <div className="py-4 text-sm text-muted-foreground">
-            No hay camas relacionadas con esta valvula.
-          </div>
-        )}
       </div>
     </div>
   );
@@ -394,6 +570,7 @@ function ValvesSection({
   valveLoading,
   valveError,
   onOpenValve,
+  onOpenValveBedsOverlay,
 }: {
   cycleKey: string;
   data: ValveProfilesByCyclePayload | null;
@@ -404,6 +581,7 @@ function ValvesSection({
   valveLoading: boolean;
   valveError: string | null;
   onOpenValve: (cycleKey: string, valveId: string) => void;
+  onOpenValveBedsOverlay: (cycleKey: string, valveId: string) => void;
 }) {
   return (
     <div className="rounded-[22px] border border-border/70 bg-card/88 p-4">
@@ -474,13 +652,21 @@ function ValvesSection({
                     <MetricPill label="Vigencia" value={`${formatDate(valve.validFrom)} / ${formatDate(valve.validTo)}`} />
                   </div>
 
-                  <div className="mt-4">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <Button
                       variant={isSelected ? "secondary" : "outline"}
                       className="rounded-xl"
                       onClick={() => onOpenValve(cycleKey, valve.valveId)}
                     >
                       {isSelected ? "Ocultar detalle" : "Abrir detalle"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => onOpenValveBedsOverlay(cycleKey, valve.valveId)}
+                    >
+                      <Rows3 className="size-4" />
+                      Abrir tabla flotante de camas
                     </Button>
                   </div>
 
@@ -490,6 +676,7 @@ function ValvesSection({
                         data={valveData}
                         loading={valveLoading}
                         error={valveError}
+                        onOpenBedsOverlay={() => onOpenValveBedsOverlay(cycleKey, valve.valveId)}
                       />
                     </div>
                   ) : null}
@@ -524,10 +711,16 @@ export function BlockProfileModal({
   valveData,
   valveLoading,
   valveError,
+  selectedCurveCycleKey,
+  curveData,
+  curveLoading,
+  curveError,
   onOpenBeds,
   onCloseBeds,
   onOpenValves,
   onOpenValve,
+  onOpenCurve,
+  onCloseCurve,
   onClose,
 }: {
   row: BlockModalRow | null;
@@ -546,37 +739,70 @@ export function BlockProfileModal({
   valveData: ValveProfilePayload | null;
   valveLoading: boolean;
   valveError: string | null;
+  selectedCurveCycleKey: string | null;
+  curveData: HarvestCurvePayload | null;
+  curveLoading: boolean;
+  curveError: string | null;
   onOpenBeds: (cycleKey: string) => void;
   onCloseBeds: () => void;
   onOpenValves: (cycleKey: string) => void;
   onOpenValve: (cycleKey: string, valveId: string) => void;
+  onOpenCurve: (cycleKey: string) => void;
+  onCloseCurve: () => void;
   onClose: () => void;
 }) {
+  const [selectedValveBeds, setSelectedValveBeds] = useState<{ cycleKey: string; valveId: string } | null>(null);
+
   useEffect(() => {
     if (!row) {
       return;
     }
 
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        if (selectedCycleKey) {
-          onCloseBeds();
-          return;
-        }
-
-        onClose();
+      if (event.key !== "Escape") {
+        return;
       }
+
+      if (selectedValveBeds) {
+        setSelectedValveBeds(null);
+        return;
+      }
+
+      if (selectedCurveCycleKey) {
+        onCloseCurve();
+        return;
+      }
+
+      if (selectedCycleKey) {
+        onCloseBeds();
+        return;
+      }
+
+      onClose();
     }
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose, onCloseBeds, row, selectedCycleKey]);
+  }, [
+    onClose,
+    onCloseBeds,
+    onCloseCurve,
+    row,
+    selectedCurveCycleKey,
+    selectedCycleKey,
+    selectedValveBeds,
+  ]);
 
   if (!row) {
     return null;
   }
 
   const showingFilteredCycle = Boolean(data?.filteredCycleKey);
+
+  function openValveBedsOverlay(cycleKey: string, valveId: string) {
+    onOpenValve(cycleKey, valveId);
+    setSelectedValveBeds({ cycleKey, valveId });
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/38 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
@@ -638,6 +864,7 @@ export function BlockProfileModal({
                 <div className="grid gap-4">
                   {data.cycles.map((cycle) => {
                     const showValves = selectedValveCycleKey === cycle.cycleKey;
+                    const showCurveActive = selectedCurveCycleKey === cycle.cycleKey;
 
                     return (
                       <Card
@@ -692,6 +919,17 @@ export function BlockProfileModal({
                           <MetricPill label="Hasta" value={formatDate(cycle.validTo)} />
                         </CardContent>
 
+                        <CardContent className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+                          <Button
+                            variant={showCurveActive ? "secondary" : "outline"}
+                            className="rounded-xl"
+                            onClick={() => onOpenCurve(cycle.cycleKey)}
+                          >
+                            <LineChart className="size-4" />
+                            Curva de la cosecha por cycle
+                          </Button>
+                        </CardContent>
+
                         {showValves ? (
                           <CardContent className="border-t border-border/60 pt-0">
                             <ValvesSection
@@ -704,6 +942,7 @@ export function BlockProfileModal({
                               valveLoading={valveLoading}
                               valveError={valveError}
                               onOpenValve={onOpenValve}
+                              onOpenValveBedsOverlay={openValveBedsOverlay}
                             />
                           </CardContent>
                         ) : null}
@@ -732,7 +971,30 @@ export function BlockProfileModal({
           valveLoading={valveLoading}
           valveError={valveError}
           onOpenValve={onOpenValve}
+          onOpenValveBedsOverlay={openValveBedsOverlay}
           onClose={onCloseBeds}
+        />
+      ) : null}
+
+      {selectedCurveCycleKey ? (
+        <HarvestCurveOverlay
+          cycleKey={selectedCurveCycleKey}
+          data={curveData}
+          loading={curveLoading}
+          error={curveError}
+          onClose={onCloseCurve}
+        />
+      ) : null}
+
+      {selectedValveBeds
+      && selectedValve
+      && selectedValve.cycleKey === selectedValveBeds.cycleKey
+      && selectedValve.valveId === selectedValveBeds.valveId ? (
+        <ValveBedsOverlay
+          data={valveData}
+          loading={valveLoading}
+          error={valveError}
+          onClose={() => setSelectedValveBeds(null)}
         />
       ) : null}
     </div>
