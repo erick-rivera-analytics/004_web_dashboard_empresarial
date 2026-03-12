@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { DashboardScaleToggle } from "@/components/dashboard-scale-toggle";
 import { getPageContext, isPathActive, mobileNavigation } from "@/config/dashboard";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,10 @@ export function SiteHeader() {
             </Badge>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">{page.title}</h1>
           </div>
-          <ModeToggle />
+          <div className="flex items-center gap-2">
+            <DashboardScaleToggle />
+            <ModeToggle />
+          </div>
         </div>
 
         <div className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden">

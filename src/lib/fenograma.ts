@@ -39,6 +39,7 @@ type CycleProfileQueryRow = {
   greenhouse: boolean | null;
   parent_block: string | null;
   block_id: string | null;
+  status: string | null;
   is_valid: boolean | null;
   change_reason: string | null;
   programmed_plants: string | number | null;
@@ -113,6 +114,7 @@ type ValveProfileBaseQueryRow = {
   valid_to: string | null;
   is_current: boolean | null;
   attributes: string | null;
+  pambiles_count: string | number | null;
   is_valid: boolean | null;
   change_reason: string | null;
 };
@@ -137,6 +139,7 @@ type ValveProfileQueryRow = {
   valid_to: string | null;
   is_current: boolean | null;
   attributes: string | null;
+  pambiles_count: string | number | null;
   is_valid: boolean | null;
   change_reason: string | null;
   programmed_plants: string | number | null;
@@ -251,6 +254,7 @@ export type CycleProfileCard = {
   greenhouse: boolean;
   parentBlock: string;
   blockId: string;
+  status: string;
   changeReason: string;
   programmedPlants: number | null;
   cycleStartPlants: number | null;
@@ -324,6 +328,7 @@ export type ValveProfileCard = {
   parentBlock: string;
   status: string;
   bedCount: number | null;
+  pambilesCount: number | null;
   validFrom: string | null;
   validTo: string | null;
   isCurrent: boolean;
@@ -350,6 +355,7 @@ export type ValveProfilePayload = {
     totalProgrammedPlants: number;
     totalCycleStartPlants: number;
     totalCurrentPlants: number;
+    totalBedArea: number;
   };
   beds: BedProfileCard[];
 };
@@ -677,6 +683,7 @@ function mapValveProfileRow(
     parentBlock: cleanText(attributes.parent_block),
     status: cleanText(attributes.status),
     bedCount: toNumber(attributes.bed_count ?? null),
+    pambilesCount: toNumber(row.pambiles_count),
     validFrom: row.valid_from,
     validTo: row.valid_to,
     isCurrent: Boolean(row.is_current),
@@ -1189,6 +1196,7 @@ export async function getCycleProfilesByBlock(
           cp.greenhouse,
           cp.parent_block,
           cp.block_id,
+          valves.status,
           cp.is_valid,
           cp.change_reason,
           plants.programmed_plants,
@@ -1201,9 +1209,10 @@ export async function getCycleProfilesByBlock(
         from slv.camp_dim_cycle_profile_scd2 cp
         left join lateral (
           select
-            count(distinct valve_id) as valve_count
-          from slv.camp_dim_valve_profile_scd2
-          where cycle_key = cp.cycle_key
+            count(distinct valve_id) as valve_count,
+            min(nullif(vp.attributes::jsonb ->> 'status', '')) as status
+          from slv.camp_dim_valve_profile_scd2 vp
+          where vp.cycle_key = cp.cycle_key
         ) valves on true
         left join lateral (
           select
@@ -1246,6 +1255,7 @@ export async function getCycleProfilesByBlock(
       greenhouse: Boolean(row.greenhouse),
       parentBlock: cleanText(row.parent_block),
       blockId: cleanText(row.block_id),
+      status: cleanText(row.status),
       changeReason: cleanText(row.change_reason),
       programmedPlants: toNumber(row.programmed_plants),
       cycleStartPlants: toNumber(row.cycle_start_plants),
@@ -1305,9 +1315,17 @@ export async function getValveProfilesByCycleKey(
           to_char(vp.valid_to, 'YYYY-MM-DD') as valid_to,
           vp.is_current,
           vp.attributes,
+          valve_beds.pambiles_count,
           vp.is_valid,
           vp.change_reason
         from slv.camp_dim_valve_profile_scd2 vp
+        left join lateral (
+          select
+            sum(coalesce(bp.pambiles_count, 0)) as pambiles_count
+          from slv.camp_dim_bed_profile_scd2 bp
+          where bp.cycle_key = vp.cycle_key
+            and bp.valve_id = vp.valve_id
+        ) valve_beds on true
         where vp.cycle_key = $1
         order by
           vp.valve_id asc,
@@ -1386,6 +1404,7 @@ export async function getValveProfileByCycleAndValve(
               to_char(vp.valid_to, 'YYYY-MM-DD') as valid_to,
               vp.is_current,
               vp.attributes,
+              valve_beds.pambiles_count,
               vp.is_valid,
               vp.change_reason,
               plants.programmed_plants,
@@ -1396,6 +1415,13 @@ export async function getValveProfileByCycleAndValve(
               plants.mortality_period,
               plants.mortality_cumulative
             from slv.camp_dim_valve_profile_scd2 vp
+            left join lateral (
+              select
+                sum(coalesce(bp.pambiles_count, 0)) as pambiles_count
+              from slv.camp_dim_bed_profile_scd2 bp
+              where bp.cycle_key = vp.cycle_key
+                and bp.valve_id = vp.valve_id
+            ) valve_beds on true
             left join lateral (
             select
               initial_plants as programmed_plants,
@@ -1440,6 +1466,7 @@ export async function getValveProfileByCycleAndValve(
             parentBlock: cleanText(attributes.parent_block),
             status: cleanText(attributes.status),
             bedCount: toNumber(attributes.bed_count ?? null),
+            pambilesCount: toNumber(row.pambiles_count),
             validFrom: row.valid_from,
             validTo: row.valid_to,
             isCurrent: Boolean(row.is_current),

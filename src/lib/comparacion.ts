@@ -91,7 +91,7 @@ export type ComparisonMetric = {
   rightDisplay: string;
   leftShare: number;
   rightShare: number;
-  winner: "left" | "right" | "tie";
+  winner: "left" | "right" | "tie" | "neutral";
 };
 
 export type ComparisonRadarPoint = {
@@ -166,11 +166,6 @@ function toNumber(value: string | number | null) {
   return Number.isFinite(numericValue) ? numericValue : null;
 }
 
-function toPercent(value: string | number | null) {
-  const numericValue = toNumber(value);
-  return numericValue === null ? null : roundValue(numericValue * 100);
-}
-
 function formatNumber(value: number | null, options?: Intl.NumberFormatOptions) {
   if (value === null) {
     return "-";
@@ -183,7 +178,7 @@ function formatNumber(value: number | null, options?: Intl.NumberFormatOptions) 
 }
 
 function formatPercent(value: number | null) {
-  return value === null ? "-" : `${value.toFixed(2)}%`;
+  return value === null ? "-" : `${(value * 100).toFixed(2)}%`;
 }
 
 function serializeFilters(filters: ComparisonSearchFilters) {
@@ -364,29 +359,22 @@ export async function searchComparisonCycles(
   });
 }
 
-function normalizeMetricValue(left: number | null, right: number | null) {
-  const leftValue = left ?? 0;
-  const rightValue = right ?? 0;
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
 
-  if (leftValue === rightValue) {
-    return { leftShare: 100, rightShare: 100 };
-  }
+function normalizeMetricValue(
+  value: number | null,
+  range: { min: number; max: number },
+  preference: "higher" | "lower" | "neutral",
+) {
+  const safeValue = value ?? range.min;
+  const boundedValue = clamp(safeValue, range.min, range.max);
+  const span = range.max - range.min || 1;
+  const rawShare = (boundedValue - range.min) / span;
+  const adjustedShare = preference === "lower" ? 1 - rawShare : rawShare;
 
-  let floor = Math.min(leftValue, rightValue);
-  let ceiling = Math.max(leftValue, rightValue);
-
-  if (leftValue >= 0 && rightValue >= 0) {
-    floor = 0;
-  } else if (leftValue <= 0 && rightValue <= 0) {
-    ceiling = 0;
-  }
-
-  const span = ceiling - floor || 1;
-
-  return {
-    leftShare: roundValue(((leftValue - floor) / span) * 100),
-    rightShare: roundValue(((rightValue - floor) / span) * 100),
-  };
+  return roundValue(adjustedShare * 100);
 }
 
 function buildMetric(
@@ -395,10 +383,30 @@ function buildMetric(
   leftValue: number | null,
   rightValue: number | null,
   formatter: (value: number | null) => string,
+  options: {
+    range: { min: number; max: number };
+    preference: "higher" | "lower" | "neutral";
+  },
 ): ComparisonMetric {
-  const shares = normalizeMetricValue(leftValue, rightValue);
-  const comparableLeft = leftValue ?? Number.NEGATIVE_INFINITY;
-  const comparableRight = rightValue ?? Number.NEGATIVE_INFINITY;
+  const leftShare = normalizeMetricValue(leftValue, options.range, options.preference);
+  const rightShare = normalizeMetricValue(rightValue, options.range, options.preference);
+  const comparableLeft = leftValue ?? Number.NaN;
+  const comparableRight = rightValue ?? Number.NaN;
+  let winner: ComparisonMetric["winner"] = "neutral";
+
+  if (options.preference !== "neutral") {
+    if (
+      Number.isNaN(comparableLeft)
+      || Number.isNaN(comparableRight)
+      || comparableLeft === comparableRight
+    ) {
+      winner = "tie";
+    } else if (options.preference === "higher") {
+      winner = comparableLeft > comparableRight ? "left" : "right";
+    } else {
+      winner = comparableLeft < comparableRight ? "left" : "right";
+    }
+  }
 
   return {
     key,
@@ -407,14 +415,9 @@ function buildMetric(
     rightValue,
     leftDisplay: formatter(leftValue),
     rightDisplay: formatter(rightValue),
-    leftShare: shares.leftShare,
-    rightShare: shares.rightShare,
-    winner:
-      comparableLeft === comparableRight
-        ? "tie"
-        : comparableLeft > comparableRight
-          ? "left"
-          : "right",
+    leftShare,
+    rightShare,
+    winner,
   };
 }
 
@@ -445,8 +448,8 @@ function mapSnapshot(row: ComparisonSnapshotQueryRow | undefined, fallback?: Com
     currentPlants: toNumber(row?.current_plants ?? null),
     deadPlants: toNumber(row?.dead_plants ?? null),
     reseededPlants: toNumber(row?.reseeded_plants ?? null),
-    mortalityCyclePct: toPercent(row?.mortality_period ?? null),
-    mortalityCumulativePct: toPercent(row?.mortality_cumulative ?? null),
+    mortalityCyclePct: toNumber(row?.mortality_period ?? null),
+    mortalityCumulativePct: toNumber(row?.mortality_cumulative ?? null),
   } satisfies ComparisonCycleSnapshot;
 }
 
@@ -545,11 +548,46 @@ export async function getComparisonPair(
       const right = mapSnapshot(rowsByCycleKey.get(normalizedRight), optionsByCycleKey.get(normalizedRight));
 
       const metrics = [
-        buildMetric("totalStems", "Tallos", left?.totalStems ?? null, right?.totalStems ?? null, (value) => formatNumber(value)),
-        buildMetric("mortalityCumulativePct", "Mortandad acumulada", left?.mortalityCumulativePct ?? null, right?.mortalityCumulativePct ?? null, formatPercent),
-        buildMetric("mortalityCyclePct", "Mortandad ciclo", left?.mortalityCyclePct ?? null, right?.mortalityCyclePct ?? null, formatPercent),
-        buildMetric("deadPlants", "Plantas muertas", left?.deadPlants ?? null, right?.deadPlants ?? null, (value) => formatNumber(value)),
-        buildMetric("reseededPlants", "Plantas resembradas", left?.reseededPlants ?? null, right?.reseededPlants ?? null, (value) => formatNumber(value)),
+        buildMetric(
+          "totalStems",
+          "Tallos",
+          left?.totalStems ?? null,
+          right?.totalStems ?? null,
+          (value) => formatNumber(value),
+          { range: { min: 0, max: 289160 }, preference: "higher" },
+        ),
+        buildMetric(
+          "mortalityCumulativePct",
+          "Mortandad acumulada",
+          left?.mortalityCumulativePct ?? null,
+          right?.mortalityCumulativePct ?? null,
+          formatPercent,
+          { range: { min: -0.53, max: 0.35 }, preference: "lower" },
+        ),
+        buildMetric(
+          "mortalityCyclePct",
+          "Mortandad ciclo",
+          left?.mortalityCyclePct ?? null,
+          right?.mortalityCyclePct ?? null,
+          formatPercent,
+          { range: { min: -0.53, max: 0.35 }, preference: "lower" },
+        ),
+        buildMetric(
+          "deadPlants",
+          "Plantas muertas",
+          left?.deadPlants ?? null,
+          right?.deadPlants ?? null,
+          (value) => formatNumber(value),
+          { range: { min: 0, max: 21466 }, preference: "lower" },
+        ),
+        buildMetric(
+          "reseededPlants",
+          "Plantas resembradas",
+          left?.reseededPlants ?? null,
+          right?.reseededPlants ?? null,
+          (value) => formatNumber(value),
+          { range: { min: 0, max: 38475 }, preference: "neutral" },
+        ),
       ];
 
       return {

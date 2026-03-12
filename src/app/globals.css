@@ -32,6 +32,7 @@
 
 :root {
   --radius: 0.875rem;
+  --dashboard-scale: 1;
   --background: oklch(0.98 0.008 95);
   --foreground: oklch(0.23 0.02 247);
   --card: oklch(0.995 0.004 95);
@@ -103,6 +104,18 @@
   backdrop-filter: blur(22px);
   box-shadow: 0 26px 70px -42px rgba(15, 23, 42, 0.22);
   border-radius: 1.5rem;
+}
+
+.dashboard-scale-shell {
+  zoom: var(--dashboard-scale);
+  transform-origin: top center;
+}
+
+@supports not (zoom: 1) {
+  .dashboard-scale-shell {
+    transform: scale(var(--dashboard-scale));
+    width: calc(100% / var(--dashboard-scale));
+  }
 }
 
 .starter-glow {

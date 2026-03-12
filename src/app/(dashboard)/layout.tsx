@@ -16,7 +16,7 @@ export default function DashboardLayout({
 
   return (
     <div className="starter-shell min-h-screen">
-      <div className="mx-auto flex min-h-screen max-w-[1600px]">
+      <div className="dashboard-scale-shell mx-auto flex min-h-screen max-w-[1600px]">
         <aside
           className={cn(
             "hidden shrink-0 border-r border-border/50 bg-card/62 backdrop-blur-xl transition-[width] duration-300 lg:block",

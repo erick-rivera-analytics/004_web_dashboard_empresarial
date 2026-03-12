@@ -114,14 +114,20 @@ function MetricBattleRow({
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {leftValue === rightValue ? "Empate operativo" : winner === "left" ? "Ventaja izquierda" : "Ventaja derecha"}
+            {winner === "neutral"
+              ? "Sin criterio operativo de ganador"
+              : leftValue === rightValue
+                ? "Empate operativo"
+                : winner === "left"
+                  ? "Ventaja izquierda"
+                  : "Ventaja derecha"}
           </p>
         </div>
         <Badge
-          variant={winner === "tie" ? "outline" : "secondary"}
+          variant={winner === "tie" || winner === "neutral" ? "outline" : "secondary"}
           className="rounded-full px-3 py-1"
         >
-          {winner === "tie" ? "Empate" : winner === "left" ? "Gana A" : "Gana B"}
+          {winner === "neutral" ? "Sin criterio" : winner === "tie" ? "Empate" : winner === "left" ? "Gana A" : "Gana B"}
         </Badge>
       </div>
 
@@ -136,11 +142,11 @@ function MetricBattleRow({
           <div className="absolute inset-y-0 left-1/2 w-px bg-foreground/14" />
           <div
             className="absolute inset-y-2 right-1/2 rounded-l-full bg-primary/85 transition-all"
-            style={{ width: `${Math.max((leftShare / 100) * 50, leftValue === rightValue ? 50 : 6)}%` }}
+            style={{ width: `${Math.max((leftShare / 100) * 50, leftValue === null ? 0 : 6)}%` }}
           />
           <div
             className="absolute inset-y-2 left-1/2 rounded-r-full bg-accent transition-all"
-            style={{ width: `${Math.max((rightShare / 100) * 50, leftValue === rightValue ? 50 : 6)}%` }}
+            style={{ width: `${Math.max((rightShare / 100) * 50, rightValue === null ? 0 : 6)}%` }}
           />
         </div>
 
@@ -541,7 +547,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
                 <div>
                   <CardTitle>Duelos por metrica</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    La barra central crece del lado que tiene mayor valor en esa metrica.
+                    La barra central crece del lado que sale mejor segun el criterio operativo de cada metrica.
                   </p>
                 </div>
               </div>

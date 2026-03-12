@@ -24,7 +24,7 @@ import type {
 } from "@/lib/fenograma";
 
 function formatDate(value: string | null) {
-  if (!value) {
+  if (!value || value.startsWith("9999-")) {
     return "-";
   }
 
@@ -53,6 +53,33 @@ function formatPercent(value: number | null) {
   }
 
   return `${value.toFixed(2)}%`;
+}
+
+function getTrailingSegment(value: string) {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return "-";
+  }
+
+  const parts = normalized.split("-");
+  return parts[parts.length - 1] || normalized;
+}
+
+function getValveDisplayName(valveName: string | null | undefined, valveId: string | null | undefined) {
+  const normalizedName = valveName?.trim();
+
+  if (normalizedName) {
+    return normalizedName;
+  }
+
+  return getTrailingSegment(valveId ?? "");
+}
+
+function getBedSortValue(bedId: string) {
+  const trailingSegment = getTrailingSegment(bedId);
+  const numericValue = Number(trailingSegment);
+  return Number.isFinite(numericValue) ? numericValue : Number.MAX_SAFE_INTEGER;
 }
 
 function MetricPill({
@@ -111,6 +138,17 @@ function BedsTable({
   selectedValveId?: string | null;
   onOpenValve?: (valveId: string) => void;
 }) {
+  const sortedBeds = [...beds].sort((left, right) => {
+    const leftSortValue = getBedSortValue(left.bedId);
+    const rightSortValue = getBedSortValue(right.bedId);
+
+    if (leftSortValue !== rightSortValue) {
+      return leftSortValue - rightSortValue;
+    }
+
+    return left.bedId.localeCompare(right.bedId, "en-US", { numeric: true });
+  });
+
   return (
     <div className="overflow-auto rounded-2xl border border-border/70">
       <table className="min-w-full border-separate border-spacing-0 text-sm">
@@ -142,7 +180,7 @@ function BedsTable({
           </tr>
         </thead>
         <tbody>
-          {beds.map((bed, index) => {
+          {sortedBeds.map((bed, index) => {
             const isActiveValve = Boolean(selectedValveId && selectedValveId === bed.valveId);
 
             return (
@@ -153,7 +191,7 @@ function BedsTable({
                   isActiveValve && "bg-primary/6",
                 )}
               >
-                <td className="border-b border-r border-border/60 px-3 py-2.5 font-medium">{bed.bedId}</td>
+                <td className="border-b border-r border-border/60 px-3 py-2.5 font-medium">{getTrailingSegment(bed.bedId)}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">
                   {bed.valveId && onOpenValve ? (
                     <button
@@ -161,10 +199,10 @@ function BedsTable({
                       className="font-medium text-primary underline-offset-4 hover:underline"
                       onClick={() => onOpenValve(bed.valveId)}
                     >
-                      {bed.valveId}
+                      {getValveDisplayName(null, bed.valveId)}
                     </button>
                   ) : (
-                    bed.valveId || "-"
+                    getValveDisplayName(null, bed.valveId)
                   )}
                 </td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{formatNumber(bed.programmedPlants)}</td>
@@ -280,7 +318,11 @@ function BedsOverlay({
                         <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
                           Detalle de valvula
                         </p>
-                        <p className="mt-1 text-sm text-muted-foreground">{selectedValveId}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {valveData?.valve
+                            ? `${getValveDisplayName(valveData.valve.valveName, valveData.valve.valveId)} / Bloque ${valveData.valve.blockId || valveData.valve.parentBlock || "-"}`
+                            : getValveDisplayName(null, selectedValveId)}
+                        </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Button
@@ -344,14 +386,14 @@ function ValveBedsOverlay({
               </Badge>
               {data?.valve ? (
                 <Badge variant="secondary" className="rounded-full px-3 py-1">
-                  {data.valve.valveName || data.valve.valveId}
+                  {getValveDisplayName(data.valve.valveName, data.valve.valveId)}
                 </Badge>
               ) : null}
             </div>
             <div className="min-w-0">
               <h3 className="text-2xl font-semibold tracking-tight">Tabla flotante de camas</h3>
               <p className="break-words text-sm text-muted-foreground">
-                Solo las camas asignadas a la valvula seleccionada.
+                Solo las camas asignadas a la valvula seleccionada del bloque {data?.valve?.blockId || data?.valve?.parentBlock || "-"}.
               </p>
             </div>
           </div>
@@ -517,10 +559,10 @@ function ValveDetailPanel({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricPill label="Valvula" value={data.valve.valveName || data.valve.valveId} />
+        <MetricPill label="Valvula" value={getValveDisplayName(data.valve.valveName, data.valve.valveId)} />
         <MetricPill label="Bloque" value={data.valve.blockId || data.valve.parentBlock || "-"} />
         <MetricPill label="Camas" value={formatNumber(data.valve.bedCount)} />
-        <MetricPill label="Estado" value={data.valve.status || "-"} />
+        <MetricPill label="Pambiles" value={formatNumber(data.valve.pambilesCount)} />
         <MetricPill label="Plantas programadas" value={formatNumber(data.valve.programmedPlants)} />
         <MetricPill label="Inicio de ciclo" value={formatNumber(data.valve.cycleStartPlants)} />
         <MetricPill label="Plantas vigentes" value={formatNumber(data.valve.currentPlants)} />
@@ -528,7 +570,7 @@ function ValveDetailPanel({
         <MetricPill label="Resiembras" value={formatNumber(data.valve.reseededPlants)} />
         <MetricPill label="Mortandad actual" value={formatPercent(data.valve.mortalityPeriodPct)} />
         <MetricPill label="Mortandad acumulada" value={formatPercent(data.valve.mortalityCumulativePct)} />
-        <MetricPill label="Vigencia" value={`${formatDate(data.valve.validFrom)} / ${formatDate(data.valve.validTo)}`} />
+        <MetricPill label="Superficie" value={formatNumber(data.summary.totalBedArea)} />
       </div>
 
       <div className="rounded-[20px] border border-border/70 bg-background/72 p-4">
@@ -537,7 +579,9 @@ function ValveDetailPanel({
             <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
               Camas de la valvula
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">{data.valve.valveId}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {getValveDisplayName(data.valve.valveName, data.valve.valveId)} / Bloque {data.valve.blockId || data.valve.parentBlock || "-"}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <DetailBadges
@@ -627,9 +671,14 @@ function ValvesSection({
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <Badge className="rounded-full px-3 py-1">
-                      {valve.valveName || valve.valveId}
+                      {getValveDisplayName(valve.valveName, valve.valveId)}
                     </Badge>
                     <div className="flex flex-wrap gap-2">
+                      {(valve.blockId || valve.parentBlock) ? (
+                        <Badge variant="outline" className="rounded-full px-3 py-1">
+                          Bloque {valve.blockId || valve.parentBlock}
+                        </Badge>
+                      ) : null}
                       {valve.isCurrent ? (
                         <Badge variant="secondary" className="rounded-full px-3 py-1">
                           Actual
@@ -644,12 +693,11 @@ function ValvesSection({
                   </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <MetricPill label="Estado" value={valve.status || "-"} />
+                    <MetricPill label="Pambiles" value={formatNumber(valve.pambilesCount)} />
                     <MetricPill label="Camas" value={formatNumber(valve.bedCount)} />
                     <MetricPill label="Plantas programadas" value={formatNumber(valve.programmedPlants)} />
                     <MetricPill label="Plantas vigentes" value={formatNumber(valve.currentPlants)} />
                     <MetricPill label="Mortandad acum." value={formatPercent(valve.mortalityCumulativePct)} />
-                    <MetricPill label="Vigencia" value={`${formatDate(valve.validFrom)} / ${formatDate(valve.validTo)}`} />
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -658,7 +706,7 @@ function ValvesSection({
                       className="rounded-xl"
                       onClick={() => onOpenValve(cycleKey, valve.valveId)}
                     >
-                      {isSelected ? "Ocultar detalle" : "Abrir detalle"}
+                      {isSelected ? "Ocultar detalle de valvula" : "Abrir detalle de valvula"}
                     </Button>
                     <Button
                       variant="outline"
@@ -893,6 +941,8 @@ export function BlockProfileModal({
                         <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                           <MetricPill label="Variedad" value={cycle.variety || "-"} />
                           <MetricPill label="Tipo SP" value={cycle.spType || "-"} />
+                          <MetricPill label="Estado" value={cycle.status || "-"} />
+                          <MetricPill label="Invernadero" value={cycle.greenhouse ? "Si" : "No"} />
                           <MetricPill label="Luz" value={cycle.lightType || "-"} />
                           <MetricPill
                             label="Camas"

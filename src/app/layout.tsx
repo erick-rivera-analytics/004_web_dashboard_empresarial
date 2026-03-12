@@ -10,6 +10,7 @@ export const metadata: Metadata = {
     "Dashboard empresarial conectado a PostgreSQL para indicadores operativos de campo.",
   icons: {
     icon: "/icon.svg",
+    shortcut: "/icon.svg",
   },
 };
 
