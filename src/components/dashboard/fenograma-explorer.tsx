@@ -37,16 +37,18 @@ function buildQueryString(filters: FenogramaFilters) {
   params.set("area", filters.area);
   params.set("variety", filters.variety);
   params.set("spType", filters.spType);
-  params.set("visibleWeeks", String(filters.visibleWeeks));
+  params.set("startWeek", filters.startWeek);
+  params.set("endWeek", filters.endWeek);
   return params.toString();
 }
 
-function SelectField({ id, label, value, options, onChange }: {
+function SelectField({ id, label, value, options, onChange, emptyLabel = "Todos" }: {
   id: string;
   label: string;
   value: string;
   options: string[];
   onChange: (value: string) => void;
+  emptyLabel?: string;
 }) {
   return (
     <div className="min-w-0 space-y-2">
@@ -57,7 +59,7 @@ function SelectField({ id, label, value, options, onChange }: {
         onChange={(event) => onChange(event.target.value)}
         className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50"
       >
-        <option value="all">Todos</option>
+        <option value={emptyLabel === "Todos" ? "all" : ""}>{emptyLabel}</option>
         {options.map((option) => (
           <option key={option} value={option}>{option}</option>
         ))}
@@ -104,9 +106,6 @@ function MetricPill({ label, value }: { label: string; value: string }) {
 
 export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashboardData }) {
   const [filters, setFilters] = useState<FenogramaFilters>(initialData.filters);
-  const [visibleWeeksInput, setVisibleWeeksInput] = useState(
-    String(initialData.filters.visibleWeeks),
-  );
   const [data, setData] = useState<FenogramaDashboardData>(initialData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +133,7 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
         const nextData = (await response.json()) as FenogramaDashboardData;
         startTransition(() => {
           setData(nextData);
+          setFilters(nextData.filters);
         });
       } catch (fetchError) {
         if (!controller.signal.aborted) {
@@ -160,28 +160,31 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
     setFilters((current) => ({ ...current, [key]: value }));
   }
 
-  function commitVisibleWeeksInput(rawValue: string) {
-    const normalizedValue = rawValue.trim();
+  function updateWeekRange(boundary: "startWeek" | "endWeek", value: string) {
+    setFilters((current) => {
+      const nextFilters = {
+        ...current,
+        [boundary]: value,
+      };
 
-    if (!normalizedValue) {
-      setVisibleWeeksInput(String(filters.visibleWeeks));
-      return;
-    }
+      if (
+        nextFilters.startWeek
+        && nextFilters.endWeek
+        && Number(nextFilters.startWeek) > Number(nextFilters.endWeek)
+      ) {
+        if (boundary === "startWeek") {
+          nextFilters.endWeek = value;
+        } else {
+          nextFilters.startWeek = value;
+        }
+      }
 
-    const numericValue = Number(normalizedValue);
-
-    if (!Number.isFinite(numericValue) || numericValue < 0) {
-      setVisibleWeeksInput(String(filters.visibleWeeks));
-      return;
-    }
-
-    updateFilter("visibleWeeks", Math.trunc(numericValue));
-    setVisibleWeeksInput(String(Math.trunc(numericValue)));
+      return nextFilters;
+    });
   }
 
   function resetFilters() {
     setFilters(initialData.filters);
-    setVisibleWeeksInput(String(initialData.filters.visibleWeeks));
   }
 
   return (
@@ -191,9 +194,9 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 space-y-2">
               <Badge variant="outline" className="rounded-full px-3 py-1">
-                Default: Activos + Planificados / rango visible configurable
+                Pivot semanal por dimensiones y rango manual
               </Badge>
-              <CardTitle className="text-2xl">Fenograma operativo</CardTitle>
+              <CardTitle className="text-2xl">Fenograma</CardTitle>
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="rounded-full px-3 py-1">{data.summary.rowCount} filas</Badge>
@@ -210,32 +213,36 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
             })}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <SelectField id="fenograma-area" label="Area" value={filters.area} options={data.options.areas} onChange={(value) => updateFilter("area", value)} />
             <SelectField id="fenograma-variety" label="Variedad" value={filters.variety} options={data.options.varieties} onChange={(value) => updateFilter("variety", value)} />
             <SelectField id="fenograma-sp-type" label="SP" value={filters.spType} options={data.options.spTypes} onChange={(value) => updateFilter("spType", value)} />
+            <SelectField
+              id="fenograma-start-week"
+              label="Semana desde"
+              value={filters.startWeek}
+              options={data.availableWeeks}
+              emptyLabel="Inicio disponible"
+              onChange={(value) => updateWeekRange("startWeek", value)}
+            />
+            <SelectField
+              id="fenograma-end-week"
+              label="Semana hasta"
+              value={filters.endWeek}
+              options={data.availableWeeks}
+              emptyLabel="Fin disponible"
+              onChange={(value) => updateWeekRange("endWeek", value)}
+            />
             <div className="min-w-0 space-y-2">
-              <Label htmlFor="fenograma-visible-weeks">Rango visible</Label>
-              <input
-                id="fenograma-visible-weeks"
-                type="number"
-                min="0"
-                max="104"
-                inputMode="numeric"
-                value={visibleWeeksInput}
-                onChange={(event) => setVisibleWeeksInput(event.target.value)}
-                onBlur={(event) => commitVisibleWeeksInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    commitVisibleWeeksInput(visibleWeeksInput);
-                  }
-                }}
-                className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50"
-                placeholder="0 = todo el rango"
-              />
-              <p className="text-xs text-muted-foreground">
-                Escribe cuantas semanas quieres ver. Usa 0 para mostrar todo el rango. Visible ahora: {data.summary.firstWeek ?? "-"} a {data.summary.lastWeek ?? "-"}
-              </p>
+              <Label>Rango visible</Label>
+              <div className="rounded-2xl border border-border/70 bg-background/72 px-4 py-3 text-sm text-muted-foreground">
+                <p>
+                  {data.summary.firstWeek ?? "-"} a {data.summary.lastWeek ?? "-"}
+                </p>
+                <p className="mt-1 text-xs">
+                  {data.availableWeeks.length} semanas disponibles en el dataset.
+                </p>
+              </div>
             </div>
             <div className="flex items-end">
               <Button variant="outline" className="w-full rounded-xl" onClick={resetFilters}>

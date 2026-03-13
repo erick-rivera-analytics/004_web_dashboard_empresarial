@@ -249,3 +249,96 @@ Objetivo:
 3. limitar semanas visibles por default
 4. introducir cache corta
 5. agregar autenticacion y permisos
+
+## 13. Produccion con Docker
+
+La app ya queda preparada para `self-hosting` en Linux con Docker y `Next.js standalone`.
+
+Archivos de despliegue:
+
+- `Dockerfile`
+- `docker-compose.yml`
+- `.dockerignore`
+- `.env.production.example`
+
+### 13.1. Variables requeridas
+
+En produccion no se debe usar `.env.local`.
+
+Crear el archivo real de runtime desde el ejemplo:
+
+```bash
+cp .env.production.example .env.production
+```
+
+Variables obligatorias:
+
+- usar `DATABASE_URL`
+- o dejar `DATABASE_URL` vacio y completar `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USER`, `DATABASE_PASSWORD`
+
+Variable opcional:
+
+- `DATABASE_SSL=true|false`
+
+### 13.2. Build-time vs runtime
+
+Hoy la app no usa variables `NEXT_PUBLIC_*` ni depende de secretos en build time.
+
+Eso significa:
+
+- la imagen se puede construir sin credenciales reales
+- las credenciales de PostgreSQL se inyectan solo en runtime con `env_file`
+
+Si en el futuro agregas variables `NEXT_PUBLIC_*`, cualquier cambio en esas variables exigira reconstruir la imagen.
+
+### 13.3. Build local con Docker
+
+```bash
+docker compose build
+```
+
+### 13.4. Levantar con docker compose
+
+```bash
+docker compose up -d
+```
+
+La app escucha internamente en `3000` y queda lista para ponerse detras de `Nginx` reverse proxy.
+
+### 13.5. Logs
+
+```bash
+docker compose logs -f web_dashboard
+```
+
+### 13.6. Reiniciar
+
+```bash
+docker compose restart web_dashboard
+```
+
+### 13.7. Actualizar despues de git pull
+
+```bash
+git pull
+docker compose build
+docker compose up -d
+```
+
+### 13.8. Comandos operativos utiles
+
+Ver contenedores:
+
+```bash
+docker ps
+```
+
+Apagar:
+
+```bash
+docker compose down
+```
+
+### 13.9. Decision tecnica
+
+Se usa `output: "standalone"` para reducir el runtime final y copiar solo lo necesario a la imagen de produccion.

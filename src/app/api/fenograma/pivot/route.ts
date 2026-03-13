@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
       area: request.nextUrl.searchParams.get("area") ?? undefined,
       variety: request.nextUrl.searchParams.get("variety") ?? undefined,
       spType: request.nextUrl.searchParams.get("spType") ?? undefined,
-      visibleWeeks: request.nextUrl.searchParams.get("visibleWeeks") ?? undefined,
+      startWeek: request.nextUrl.searchParams.get("startWeek") ?? undefined,
+      endWeek: request.nextUrl.searchParams.get("endWeek") ?? undefined,
     });
     const data = await getFenogramaDashboardData(filters);
 

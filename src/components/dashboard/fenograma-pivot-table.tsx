@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useMemo, useState } from "react";
+import { ArrowDownUp } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,37 +9,56 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { FenogramaDashboardData, FenogramaPivotRow } from "@/lib/fenograma";
 
-const SUMMARY_COLUMN_WIDTH = 220;
+const collator = new Intl.Collator("en-US", {
+  numeric: true,
+  sensitivity: "base",
+});
 
-const fixedColumns = [
-  { key: "block", label: "Bloque", width: 96, hideable: true },
-  { key: "area", label: "Area", width: 110, hideable: true },
-  { key: "variety", label: "Variedad", width: 156, hideable: true },
-  { key: "spType", label: "SP", width: 92, hideable: true },
-  { key: "spDate", label: "Fecha SP", width: 112, hideable: true },
-  { key: "harvestStartDate", label: "Fecha Ini Cos", width: 126, hideable: true },
-  { key: "harvestEndDate", label: "Fecha Fin Cos", width: 126, hideable: true },
+const SUMMARY_COLUMN_WIDTH = 176;
+const TOTAL_COLUMN_WIDTH = 128;
+
+const dimensionOptions = [
+  { key: "area", label: "Area", type: "text", width: 116 },
+  { key: "variety", label: "Variedad", type: "text", width: 168 },
+  { key: "block", label: "Bloque", type: "text", width: 102 },
+  { key: "cycleKey", label: "Ciclo", type: "text", width: 234 },
+  { key: "spType", label: "SP", type: "text", width: 96 },
+  { key: "spDate", label: "Fecha SP", type: "date", width: 122 },
+  { key: "harvestStartDate", label: "Fecha Ini Cos", type: "date", width: 132 },
+  { key: "harvestEndDate", label: "Fecha Fin Cos", type: "date", width: 132 },
+  { key: "lifecycleStatus", label: "Estado", type: "status", width: 112 },
 ] as const;
 
-const groupOptions = [
-  { key: "none", label: "Sin grupo" },
-  { key: "area", label: "Area" },
-  { key: "variety", label: "Variedad" },
-  { key: "spType", label: "SP" },
-] as const;
+type PivotDimensionKey = (typeof dimensionOptions)[number]["key"];
+type PivotSortKey = PivotDimensionKey | "totalStems";
+type SortDirection = "asc" | "desc";
+type LeadingColumnKey = PivotDimensionKey | "summary" | "totalStems";
+type SortValue = number | string;
+type LeadingColumn = {
+  key: LeadingColumnKey;
+  label: string;
+  width: number;
+  offset: number;
+};
+type AggregatedPivotRow = {
+  id: string;
+  groupValues: Partial<Record<PivotDimensionKey, string>>;
+  weekValues: Record<string, number | null>;
+  totalStems: number;
+  sourceRows: FenogramaPivotRow[];
+  sourceCount: number;
+  sortValues: Record<PivotSortKey, SortValue>;
+};
 
-type FixedColumnKey = (typeof fixedColumns)[number]["key"];
-type GroupKey = (typeof groupOptions)[number]["key"];
-type VisibleFixedColumn = (typeof fixedColumns)[number] & { offset: number };
-
-type TableEntry =
-  | { kind: "detail"; key: string; row: FenogramaPivotRow }
-  | { kind: "groupHeader"; key: string; label: string }
-  | { kind: "subtotal"; key: string; label: string; weekValues: Record<string, number | null> };
+const lifecycleLabelMap: Record<FenogramaPivotRow["lifecycleStatus"], string> = {
+  active: "Activo",
+  planned: "Planificado",
+  history: "Historia",
+};
 
 function formatDate(value: string | null) {
   if (!value) {
-    return "";
+    return "-";
   }
 
   const [year, month, day] = value.split("-");
@@ -56,20 +76,101 @@ function formatCellValue(value: number | null | undefined) {
   });
 }
 
-function buildVisibleFixedColumns(visibleKeys: Set<FixedColumnKey>) {
+function getDimensionValue(row: FenogramaPivotRow, key: PivotDimensionKey) {
+  switch (key) {
+    case "area":
+      return row.area;
+    case "variety":
+      return row.variety;
+    case "block":
+      return row.block;
+    case "cycleKey":
+      return row.cycleKey;
+    case "spType":
+      return row.spType;
+    case "spDate":
+      return row.spDate ?? "";
+    case "harvestStartDate":
+      return row.harvestStartDate ?? "";
+    case "harvestEndDate":
+      return row.harvestEndDate ?? "";
+    case "lifecycleStatus":
+      return row.lifecycleStatus;
+    default:
+      return "";
+  }
+}
+
+function formatDimensionValue(key: PivotDimensionKey, value: string | undefined) {
+  const normalizedValue = value?.trim() ?? "";
+
+  if (!normalizedValue) {
+    return "-";
+  }
+
+  if (key === "spDate" || key === "harvestStartDate" || key === "harvestEndDate") {
+    return formatDate(normalizedValue);
+  }
+
+  if (key === "lifecycleStatus") {
+    return lifecycleLabelMap[normalizedValue as FenogramaPivotRow["lifecycleStatus"]] ?? normalizedValue;
+  }
+
+  return normalizedValue;
+}
+
+function lifecycleRank(value: string) {
+  if (value === "active") {
+    return 0;
+  }
+
+  if (value === "planned") {
+    return 1;
+  }
+
+  if (value === "history") {
+    return 2;
+  }
+
+  return 3;
+}
+
+function toDateSortValue(value: string) {
+  return value ? Number(value.replace(/-/g, "")) : Number.POSITIVE_INFINITY;
+}
+
+function buildLeadingColumns(selectedDimensions: PivotDimensionKey[]) {
+  const baseColumns: Array<Pick<LeadingColumn, "key" | "label" | "width">> = selectedDimensions.length
+    ? dimensionOptions
+      .filter((option) => selectedDimensions.includes(option.key))
+      .map((option) => ({
+        key: option.key,
+        label: option.label,
+        width: option.width,
+      }))
+    : [{ key: "summary", label: "Vista", width: SUMMARY_COLUMN_WIDTH }];
   let offset = 0;
 
-  return fixedColumns
-    .filter((column) => visibleKeys.has(column.key))
-    .map((column) => {
-      const nextColumn = {
-        ...column,
-        offset,
-      } satisfies VisibleFixedColumn;
+  const leadingColumns: LeadingColumn[] = baseColumns.map((column) => {
+    const nextColumn = {
+      key: column.key,
+      label: column.label,
+      width: column.width,
+      offset,
+    } satisfies LeadingColumn;
 
-      offset += column.width;
-      return nextColumn;
-    });
+    offset += column.width;
+    return nextColumn;
+  });
+
+  leadingColumns.push({
+    key: "totalStems",
+    label: "Total",
+    width: TOTAL_COLUMN_WIDTH,
+    offset,
+  });
+
+  return leadingColumns;
 }
 
 function getStickyStyle(offset: number, width: number) {
@@ -80,136 +181,166 @@ function getStickyStyle(offset: number, width: number) {
   };
 }
 
-function isLastFixedColumn(key: FixedColumnKey, visibleColumns: VisibleFixedColumn[]) {
-  return key === visibleColumns[visibleColumns.length - 1]?.key;
+function isLastLeadingColumn(columnKey: LeadingColumnKey, columns: LeadingColumn[]) {
+  return columnKey === columns[columns.length - 1]?.key;
 }
 
-function getFixedCellValue(row: FenogramaPivotRow, key: FixedColumnKey) {
-  if (key === "spDate") {
-    return formatDate(row.spDate);
+function buildAggregateSortValue(rows: FenogramaPivotRow[], key: PivotDimensionKey) {
+  const option = dimensionOptions.find((entry) => entry.key === key);
+  const values = Array.from(
+    new Set(
+      rows
+        .map((row) => getDimensionValue(row, key))
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (!option) {
+    return "";
   }
 
-  if (key === "harvestStartDate") {
-    return formatDate(row.harvestStartDate);
+  if (!values.length) {
+    return option.type === "date" || option.type === "status" ? Number.POSITIVE_INFINITY : "";
   }
 
-  if (key === "harvestEndDate") {
-    return formatDate(row.harvestEndDate);
+  if (option.type === "date") {
+    return Math.min(...values.map((value) => toDateSortValue(value)));
   }
 
-  return row[key] ?? "";
+  if (option.type === "status") {
+    return Math.min(...values.map((value) => lifecycleRank(value)));
+  }
+
+  return values.sort((left, right) => collator.compare(left, right))[0] ?? "";
 }
 
-function lifecycleTone(status: FenogramaPivotRow["lifecycleStatus"]) {
-  if (status === "active") {
+function aggregateRows(
+  rows: FenogramaPivotRow[],
+  weeks: string[],
+  selectedDimensions: PivotDimensionKey[],
+) {
+  const groups = new Map<string, {
+    groupValues: Partial<Record<PivotDimensionKey, string>>;
+    sourceRows: FenogramaPivotRow[];
+    totalStems: number;
+    weekValues: Record<string, number | null>;
+  }>();
+
+  for (const row of rows) {
+    const groupKey = selectedDimensions.length
+      ? selectedDimensions.map((key) => getDimensionValue(row, key)).join("|")
+      : "__total__";
+    const existingGroup = groups.get(groupKey) ?? {
+      groupValues: Object.fromEntries(
+        selectedDimensions.map((key) => [key, getDimensionValue(row, key)]),
+      ) as Partial<Record<PivotDimensionKey, string>>,
+      sourceRows: [],
+      totalStems: 0,
+      weekValues: Object.fromEntries(weeks.map((week) => [week, null])) as Record<string, number | null>,
+    };
+
+    existingGroup.sourceRows.push(row);
+    existingGroup.totalStems += row.totalStems;
+
+    for (const week of weeks) {
+      const currentValue = existingGroup.weekValues[week] ?? 0;
+      existingGroup.weekValues[week] = currentValue + (row.weekValues[week] ?? 0);
+    }
+
+    groups.set(groupKey, existingGroup);
+  }
+
+  return Array.from(groups.entries()).map(([groupKey, group]) => {
+    const weeklyValues = Object.fromEntries(
+      weeks.map((week) => {
+        const weekValue = group.weekValues[week] ?? 0;
+        return [week, weekValue === 0 ? null : Number(weekValue.toFixed(2))];
+      }),
+    ) as Record<string, number | null>;
+
+    return {
+      id: groupKey,
+      groupValues: group.groupValues,
+      weekValues: weeklyValues,
+      totalStems: Number(group.totalStems.toFixed(2)),
+      sourceRows: group.sourceRows,
+      sourceCount: group.sourceRows.length,
+      sortValues: {
+        totalStems: Number(group.totalStems.toFixed(2)),
+        area: buildAggregateSortValue(group.sourceRows, "area"),
+        variety: buildAggregateSortValue(group.sourceRows, "variety"),
+        block: buildAggregateSortValue(group.sourceRows, "block"),
+        cycleKey: buildAggregateSortValue(group.sourceRows, "cycleKey"),
+        spType: buildAggregateSortValue(group.sourceRows, "spType"),
+        spDate: buildAggregateSortValue(group.sourceRows, "spDate"),
+        harvestStartDate: buildAggregateSortValue(group.sourceRows, "harvestStartDate"),
+        harvestEndDate: buildAggregateSortValue(group.sourceRows, "harvestEndDate"),
+        lifecycleStatus: buildAggregateSortValue(group.sourceRows, "lifecycleStatus"),
+      },
+    } satisfies AggregatedPivotRow;
+  });
+}
+
+function compareSortValues(left: SortValue, right: SortValue) {
+  if (typeof left === "number" && typeof right === "number") {
+    return left - right;
+  }
+
+  return collator.compare(String(left), String(right));
+}
+
+function sortAggregatedRows(
+  rows: AggregatedPivotRow[],
+  selectedDimensions: PivotDimensionKey[],
+  sortBy: PivotSortKey,
+  sortDirection: SortDirection,
+) {
+  const directionMultiplier = sortDirection === "asc" ? 1 : -1;
+
+  return [...rows].sort((left, right) => {
+    const primaryComparison = compareSortValues(left.sortValues[sortBy], right.sortValues[sortBy]);
+
+    if (primaryComparison !== 0) {
+      return primaryComparison * directionMultiplier;
+    }
+
+    for (const dimension of selectedDimensions) {
+      if (dimension === sortBy) {
+        continue;
+      }
+
+      const comparison = compareSortValues(left.sortValues[dimension], right.sortValues[dimension]);
+
+      if (comparison !== 0) {
+        return comparison;
+      }
+    }
+
+    const byTotal = Number(right.totalStems.toFixed(2)) - Number(left.totalStems.toFixed(2));
+
+    if (byTotal !== 0) {
+      return byTotal;
+    }
+
+    return collator.compare(left.id, right.id);
+  });
+}
+
+function lifecycleTone(rows: FenogramaPivotRow[]) {
+  if (rows.length !== 1) {
+    return "bg-background/72";
+  }
+
+  if (rows[0]?.lifecycleStatus === "active") {
     return "bg-primary/6";
   }
 
-  if (status === "planned") {
+  if (rows[0]?.lifecycleStatus === "planned") {
     return "bg-accent/14";
   }
 
   return "bg-background/68";
-}
-
-function getGroupValue(row: FenogramaPivotRow, groupBy: GroupKey) {
-  if (groupBy === "none") {
-    return "";
-  }
-
-  if (groupBy === "area") {
-    return row.area || "Sin area";
-  }
-
-  if (groupBy === "variety") {
-    return row.variety || "Sin variedad";
-  }
-
-  return row.spType || "Sin SP";
-}
-
-function sortRows(left: FenogramaPivotRow, right: FenogramaPivotRow) {
-  const byArea = left.area.localeCompare(right.area, "en-US", { sensitivity: "base" });
-
-  if (byArea !== 0) {
-    return byArea;
-  }
-
-  const byBlock = left.block.localeCompare(right.block, "en-US", { numeric: true });
-
-  if (byBlock !== 0) {
-    return byBlock;
-  }
-
-  return left.cycleKey.localeCompare(right.cycleKey, "en-US", { numeric: true });
-}
-
-function summarizeRowsByWeeks(rows: FenogramaPivotRow[], weeks: string[]) {
-  return Object.fromEntries(
-    weeks.map((week) => [
-      week,
-      rows.reduce<number>((sum, row) => sum + (row.weekValues[week] ?? 0), 0),
-    ]),
-  ) as Record<string, number>;
-}
-
-function buildTableEntries(
-  rows: FenogramaPivotRow[],
-  groupBy: GroupKey,
-  showDetailRows: boolean,
-  weeks: string[],
-) {
-  const sortedRows = [...rows].sort(sortRows);
-
-  if (groupBy === "none") {
-    if (!showDetailRows) {
-      return [] as TableEntry[];
-    }
-
-    return sortedRows.map((row) => ({
-      kind: "detail" as const,
-      key: row.id,
-      row,
-    }));
-  }
-
-  const groupedRows = new Map<string, FenogramaPivotRow[]>();
-
-  for (const row of sortedRows) {
-    const groupValue = getGroupValue(row, groupBy);
-    const currentRows = groupedRows.get(groupValue) ?? [];
-    currentRows.push(row);
-    groupedRows.set(groupValue, currentRows);
-  }
-
-  const entries: TableEntry[] = [];
-
-  for (const [groupValue, currentRows] of groupedRows.entries()) {
-    if (showDetailRows) {
-      entries.push({
-        kind: "groupHeader",
-        key: `group-${groupValue}`,
-        label: groupValue,
-      });
-
-      for (const row of currentRows) {
-        entries.push({
-          kind: "detail",
-          key: row.id,
-          row,
-        });
-      }
-    }
-
-    entries.push({
-      kind: "subtotal",
-      key: `subtotal-${groupValue}`,
-      label: `Subtotal ${groupOptions.find((option) => option.key === groupBy)?.label}: ${groupValue}`,
-      weekValues: summarizeRowsByWeeks(currentRows, weeks),
-    });
-  }
-
-  return entries;
 }
 
 export const FenogramaPivotTable = memo(function FenogramaPivotTable({
@@ -219,83 +350,100 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
   data: FenogramaDashboardData;
   onRowSelect?: (row: FenogramaPivotRow) => void;
 }) {
-  const [groupBy, setGroupBy] = useState<GroupKey>("none");
-  const [visibleColumnKeys, setVisibleColumnKeys] = useState<FixedColumnKey[]>(
-    fixedColumns.map((column) => column.key),
+  const [selectedDimensions, setSelectedDimensions] = useState<PivotDimensionKey[]>(["area"]);
+  const [sortBy, setSortBy] = useState<PivotSortKey>("area");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  const leadingColumns = useMemo(
+    () => buildLeadingColumns(selectedDimensions),
+    [selectedDimensions],
+  );
+  const aggregatedRows = useMemo(
+    () => aggregateRows(data.rows, data.weeks, selectedDimensions),
+    [data.rows, data.weeks, selectedDimensions],
+  );
+  const sortedRows = useMemo(
+    () => sortAggregatedRows(aggregatedRows, selectedDimensions, sortBy, sortDirection),
+    [aggregatedRows, selectedDimensions, sortBy, sortDirection],
   );
 
-  const visibleColumns = useMemo(
-    () => buildVisibleFixedColumns(new Set(visibleColumnKeys)),
-    [visibleColumnKeys],
-  );
-  const showDetailRows = visibleColumns.length > 0;
-  const needsSummaryColumn = visibleColumns.length === 0;
-  const tableEntries = useMemo(
-    () => buildTableEntries(data.rows, groupBy, showDetailRows, data.weeks),
-    [data.rows, data.weeks, groupBy, showDetailRows],
-  );
+  function toggleDimension(dimension: PivotDimensionKey) {
+    setSelectedDimensions((current) => {
+      if (current.includes(dimension)) {
+        return current.filter((item) => item !== dimension);
+      }
 
-  function handleRowSelect(row: FenogramaPivotRow) {
-    if (!onRowSelect) {
+      return dimensionOptions
+        .map((option) => option.key)
+        .filter((key) => current.includes(key) || key === dimension);
+    });
+  }
+
+  function handleRowSelect(row: AggregatedPivotRow) {
+    if (!onRowSelect || row.sourceRows.length !== 1) {
       return;
     }
 
-    onRowSelect(row);
-  }
-
-  function toggleFixedColumn(columnKey: FixedColumnKey) {
-    setVisibleColumnKeys((current) => {
-      if (current.includes(columnKey)) {
-        return current.filter((key) => key !== columnKey);
-      }
-
-      return fixedColumns
-        .map((column) => column.key)
-        .filter((key) => current.includes(key) || key === columnKey);
-    });
+    onRowSelect(row.sourceRows[0]!);
   }
 
   return (
     <Card className="starter-panel overflow-hidden border-border/70 bg-card/82">
       <CardContent className="space-y-4 p-4">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-              Vista operativa
+              Columnas de agrupacion
             </p>
             <div className="flex flex-wrap gap-2">
-              {groupOptions.map((option) => (
-                <Button
-                  key={option.key}
-                  variant={groupBy === option.key ? "secondary" : "outline"}
-                  className="rounded-full"
-                  onClick={() => setGroupBy(option.key)}
-                >
-                  {option.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-              Columnas fijas
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {fixedColumns.map((column) => {
-                const isVisible = visibleColumnKeys.includes(column.key);
+              {dimensionOptions.map((option) => {
+                const active = selectedDimensions.includes(option.key);
 
                 return (
                   <Button
-                    key={column.key}
-                    variant={isVisible ? "secondary" : "outline"}
+                    key={option.key}
+                    variant={active ? "secondary" : "outline"}
                     className="rounded-full"
-                    onClick={() => toggleFixedColumn(column.key)}
+                    onClick={() => toggleDimension(option.key)}
                   >
-                    {column.label}
+                    {option.label}
                   </Button>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px]">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                Orden
+              </p>
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as PivotSortKey)}
+                className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                {dimensionOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+                <option value="totalStems">Total tallos</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                Direccion
+              </p>
+              <Button
+                variant="outline"
+                className="h-10 w-full rounded-xl"
+                onClick={() => setSortDirection((current) => (current === "asc" ? "desc" : "asc"))}
+              >
+                <ArrowDownUp className="size-4" />
+                {sortDirection === "asc" ? "Ascendente" : "Descendente"}
+              </Button>
             </div>
           </div>
         </div>
@@ -305,32 +453,27 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
             {data.rows.length} filas base
           </Badge>
           <Badge variant="outline" className="rounded-full px-3 py-1">
-            {visibleColumns.length} columnas fijas activas
+            {sortedRows.length} filas pivotadas
           </Badge>
           <Badge variant="outline" className="rounded-full px-3 py-1">
-            Agrupacion: {groupOptions.find((option) => option.key === groupBy)?.label}
+            {selectedDimensions.length ? selectedDimensions.length : "Sin"} dimensiones activas
+          </Badge>
+          <Badge variant="outline" className="rounded-full px-3 py-1">
+            Click solo cuando el grupo representa 1 ciclo
           </Badge>
         </div>
 
-        <div className="max-h-[min(72vh,780px)] w-full overflow-auto rounded-[24px] border border-border/70">
+        <div className="max-h-[min(74vh,820px)] w-full overflow-auto rounded-[24px] border border-border/70">
           <table className="min-w-full w-max border-separate border-spacing-0 text-sm">
             <thead className="sticky top-0 z-30 bg-card/95 backdrop-blur">
               <tr>
-                {needsSummaryColumn ? (
-                  <th
-                    className="sticky top-0 border-b border-r border-border/70 bg-card px-3 py-3 text-left font-semibold text-foreground"
-                    style={{ minWidth: `${SUMMARY_COLUMN_WIDTH}px`, width: `${SUMMARY_COLUMN_WIDTH}px` }}
-                  >
-                    Resumen
-                  </th>
-                ) : null}
-                {visibleColumns.map((column) => (
+                {leadingColumns.map((column) => (
                   <th
                     key={column.key}
                     style={getStickyStyle(column.offset, column.width)}
                     className={cn(
                       "sticky top-0 z-40 border-b border-r border-border/70 bg-card px-3 py-3 text-left font-semibold text-foreground",
-                      isLastFixedColumn(column.key, visibleColumns) && "shadow-[14px_0_20px_-16px_rgba(15,23,42,0.28)]",
+                      isLastLeadingColumn(column.key, leadingColumns) && "shadow-[14px_0_20px_-16px_rgba(15,23,42,0.28)]",
                     )}
                   >
                     {column.label}
@@ -347,95 +490,70 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
               </tr>
             </thead>
             <tbody>
-              {tableEntries.map((entry, rowIndex) => {
-                if (entry.kind === "groupHeader") {
-                  return (
-                    <tr key={entry.key}>
-                      <td
-                        colSpan={visibleColumns.length + data.weeks.length}
-                        className="sticky top-[49px] z-20 border-b border-t border-border/60 bg-primary/8 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-primary backdrop-blur"
-                      >
-                        {entry.label}
-                      </td>
-                    </tr>
-                  );
-                }
-
-                if (entry.kind === "subtotal") {
-                  return (
-                    <tr key={entry.key} className="bg-primary/7">
-                      {needsSummaryColumn ? (
-                        <td
-                          className="border-b border-r border-border/60 px-3 py-2.5 font-semibold text-foreground"
-                          style={{ minWidth: `${SUMMARY_COLUMN_WIDTH}px`, width: `${SUMMARY_COLUMN_WIDTH}px` }}
-                        >
-                          {entry.label}
-                        </td>
-                      ) : (
-                        <td
-                          colSpan={visibleColumns.length}
-                          className="border-b border-r border-border/60 px-3 py-2.5 font-semibold text-foreground"
-                        >
-                          {entry.label}
-                        </td>
-                      )}
-                      {data.weeks.map((week) => (
-                        <td
-                          key={`${entry.key}-${week}`}
-                          className="border-b border-r border-border/60 px-3 py-2.5 text-right font-semibold tabular-nums text-foreground"
-                        >
-                          <div className="min-w-[92px]">{formatCellValue(entry.weekValues[week])}</div>
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                }
-
-                const row = entry.row;
+              {sortedRows.length ? sortedRows.map((row, rowIndex) => {
+                const isClickable = row.sourceRows.length === 1 && Boolean(onRowSelect);
 
                 return (
                   <tr
-                    key={entry.key}
+                    key={row.id}
                     className={cn(
                       rowIndex % 2 === 0 ? "bg-background/84" : "bg-background/70",
-                      lifecycleTone(row.lifecycleStatus),
-                      onRowSelect && "cursor-pointer transition-colors hover:bg-primary/6",
+                      lifecycleTone(row.sourceRows),
+                      isClickable && "cursor-pointer transition-colors hover:bg-primary/6",
                     )}
-                    onClick={onRowSelect ? () => handleRowSelect(row) : undefined}
-                    onKeyDown={onRowSelect ? (event) => {
+                    onClick={isClickable ? () => handleRowSelect(row) : undefined}
+                    onKeyDown={isClickable ? (event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
                         handleRowSelect(row);
                       }
                     } : undefined}
-                    role={onRowSelect ? "button" : undefined}
-                    tabIndex={onRowSelect ? 0 : undefined}
+                    role={isClickable ? "button" : undefined}
+                    tabIndex={isClickable ? 0 : undefined}
                   >
-                    {visibleColumns.map((column) => (
-                      <td
-                        key={`${row.id}-${column.key}`}
-                        style={getStickyStyle(column.offset, column.width)}
-                        className={cn(
-                          "sticky z-20 border-b border-r border-border/60 bg-card px-3 py-2.5 align-middle text-left text-foreground",
-                          isLastFixedColumn(column.key, visibleColumns) && "shadow-[14px_0_20px_-16px_rgba(15,23,42,0.22)]",
-                        )}
-                      >
-                        {column.key === "block" && onRowSelect && row.block ? (
-                          <button
-                            type="button"
-                            className="w-full text-left font-semibold underline-offset-4 hover:underline"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleRowSelect(row);
-                            }}
+                    {leadingColumns.map((column, columnIndex) => {
+                      const isLastColumn = isLastLeadingColumn(column.key, leadingColumns);
+
+                      if (column.key === "totalStems") {
+                        return (
+                          <td
+                            key={`${row.id}-${column.key}`}
+                            style={getStickyStyle(column.offset, column.width)}
+                            className={cn(
+                              "sticky z-20 border-b border-r border-border/60 bg-card px-3 py-2.5 text-right font-semibold tabular-nums text-foreground",
+                              isLastColumn && "shadow-[14px_0_20px_-16px_rgba(15,23,42,0.22)]",
+                            )}
                           >
-                            {getFixedCellValue(row, column.key)}
-                          </button>
-                        ) : (
-                          getFixedCellValue(row, column.key)
-                        )}
-                      </td>
-                    ))}
+                            {formatCellValue(row.totalStems)}
+                          </td>
+                        );
+                      }
+
+                      const displayValue = column.key === "summary"
+                        ? "Total general"
+                        : formatDimensionValue(column.key, row.groupValues[column.key]);
+
+                      return (
+                        <td
+                          key={`${row.id}-${column.key}`}
+                          style={getStickyStyle(column.offset, column.width)}
+                          className={cn(
+                            "sticky z-20 border-b border-r border-border/60 bg-card px-3 py-2.5 align-middle text-left text-foreground",
+                            isLastColumn && "shadow-[14px_0_20px_-16px_rgba(15,23,42,0.22)]",
+                          )}
+                        >
+                          <div className="min-w-0">
+                            <p className={cn("truncate", isClickable && columnIndex === 0 && "font-semibold underline-offset-4 hover:underline")}>
+                              {displayValue}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {row.sourceCount === 1 ? "1 ciclo" : `${row.sourceCount} ciclos`}
+                            </p>
+                          </div>
+                        </td>
+                      );
+                    })}
+
                     {data.weeks.map((week) => (
                       <td
                         key={`${row.id}-${week}`}
@@ -446,30 +564,41 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
                     ))}
                   </tr>
                 );
-              })}
+              }) : (
+                <tr>
+                  <td
+                    colSpan={leadingColumns.length + data.weeks.length}
+                    className="px-4 py-8 text-center text-sm text-muted-foreground"
+                  >
+                    No hay datos para el rango seleccionado.
+                  </td>
+                </tr>
+              )}
             </tbody>
             <tfoot className="sticky bottom-0 z-30 bg-card/96 backdrop-blur">
               <tr>
-                {needsSummaryColumn ? (
-                  <td
-                    className="sticky bottom-0 border-t border-r border-border/70 bg-card px-3 py-3 text-left font-semibold text-foreground"
-                    style={{ minWidth: `${SUMMARY_COLUMN_WIDTH}px`, width: `${SUMMARY_COLUMN_WIDTH}px` }}
-                  >
-                    Total general
-                  </td>
-                ) : null}
-                {visibleColumns.map((column, index) => (
-                  <td
-                    key={`total-${column.key}`}
-                    style={getStickyStyle(column.offset, column.width)}
-                    className={cn(
-                      "sticky bottom-0 z-40 border-t border-r border-border/70 bg-card px-3 py-3 text-left font-semibold text-foreground",
-                      isLastFixedColumn(column.key, visibleColumns) && "shadow-[14px_0_20px_-16px_rgba(15,23,42,0.28)]",
-                    )}
-                  >
-                    {index === 0 ? "Total general" : ""}
-                  </td>
-                ))}
+                {leadingColumns.map((column, columnIndex) => {
+                  const isLastColumn = isLastLeadingColumn(column.key, leadingColumns);
+                  const content = column.key === "totalStems"
+                    ? formatCellValue(data.summary.totalStems)
+                    : columnIndex === 0
+                      ? "Total general"
+                      : "";
+
+                  return (
+                    <td
+                      key={`footer-${column.key}`}
+                      style={getStickyStyle(column.offset, column.width)}
+                      className={cn(
+                        "sticky bottom-0 z-40 border-t border-r border-border/70 bg-card px-3 py-3 text-left font-semibold text-foreground",
+                        column.key === "totalStems" && "text-right tabular-nums",
+                        isLastColumn && "shadow-[14px_0_20px_-16px_rgba(15,23,42,0.28)]",
+                      )}
+                    >
+                      {content}
+                    </td>
+                  );
+                })}
                 {data.weeklyTotals.map((entry) => (
                   <td
                     key={`total-${entry.week}`}

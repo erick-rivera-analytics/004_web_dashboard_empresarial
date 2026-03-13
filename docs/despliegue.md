@@ -91,59 +91,48 @@ Esto permite separar problemas de `dev` de problemas reales de produccion.
 
 ## 7. Despliegue con Docker
 
-## 7.1. Dockerfile de referencia
+El repo ahora incluye un `Dockerfile` multi-stage real para produccion:
 
-```dockerfile
-FROM node:22-alpine AS deps
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci
+- `node:20-alpine`
+- `output: "standalone"` en `next.config.ts`
+- `npm ci` en etapa de dependencias
+- `npm run build` en etapa de build
+- runtime final con usuario no root
+- puerto interno `3000`
+- secretos inyectados por `env_file` en runtime, no dentro de la imagen
 
-FROM node:22-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN npm run build
-
-FROM node:22-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-EXPOSE 3000
-CMD ["npm", "run", "start"]
-```
-
-## 7.2. Consideraciones del Dockerfile
+## 7.1. Consideraciones del Dockerfile
 
 - usa una etapa para dependencias
 - usa una etapa para build
-- arranca en modo produccion
+- usa runtime final liviano con `standalone`
+- arranca en modo produccion con `node server.js`
 - necesita variables de entorno reales al ejecutar el contenedor
 
-## 7.3. Ejemplo basico de ejecucion
+## 7.2. Ejecucion recomendada
 
 ```bash
-docker build -t atlas-empresarial .
-docker run -p 3000:3000 --env-file .env.production atlas-empresarial
+cp .env.production.example .env.production
+docker compose build
+docker compose up -d
 ```
 
 ## 8. Despliegue con compose
 
-Ejemplo minimo:
+El repo ahora incluye `docker-compose.yml` con:
 
-```yaml
-services:
-  dashboard:
-    build: .
-    container_name: atlas-empresarial
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env.production
-    restart: unless-stopped
+- servicio `web_dashboard`
+- `restart: unless-stopped`
+- `env_file: .env.production`
+- puerto `3000:3000`
+- red `atlas_dashboard_net`
+
+Comandos utiles:
+
+```bash
+docker compose logs -f web_dashboard
+docker compose restart web_dashboard
+docker compose down
 ```
 
 ## 9. Recomendaciones de red

@@ -1,7 +1,7 @@
 "use client";
 
-import { MapPinned, Move, Plus, RefreshCcw, Sprout, ZoomOut } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MapPinned, Move, Plus, RefreshCcw, Sprout, ZoomOut } from "lucide-react";
 
 import { BlockProfileModal } from "@/components/dashboard/fenograma-block-modal";
 import { Badge } from "@/components/ui/badge";
@@ -25,8 +25,6 @@ type ViewportState = {
 
 type AreaLabel = {
   name: string;
-  x: number;
-  y: number;
   blockCount: number;
   totalStems: number;
 };
@@ -106,8 +104,6 @@ function buildMapTransform(viewport: ViewportState, width: number, height: numbe
 
 function buildAreaLabels(features: CampoMapFeature[]): AreaLabel[] {
   const grouped = new Map<string, {
-    sumX: number;
-    sumY: number;
     blockCount: number;
     totalStems: number;
   }>();
@@ -120,14 +116,10 @@ function buildAreaLabels(features: CampoMapFeature[]): AreaLabel[] {
     }
 
     const currentGroup = grouped.get(areaName) ?? {
-      sumX: 0,
-      sumY: 0,
       blockCount: 0,
       totalStems: 0,
     };
 
-    currentGroup.sumX += feature.center[0];
-    currentGroup.sumY += feature.center[1];
     currentGroup.blockCount += 1;
     currentGroup.totalStems += feature.row.totalStems;
     grouped.set(areaName, currentGroup);
@@ -136,8 +128,6 @@ function buildAreaLabels(features: CampoMapFeature[]): AreaLabel[] {
   return Array.from(grouped.entries())
     .map(([name, value]) => ({
       name,
-      x: value.sumX / value.blockCount,
-      y: value.sumY / value.blockCount,
       blockCount: value.blockCount,
       totalStems: value.totalStems,
     }))
@@ -288,6 +278,22 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="rounded-[28px] border border-border/70 bg-background/72 p-4">
+            <div className="flex flex-wrap items-start gap-3">
+              {areaLabels.map((label) => (
+                <div
+                  key={label.name}
+                  className="rounded-2xl border border-border/70 bg-card/88 px-4 py-3 shadow-sm"
+                >
+                  <p className="text-sm font-semibold">{label.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {label.blockCount} bloques · {formatNumber(label.totalStems)} tallos
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="rounded-[30px] border border-border/70 bg-background/72 p-3">
             <div
               ref={mapRef}
@@ -401,40 +407,6 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
                       </g>
                     );
                   })}
-
-                  {areaLabels.map((label) => (
-                    <g key={label.name} className="pointer-events-none" transform={`translate(${label.x} ${label.y})`}>
-                      <rect
-                        x={-74}
-                        y={-24}
-                        width={148}
-                        height={44}
-                        rx={16}
-                        fill="rgba(255,255,255,0.9)"
-                        stroke="rgba(15,23,42,0.18)"
-                        strokeWidth={1.2}
-                      />
-                      <text
-                        x="0"
-                        y="-3"
-                        fill="rgba(15,23,42,0.92)"
-                        fontSize="12"
-                        fontWeight="700"
-                        textAnchor="middle"
-                      >
-                        {label.name}
-                      </text>
-                      <text
-                        x="0"
-                        y="13"
-                        fill="rgba(71,85,105,0.92)"
-                        fontSize="10"
-                        textAnchor="middle"
-                      >
-                        {`${label.blockCount} bloques · ${formatNumber(label.totalStems)} tallos`}
-                      </text>
-                    </g>
-                  ))}
                 </g>
               </svg>
 
@@ -497,7 +469,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
                   <div>
                     <CardTitle className="text-lg">Areas identificadas</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      Etiquetas agregadas segun el area actual del ultimo ciclo por bloque.
+                      Resumen agregado del area actual del ultimo ciclo por bloque.
                     </p>
                   </div>
                 </div>

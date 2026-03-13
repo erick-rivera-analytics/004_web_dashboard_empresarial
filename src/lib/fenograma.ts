@@ -176,7 +176,8 @@ export type FenogramaFilters = {
   area: string;
   variety: string;
   spType: string;
-  visibleWeeks: number;
+  startWeek: string;
+  endWeek: string;
 };
 
 export type BlockModalRow = {
@@ -222,6 +223,7 @@ export type FenogramaDashboardData = {
   today: string;
   filters: FenogramaFilters;
   options: FenogramaFilterOptions;
+  availableWeeks: string[];
   weeks: string[];
   rows: FenogramaPivotRow[];
   weeklyTotals: FenogramaWeeklyTotal[];
@@ -406,7 +408,8 @@ export const defaultFenogramaFilters: FenogramaFilters = {
   area: "all",
   variety: "all",
   spType: "all",
-  visibleWeeks: 24,
+  startWeek: "",
+  endWeek: "",
 };
 
 const AREA_SQL = `
@@ -494,22 +497,13 @@ function parseSelectValue(value: string | undefined) {
   return value;
 }
 
-function parseVisibleWeeks(value: string | number | undefined, fallback: number) {
-  if (value === undefined) {
-    return fallback;
+function parseWeekFilter(value: string | undefined) {
+  if (!value) {
+    return "";
   }
 
-  const numericValue = Number(value);
-
-  if (!Number.isFinite(numericValue)) {
-    return fallback;
-  }
-
-  if (numericValue <= 0) {
-    return 0;
-  }
-
-  return Math.min(Math.max(Math.trunc(numericValue), 4), 104);
+  const normalizedValue = value.trim();
+  return /^\d{4}$/.test(normalizedValue) ? normalizedValue : "";
 }
 
 function roundValue(value: number) {
@@ -556,7 +550,8 @@ function serializeFilters(filters: FenogramaFilters) {
     filters.area,
     filters.variety,
     filters.spType,
-    String(filters.visibleWeeks),
+    filters.startWeek,
+    filters.endWeek,
   ].join("|");
 }
 
@@ -578,35 +573,72 @@ function shouldUseCurrentWeekWindow(filters: FenogramaFilters) {
   );
 }
 
-function getVisibleWeekLimit(filters: FenogramaFilters) {
-  if (filters.visibleWeeks <= 0) {
-    return null;
-  }
+const DEFAULT_VISIBLE_WEEK_SPAN = 24;
 
-  return filters.visibleWeeks;
-}
-
-function buildVisibleWeeks(allWeeks: string[], filters: FenogramaFilters) {
-  const visibleWeekLimit = getVisibleWeekLimit(filters);
-
-  if (!visibleWeekLimit) {
-    return allWeeks;
+function buildDefaultVisibleWeeks(allWeeks: string[], filters: FenogramaFilters) {
+  if (!allWeeks.length) {
+    return [] as string[];
   }
 
   if (!shouldUseCurrentWeekWindow(filters)) {
-    return allWeeks.slice(-visibleWeekLimit);
+    return allWeeks.slice(-DEFAULT_VISIBLE_WEEK_SPAN);
   }
 
   const currentIsoWeekId = getCurrentIsoWeekId();
   const visibleWeeks = allWeeks
     .filter((week) => Number(week) >= Number(currentIsoWeekId))
-    .slice(0, visibleWeekLimit);
+    .slice(0, DEFAULT_VISIBLE_WEEK_SPAN);
 
   if (visibleWeeks.length) {
     return visibleWeeks;
   }
 
-  return allWeeks.slice(-visibleWeekLimit);
+  return allWeeks.slice(-DEFAULT_VISIBLE_WEEK_SPAN);
+}
+
+function buildVisibleWeeks(allWeeks: string[], filters: FenogramaFilters) {
+  if (!allWeeks.length) {
+    return {
+      weeks: [] as string[],
+      startWeek: "",
+      endWeek: "",
+    };
+  }
+
+  const requestedStartWeek = parseWeekFilter(filters.startWeek);
+  const requestedEndWeek = parseWeekFilter(filters.endWeek);
+  let startIndex = requestedStartWeek ? allWeeks.indexOf(requestedStartWeek) : -1;
+  let endIndex = requestedEndWeek ? allWeeks.indexOf(requestedEndWeek) : -1;
+
+  if (startIndex === -1 && endIndex === -1) {
+    const defaultWeeks = buildDefaultVisibleWeeks(allWeeks, filters);
+
+    return {
+      weeks: defaultWeeks,
+      startWeek: defaultWeeks[0] ?? "",
+      endWeek: defaultWeeks[defaultWeeks.length - 1] ?? "",
+    };
+  }
+
+  if (startIndex === -1) {
+    startIndex = 0;
+  }
+
+  if (endIndex === -1) {
+    endIndex = allWeeks.length - 1;
+  }
+
+  if (startIndex > endIndex) {
+    [startIndex, endIndex] = [endIndex, startIndex];
+  }
+
+  const weeks = allWeeks.slice(startIndex, endIndex + 1);
+
+  return {
+    weeks,
+    startWeek: weeks[0] ?? "",
+    endWeek: weeks[weeks.length - 1] ?? "",
+  };
 }
 
 function buildRowKey(
@@ -877,12 +909,8 @@ export function normalizeFenogramaFilters(
     area: parseSelectValue(typeof input.area === "string" ? input.area : undefined),
     variety: parseSelectValue(typeof input.variety === "string" ? input.variety : undefined),
     spType: parseSelectValue(typeof input.spType === "string" ? input.spType : undefined),
-    visibleWeeks: parseVisibleWeeks(
-      typeof input.visibleWeeks === "number" || typeof input.visibleWeeks === "string"
-        ? input.visibleWeeks
-        : undefined,
-      defaultFenogramaFilters.visibleWeeks,
-    ),
+    startWeek: parseWeekFilter(typeof input.startWeek === "string" ? input.startWeek : undefined),
+    endWeek: parseWeekFilter(typeof input.endWeek === "string" ? input.endWeek : undefined),
   };
 }
 
@@ -1035,9 +1063,9 @@ export async function getFenogramaDashboardData(
         currentRow.weekValues[isoWeek] = roundValue(currentWeekValue + stemsCount);
       }
 
-      const allWeeks = Array.from(weeksSet).sort((left, right) => Number(left) - Number(right));
-      const weeks = buildVisibleWeeks(allWeeks, filters);
-      const visibleWeekLimit = getVisibleWeekLimit(filters);
+      const availableWeeks = Array.from(weeksSet).sort((left, right) => Number(left) - Number(right));
+      const visibleWeekRange = buildVisibleWeeks(availableWeeks, filters);
+      const weeks = visibleWeekRange.weeks;
       const rows = Array.from(rowsMap.values())
         .map((row) => {
           const visibleWeekValues = Object.fromEntries(
@@ -1051,7 +1079,7 @@ export async function getFenogramaDashboardData(
             weekValues: visibleWeekValues,
           };
         })
-        .filter((row) => !visibleWeekLimit || row.totalStems > 0);
+        .filter((row) => row.totalStems > 0);
       const weeklyTotals = weeks.map((week) => ({
         week,
         stems: roundValue(weeklyTotalsMap.get(week) ?? 0),
@@ -1063,8 +1091,13 @@ export async function getFenogramaDashboardData(
       return {
         generatedAt: new Date().toISOString(),
         today: formatToday(),
-        filters,
+        filters: {
+          ...filters,
+          startWeek: visibleWeekRange.startWeek,
+          endWeek: visibleWeekRange.endWeek,
+        },
         options,
+        availableWeeks,
         weeks,
         rows,
         weeklyTotals,
