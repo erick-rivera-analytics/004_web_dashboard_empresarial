@@ -1,5 +1,14 @@
 # Despliegue y rendimiento
 
+## Flujo de actualizacion
+
+```bash
+git pull --ff-only origin main
+docker compose build
+docker compose up -d
+docker logs --tail 50 atlas_web_dashboard
+```
+
 ## 1. Objetivo operativo
 
 La meta de despliegue es correr la app en modo produccion, idealmente en la misma maquina o en la misma red privada donde vive PostgreSQL.
