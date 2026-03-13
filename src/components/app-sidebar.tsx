@@ -36,6 +36,8 @@ type SidebarBranchProps = {
   onBranchToggle: (key: string) => void;
 };
 
+const EMPTY_LINEAGE: string[] = [];
+
 function getNodeKey(lineage: string[], label: string) {
   return [...lineage, label].join("/");
 }
@@ -50,7 +52,7 @@ function treeIsActive(node: SidebarNode, pathname: string): boolean {
 
 function buildOpenState(
   nodes: SidebarNode[],
-  lineage: string[] = [],
+  lineage: string[] = EMPTY_LINEAGE,
   initialState: Record<string, boolean> = {},
 ) {
   for (const node of nodes) {
@@ -112,7 +114,7 @@ function SidebarItem({
 function SidebarBranch({
   node,
   pathname,
-  lineage = [],
+  lineage = EMPTY_LINEAGE,
   depth = 0,
   collapsed,
   openBranches,

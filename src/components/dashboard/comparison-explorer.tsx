@@ -1,7 +1,8 @@
 "use client";
 
-import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { ArrowLeftRight, Search, ShieldAlert, Swords, Trophy } from "lucide-react";
+import useSWR from "swr";
 
 import { ComparisonRadarPanel } from "@/components/dashboard/comparison-radar-panel";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { fetchJson } from "@/lib/fetch-json";
 import { cn } from "@/lib/utils";
 import type {
   ComparisonCycleOption,
@@ -48,6 +50,12 @@ function buildOptionsQuery(filters: ComparisonSearchFilters) {
   params.set("limit", String(filters.limit));
   return params.toString();
 }
+
+const comparisonOptionsFetcher = (url: string) =>
+  fetchJson<ComparisonCycleOption[]>(url, "No se pudo cargar la busqueda de ciclos.");
+
+const comparisonPairFetcher = (url: string) =>
+  fetchJson<ComparisonPairPayload>(url, "No se pudo cargar la comparacion.");
 
 function ComparisonSlotCard({
   label,
@@ -163,123 +171,60 @@ function MetricBattleRow({
 export function ComparisonExplorer({ initialData }: { initialData: ComparisonDashboardData }) {
   const [filters, setFilters] = useState(initialData.filters);
   const deferredFilters = useDeferredValue(filters);
-  const [options, setOptions] = useState(initialData.options);
-  const [optionsLoading, setOptionsLoading] = useState(false);
-  const [optionsError, setOptionsError] = useState<string | null>(null);
   const [leftCycleKey, setLeftCycleKey] = useState(initialData.leftCycleKey);
   const [rightCycleKey, setRightCycleKey] = useState(initialData.rightCycleKey);
-  const [comparison, setComparison] = useState<ComparisonPairPayload | null>(initialData.comparison);
-  const [comparisonLoading, setComparisonLoading] = useState(false);
-  const [comparisonError, setComparisonError] = useState<string | null>(null);
-  const hasBootstrappedOptionsRef = useRef(false);
-  const hasBootstrappedPairRef = useRef(false);
-
-  useEffect(() => {
-    const query = buildOptionsQuery(deferredFilters);
-
-    if (!hasBootstrappedOptionsRef.current) {
-      hasBootstrappedOptionsRef.current = true;
-      return;
-    }
-
-    const controller = new AbortController();
-
-    async function loadOptions() {
-      setOptionsLoading(true);
-      setOptionsError(null);
-
-      try {
-        const response = await fetch(`/api/comparacion/options?${query}`, {
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          const payload = (await response.json()) as { message?: string };
-          throw new Error(payload.message ?? "No se pudo cargar la busqueda de ciclos.");
-        }
-
-        const payload = (await response.json()) as ComparisonCycleOption[];
-        startTransition(() => {
-          setOptions(payload);
-        });
-      } catch (fetchError) {
-        if (!controller.signal.aborted) {
-          setOptionsError(
-            fetchError instanceof Error
-              ? fetchError.message
-              : "No se pudo cargar la busqueda de ciclos.",
-          );
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setOptionsLoading(false);
-        }
-      }
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      void loadOptions();
-    }, 180);
-
-    return () => {
-      controller.abort();
-      window.clearTimeout(timeoutId);
-    };
-  }, [deferredFilters]);
-
-  useEffect(() => {
+  const optionsQuery = useMemo(() => buildOptionsQuery(deferredFilters), [deferredFilters]);
+  const initialOptionsQuery = useMemo(() => buildOptionsQuery(initialData.filters), [initialData.filters]);
+  const pairQuery = useMemo(() => {
     if (!leftCycleKey || !rightCycleKey) {
-      setComparison(null);
-      setComparisonError(null);
-      return;
+      return null;
     }
 
-    if (!hasBootstrappedPairRef.current) {
-      hasBootstrappedPairRef.current = true;
-      return;
-    }
-
-    const controller = new AbortController();
-    const nextLeftCycleKey = leftCycleKey;
-    const nextRightCycleKey = rightCycleKey;
-
-    async function loadComparison() {
-      setComparisonLoading(true);
-      setComparisonError(null);
-
-      try {
-        const params = new URLSearchParams();
-        params.set("left", nextLeftCycleKey);
-        params.set("right", nextRightCycleKey);
-        const response = await fetch(`/api/comparacion/pair?${params.toString()}`, {
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          const payload = (await response.json()) as { message?: string };
-          throw new Error(payload.message ?? "No se pudo cargar la comparacion.");
-        }
-
-        const payload = (await response.json()) as ComparisonPairPayload;
-        startTransition(() => {
-          setComparison(payload);
-        });
-      } catch (fetchError) {
-        if (!controller.signal.aborted) {
-          setComparisonError(
-            fetchError instanceof Error ? fetchError.message : "No se pudo cargar la comparacion.",
-          );
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setComparisonLoading(false);
-        }
-      }
-    }
-
-    void loadComparison();
-    return () => controller.abort();
+    const params = new URLSearchParams();
+    params.set("left", leftCycleKey);
+    params.set("right", rightCycleKey);
+    return params.toString();
   }, [leftCycleKey, rightCycleKey]);
+  const initialPairQuery = useMemo(() => {
+    if (!initialData.leftCycleKey || !initialData.rightCycleKey) {
+      return null;
+    }
+
+    const params = new URLSearchParams();
+    params.set("left", initialData.leftCycleKey);
+    params.set("right", initialData.rightCycleKey);
+    return params.toString();
+  }, [initialData.leftCycleKey, initialData.rightCycleKey]);
+  const {
+    data: optionsData,
+    error: optionsError,
+    isValidating: optionsLoading,
+  } = useSWR(
+    `/api/comparacion/options?${optionsQuery}`,
+    comparisonOptionsFetcher,
+    {
+      fallbackData: optionsQuery === initialOptionsQuery ? initialData.options : undefined,
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 15000,
+    },
+  );
+  const {
+    data: comparisonData,
+    error: comparisonError,
+    isLoading: comparisonLoading,
+  } = useSWR(
+    pairQuery ? `/api/comparacion/pair?${pairQuery}` : null,
+    comparisonPairFetcher,
+    {
+      fallbackData: pairQuery && pairQuery === initialPairQuery ? initialData.comparison ?? undefined : undefined,
+      revalidateOnFocus: false,
+    },
+  );
+  const options = optionsData ?? initialData.options;
+  const comparison = pairQuery
+    ? comparisonData ?? (pairQuery === initialPairQuery ? initialData.comparison : null)
+    : null;
 
   const leftCycle = options.find((option) => option.cycleKey === leftCycleKey)
     ?? comparison?.left
@@ -398,7 +343,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
           {optionsLoading ? (
             <div className="text-sm text-muted-foreground">Buscando ciclos...</div>
           ) : null}
-          {optionsError ? <div className="text-sm text-destructive">{optionsError}</div> : null}
+          {optionsError ? <div className="text-sm text-destructive">{optionsError.message}</div> : null}
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {options.map((option) => {
@@ -465,7 +410,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
 
       {comparisonError ? (
         <div className="rounded-[24px] border border-destructive/30 bg-destructive/8 px-5 py-4 text-sm text-destructive">
-          {comparisonError}
+          {comparisonError.message}
         </div>
       ) : null}
 

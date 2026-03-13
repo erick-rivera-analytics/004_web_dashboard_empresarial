@@ -1,7 +1,8 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { LoaderCircle, RefreshCcw, Sprout } from "lucide-react";
+import useSWR from "swr";
 
 import { BlockProfileModal } from "@/components/dashboard/fenograma-block-modal";
 import { FenogramaPivotTable } from "@/components/dashboard/fenograma-pivot-table";
@@ -16,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { fetchJson } from "@/lib/fetch-json";
 import type {
   FenogramaDashboardData,
   FenogramaFilters,
@@ -28,6 +30,9 @@ const lifecycleLabels: Record<FenogramaLifecycle, string> = {
   planned: "Planificados",
   history: "Historia",
 };
+
+const fenogramaFetcher = (url: string) =>
+  fetchJson<FenogramaDashboardData>(url, "No se pudo filtrar el fenograma.");
 
 function buildQueryString(filters: FenogramaFilters) {
   const params = new URLSearchParams();
@@ -106,55 +111,26 @@ function MetricPill({ label, value }: { label: string; value: string }) {
 
 export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashboardData }) {
   const [filters, setFilters] = useState<FenogramaFilters>(initialData.filters);
-  const [data, setData] = useState<FenogramaDashboardData>(initialData);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedRow, setSelectedRow] = useState<FenogramaPivotRow | null>(null);
-  const initialFilterKey = useRef(buildQueryString(initialData.filters));
-  const filterKey = useMemo(() => buildQueryString(filters), [filters]);
+  const deferredFilters = useDeferredValue(filters);
+  const initialFilterKey = useMemo(() => buildQueryString(initialData.filters), [initialData.filters]);
+  const filterKey = useMemo(() => buildQueryString(deferredFilters), [deferredFilters]);
+  const {
+    data: dashboardData,
+    error: dashboardError,
+    isValidating,
+  } = useSWR(
+    `/api/fenograma/pivot?${filterKey}`,
+    fenogramaFetcher,
+    {
+      fallbackData: filterKey === initialFilterKey ? initialData : undefined,
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 15000,
+    },
+  );
+  const data = dashboardData ?? initialData;
   const blockModal = useBlockProfileModal(selectedRow);
-
-  useEffect(() => {
-    if (filterKey === initialFilterKey.current) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`/api/fenograma/pivot?${filterKey}`, { signal: controller.signal });
-        if (!response.ok) {
-          const payload = (await response.json()) as { message?: string };
-          throw new Error(payload.message ?? "No se pudo filtrar el fenograma.");
-        }
-        const nextData = (await response.json()) as FenogramaDashboardData;
-        startTransition(() => {
-          setData(nextData);
-          setFilters(nextData.filters);
-        });
-      } catch (fetchError) {
-        if (!controller.signal.aborted) {
-          setError(fetchError instanceof Error ? fetchError.message : "No se pudo filtrar el fenograma.");
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      void load();
-    }, 180);
-
-    return () => {
-      controller.abort();
-      window.clearTimeout(timeoutId);
-    };
-  }, [filterKey]);
 
   function updateFilter<Key extends keyof FenogramaFilters>(key: Key, value: FenogramaFilters[Key]) {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -234,7 +210,7 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
               onChange={(value) => updateWeekRange("endWeek", value)}
             />
             <div className="min-w-0 space-y-2">
-              <Label>Rango visible</Label>
+              <p className="text-sm font-medium leading-none">Rango visible</p>
               <div className="rounded-2xl border border-border/70 bg-background/72 px-4 py-3 text-sm text-muted-foreground">
                 <p>
                   {data.summary.firstWeek ?? "-"} a {data.summary.lastWeek ?? "-"}
@@ -259,8 +235,8 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
             <MetricPill label="Hoy" value={formatDate(data.today)} />
           </div>
 
-          {loading ? <div className="flex items-center gap-3 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Actualizando fenograma.</div> : null}
-          {error ? <div className="text-sm text-destructive">{error}</div> : null}
+          {isValidating ? <div className="flex items-center gap-3 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Actualizando fenograma.</div> : null}
+          {dashboardError ? <div className="text-sm text-destructive">{dashboardError.message}</div> : null}
         </CardContent>
       </Card>
 

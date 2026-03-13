@@ -257,7 +257,7 @@ function BedsOverlay({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/46 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
-      <div className="absolute inset-0" onClick={onClose} />
+      <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar detalle de camas" />
       <div className="starter-panel relative z-10 flex max-h-[90vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/22 sm:w-[min(1480px,calc(100vw-2rem))]">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
@@ -376,7 +376,7 @@ function ValveBedsOverlay({
 }) {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
-      <div className="absolute inset-0" onClick={onClose} />
+      <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar camas de la valvula" />
       <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))]">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
@@ -455,7 +455,7 @@ function HarvestCurveOverlay({
 }) {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
-      <div className="absolute inset-0" onClick={onClose} />
+      <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar curva de cosecha" />
       <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))]">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
@@ -769,7 +769,7 @@ function ValvesOverlay({
 }) {
   return (
     <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/50 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
-      <div className="absolute inset-0" onClick={onClose} />
+      <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar valvulas del ciclo" />
       <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1480px,calc(100vw-2rem))]">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
@@ -933,7 +933,7 @@ export function BlockProfileModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/38 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
-      <div className="absolute inset-0" onClick={onClose} />
+      <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar ficha del bloque" />
       <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1320px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/96 shadow-2xl shadow-slate-950/20 sm:w-[min(1320px,calc(100vw-2rem))]">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">

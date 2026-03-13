@@ -9,7 +9,7 @@ import {
   Sprout,
 } from "lucide-react";
 
-export type DashboardView = {
+type DashboardView = {
   slug: string;
   title: string;
   eyebrow: string;
@@ -96,7 +96,7 @@ export const mobileNavigation = [
   })),
 ];
 
-export function getDashboardView(slug: string) {
+function getDashboardView(slug: string) {
   return dashboardViews.find((view) => view.slug === slug);
 }
 
