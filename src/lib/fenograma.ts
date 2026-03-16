@@ -1,6 +1,7 @@
 import { getISOWeek, getISOWeekYear } from "date-fns";
 
 import { query } from "@/lib/db";
+import { decodeMultiSelectValue, encodeMultiSelectValue, hasMultiSelectValue } from "@/lib/multi-select";
 import { cachedAsync } from "@/lib/server-cache";
 
 type FenogramaQueryRow = {
@@ -498,11 +499,7 @@ function parseBoolean(value: string | boolean | undefined, fallback: boolean) {
 }
 
 function parseSelectValue(value: string | undefined) {
-  if (!value || value === "all") {
-    return "all";
-  }
-
-  return value;
+  return encodeMultiSelectValue(decodeMultiSelectValue(value));
 }
 
 function parseWeekFilter(value: string | undefined) {
@@ -585,9 +582,9 @@ function shouldUseCurrentWeekWindow(filters: FenogramaFilters) {
     filters.includeActive
     && filters.includePlanned
     && !filters.includeHistory
-    && filters.area === "all"
-    && filters.variety === "all"
-    && filters.spType === "all"
+    && !hasMultiSelectValue(filters.area)
+    && !hasMultiSelectValue(filters.variety)
+    && !hasMultiSelectValue(filters.spType)
   );
 }
 
@@ -940,6 +937,9 @@ function buildWhereClause(filters: FenogramaFilters) {
   const conditions: string[] = [];
   const values: unknown[] = [];
   const statusConditions: string[] = [];
+  const selectedAreas = decodeMultiSelectValue(filters.area);
+  const selectedVarieties = decodeMultiSelectValue(filters.variety);
+  const selectedSpTypes = decodeMultiSelectValue(filters.spType);
 
   if (filters.includePlanned) {
     statusConditions.push("sp_date >= current_date");
@@ -963,19 +963,19 @@ function buildWhereClause(filters: FenogramaFilters) {
     conditions.push("1 = 0");
   }
 
-  if (filters.area !== "all") {
-    values.push(filters.area);
-    conditions.push(`${AREA_SQL} = $${values.length}`);
+  if (selectedAreas.length) {
+    values.push(selectedAreas);
+    conditions.push(`${AREA_SQL} = any($${values.length}::text[])`);
   }
 
-  if (filters.variety !== "all") {
-    values.push(filters.variety);
-    conditions.push(`nullif(variety, '') = $${values.length}`);
+  if (selectedVarieties.length) {
+    values.push(selectedVarieties);
+    conditions.push(`nullif(variety, '') = any($${values.length}::text[])`);
   }
 
-  if (filters.spType !== "all") {
-    values.push(filters.spType);
-    conditions.push(`nullif(sp_type, '') = $${values.length}`);
+  if (selectedSpTypes.length) {
+    values.push(selectedSpTypes);
+    conditions.push(`nullif(sp_type, '') = any($${values.length}::text[])`);
   }
 
   return {

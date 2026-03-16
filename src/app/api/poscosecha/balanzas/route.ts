@@ -1,0 +1,41 @@
+import { NextRequest, NextResponse } from "next/server";
+
+import {
+  getBalanzasDashboardData,
+  normalizeBalanzasFilters,
+} from "@/lib/poscosecha-balanzas";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  try {
+    const filters = normalizeBalanzasFilters({
+      metric: request.nextUrl.searchParams.get("metric") ?? undefined,
+      year: request.nextUrl.searchParams.get("year") ?? undefined,
+      month: request.nextUrl.searchParams.get("month") ?? undefined,
+      dayName: request.nextUrl.searchParams.get("dayName") ?? undefined,
+      destination: request.nextUrl.searchParams.get("destination") ?? undefined,
+      weekMode: request.nextUrl.searchParams.get("weekMode") ?? undefined,
+      weekValue: request.nextUrl.searchParams.get("weekValue") ?? undefined,
+      dateFrom: request.nextUrl.searchParams.get("dateFrom") ?? undefined,
+      dateTo: request.nextUrl.searchParams.get("dateTo") ?? undefined,
+    });
+    const data = await getBalanzasDashboardData(filters);
+
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": "private, max-age=30, stale-while-revalidate=120",
+      },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "No se pudo cargar el indicador de balanzas.",
+      },
+      { status: 500 },
+    );
+  }
+}

@@ -56,6 +56,10 @@ Entrada server del modulo `Fenograma`. Hace bootstrap inicial con datos reales.
 
 Vista base de comparacion. Hoy usa seed local.
 
+### `src/app/(dashboard)/dashboard/poscosecha/balanzas/page.tsx`
+
+Entrada server del modulo `Poscosecha Balanzas`. Hace bootstrap inicial del flujo BPMN y sus indicadores reales.
+
 ## 3.3. APIs
 
 ### `src/app/api/health/db/route.ts`
@@ -73,6 +77,10 @@ Devuelve perfiles de ciclo por bloque.
 ### `src/app/api/fenograma/cycle/[cycleKey]/beds/route.ts`
 
 Devuelve detalle de camas por ciclo.
+
+### `src/app/api/poscosecha/balanzas/route.ts`
+
+Devuelve el dashboard de `Balanzas` con filtros temporales, nodos BPMN, detalle de tablas y resumen por tramo.
 
 ## 4. Componentes generales
 
@@ -142,6 +150,20 @@ Grafica radar `Recharts` de la vista de comparacion.
 
 Tarjeta reutilizable para metricas resumen.
 
+## 5.3. Poscosecha Balanzas
+
+### `src/components/dashboard/balanzas-explorer.tsx`
+
+Componente cliente principal del modulo. Administra filtros temporales, fetch incremental, apertura del modal y detalle de nodo.
+
+### `src/components/dashboard/balanzas-process-viewer.tsx`
+
+Renderiza el BPMN con overlays por tramo instrumentado y apertura de detalle al hacer click.
+
+### `src/components/dashboard/balanzas-grouped-table.tsx`
+
+Tabla agrupable del nodo seleccionado. Recalcula resumenes del tramo y permite agrupar por semana, dia, fecha, lote o grado.
+
 ## 6. Componentes UI base
 
 ### `src/components/ui/button.tsx`
@@ -163,6 +185,10 @@ Input base reutilizable.
 ### `src/components/ui/label.tsx`
 
 Label base reutilizable.
+
+### `src/components/ui/multi-select-field.tsx`
+
+Selector multivalor reutilizable con panel flotante renderizado sobre `body`.
 
 ## 7. Configuracion, contextos y hooks
 
@@ -197,6 +223,21 @@ Dominio principal del modulo real actual. Contiene:
 - carga de perfiles de ciclo
 - carga de perfiles de cama
 - conversion de mortandad a porcentaje
+
+### `src/lib/poscosecha-balanzas.ts`
+
+Dominio principal del modulo de `Balanzas`. Resuelve:
+
+- fuentes por tramo BPMN
+- introspeccion de columnas de vistas
+- filtros globales
+- normalizacion de semana ISO
+- armado de nodos, overlays y tablas
+- calculo del macro indicador por tramo
+
+### `src/lib/multi-select.ts`
+
+Utilidades para codificar, decodificar y comparar filtros multiseleccion.
 
 ### `src/lib/dashboard-seed.ts`
 
@@ -265,6 +306,15 @@ Editar:
 - `src/lib/dashboard-seed.ts` o reemplazarla por una nueva libreria de dominio real
 - posiblemente crear nuevas rutas API si el modulo se vuelve interactivo
 
+### Quieres cambiar el flujo o indicadores de Poscosecha Balanzas
+
+Editar:
+
+- `src/lib/poscosecha-balanzas.ts`
+- `src/components/dashboard/balanzas-explorer.tsx`
+- `src/components/dashboard/balanzas-process-viewer.tsx`
+- `src/components/dashboard/balanzas-grouped-table.tsx`
+
 ## 11. Archivos mas sensibles
 
 Estos archivos merecen mas cuidado porque concentran comportamiento de negocio o de shell:
@@ -275,5 +325,7 @@ Estos archivos merecen mas cuidado porque concentran comportamiento de negocio o
 - `src/components/app-sidebar.tsx`
 - `src/components/dashboard/fenograma-explorer.tsx`
 - `src/components/dashboard/fenograma-pivot-table.tsx`
+- `src/lib/poscosecha-balanzas.ts`
+- `src/components/dashboard/balanzas-explorer.tsx`
 
 Un cambio mal planteado aqui afecta toda la experiencia del dashboard o rompe el modulo principal.

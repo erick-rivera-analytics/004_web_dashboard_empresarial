@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { MultiSelectField } from "@/components/ui/multi-select-field";
 import { fetchJson } from "@/lib/fetch-json";
 import type {
   FenogramaDashboardData,
@@ -190,9 +191,9 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-            <SelectField id="fenograma-area" label="Area" value={filters.area} options={data.options.areas} onChange={(value) => updateFilter("area", value)} />
-            <SelectField id="fenograma-variety" label="Variedad" value={filters.variety} options={data.options.varieties} onChange={(value) => updateFilter("variety", value)} />
-            <SelectField id="fenograma-sp-type" label="SP" value={filters.spType} options={data.options.spTypes} onChange={(value) => updateFilter("spType", value)} />
+            <MultiSelectField id="fenograma-area" label="Areas" value={filters.area} options={data.options.areas} onChange={(value) => updateFilter("area", value)} />
+            <MultiSelectField id="fenograma-variety" label="Variedades" value={filters.variety} options={data.options.varieties} onChange={(value) => updateFilter("variety", value)} />
+            <MultiSelectField id="fenograma-sp-type" label="Tipos SP" value={filters.spType} options={data.options.spTypes} onChange={(value) => updateFilter("spType", value)} />
             <SelectField
               id="fenograma-start-week"
               label="Semana desde"

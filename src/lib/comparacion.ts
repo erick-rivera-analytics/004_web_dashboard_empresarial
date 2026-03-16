@@ -1,4 +1,5 @@
 import { query } from "@/lib/db";
+import { decodeMultiSelectValue, encodeMultiSelectValue } from "@/lib/multi-select";
 import { cachedAsync } from "@/lib/server-cache";
 
 type ComparisonOptionQueryRow = {
@@ -224,7 +225,7 @@ function buildOption(row: ComparisonOptionQueryRow): ComparisonCycleOption | nul
 }
 
 function normalizeSelectValue(value: string | undefined) {
-  return !value || value === "all" ? "all" : value;
+  return encodeMultiSelectValue(decodeMultiSelectValue(value));
 }
 
 export function normalizeComparisonFilters(
@@ -289,15 +290,17 @@ export async function getComparisonFilterOptions() {
 function buildSearchWhere(filters: ComparisonSearchFilters) {
   const conditions: string[] = [];
   const values: unknown[] = [];
+  const selectedAreas = decodeMultiSelectValue(filters.area);
+  const selectedVarieties = decodeMultiSelectValue(filters.variety);
 
-  if (filters.area !== "all") {
-    values.push(filters.area);
-    conditions.push(`area = $${values.length}`);
+  if (selectedAreas.length) {
+    values.push(selectedAreas);
+    conditions.push(`area = any($${values.length}::text[])`);
   }
 
-  if (filters.variety !== "all") {
-    values.push(filters.variety);
-    conditions.push(`variety = $${values.length}`);
+  if (selectedVarieties.length) {
+    values.push(selectedVarieties);
+    conditions.push(`variety = any($${values.length}::text[])`);
   }
 
   if (filters.block) {

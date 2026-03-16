@@ -53,6 +53,7 @@ El proyecto ya no funciona como una plantilla generica. Hoy tiene una estructura
 - `/dashboard/campo`
 - `/dashboard/fenograma`
 - `/dashboard/comparacion`
+- `/dashboard/poscosecha/balanzas`
 
 ### Rutas API
 
@@ -61,6 +62,7 @@ El proyecto ya no funciona como una plantilla generica. Hoy tiene una estructura
 - `/api/fenograma/block/[parentBlock]`
 - `/api/fenograma/cycle/[cycleKey]/beds`
 - `/api/fenograma/cycle/[cycleKey]/valves`
+- `/api/poscosecha/balanzas`
 - `/api/fenograma/cycle/[cycleKey]/valves/[valveId]`
 
 ## 4. Inicio rapido
@@ -137,6 +139,14 @@ DATABASE_SSL=false
 - usa data seed local en `src/lib/dashboard-seed.ts`
 - no consulta PostgreSQL todavia
 
+### Poscosecha Balanzas
+
+- `gld.mv_camp_ind_bal_apertura_b1_vs_b1c_peso_xl_np_cur`
+- `gld.mv_camp_ind_bal_apertura_b1_vs_b1c_tallos_xl_np_cur`
+- `gld.mv_camp_ind_bal_apertura_b1c_vs_b2_peso_xl_np_cur`
+- `gld.mv_camp_ind_bal_apertura_b1c_vs_b2_tallos_xl_np_cur`
+- `gld.mv_camp_ind_bal_apertura_b2_vs_b2a_peso_xl_np_cur`
+
 ## 7. Estructura principal del proyecto
 
 ```text
@@ -192,6 +202,9 @@ docs/
 - `src/components/dashboard/fenograma-pivot-table.tsx`
 - `src/components/dashboard/fenograma-weekly-bars-panel.tsx`
 - `src/components/dashboard/comparison-radar-panel.tsx`
+- `src/components/dashboard/balanzas-explorer.tsx`
+- `src/components/dashboard/balanzas-process-viewer.tsx`
+- `src/components/dashboard/balanzas-grouped-table.tsx`
 
 ### APIs
 
@@ -229,6 +242,7 @@ La documentacion detallada del repo vive en `docs/`:
 - `docs/apis.md`: contrato de rutas API y ejemplos de consumo
 - `docs/estructura-codigo.md`: inventario del codigo activo y responsabilidad por archivo
 - `docs/extender-modulos.md`: guia para crear dashboards nuevos sobre esta base
+- `docs/poscosecha-balanzas.md`: fuentes, formulas y comportamiento del modulo de balanzas
 
 ## 11. Codigo archivado
 

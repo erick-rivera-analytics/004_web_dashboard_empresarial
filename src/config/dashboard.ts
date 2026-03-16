@@ -6,6 +6,7 @@ import {
   GitCompareArrows,
   LayoutDashboard,
   Map,
+  Scale,
   Sprout,
 } from "lucide-react";
 
@@ -16,6 +17,7 @@ type DashboardView = {
   summary: string;
   href: string;
   icon: LucideIcon;
+  category: "campo" | "poscosecha";
 };
 
 export type SidebarNode = {
@@ -35,6 +37,7 @@ export const dashboardViews: DashboardView[] = [
     summary: "Historial espacial de bloques con apertura por parent_block.",
     href: "/dashboard/campo",
     icon: Map,
+    category: "campo",
   },
   {
     slug: "fenograma",
@@ -43,6 +46,7 @@ export const dashboardViews: DashboardView[] = [
     summary: "Pivot semanal de corte y desviacion por ciclo.",
     href: "/dashboard/fenograma",
     icon: CalendarRange,
+    category: "campo",
   },
   {
     slug: "comparacion",
@@ -51,8 +55,21 @@ export const dashboardViews: DashboardView[] = [
     summary: "Cruce uno a uno entre ciclos activos.",
     href: "/dashboard/comparacion",
     icon: GitCompareArrows,
+    category: "campo",
+  },
+  {
+    slug: "balanzas",
+    title: "Indicadores Balanzas",
+    eyebrow: "Indicadores / Produccion / Poscosecha",
+    summary: "Apertura B1 vs B1C sobre el flujo de postcosecha para peso y tallos.",
+    href: "/dashboard/poscosecha/balanzas",
+    icon: Scale,
+    category: "poscosecha",
   },
 ];
+
+const campoViews = dashboardViews.filter((view) => view.category === "campo");
+const poscosechaViews = dashboardViews.filter((view) => view.category === "poscosecha");
 
 export const sidebarTree: SidebarNode[] = [
   {
@@ -71,7 +88,16 @@ export const sidebarTree: SidebarNode[] = [
           {
             label: "Campo",
             icon: Sprout,
-            items: dashboardViews.map((view) => ({
+            items: campoViews.map((view) => ({
+              label: view.title,
+              href: view.href,
+              icon: view.icon,
+            })),
+          },
+          {
+            label: "Poscosecha",
+            icon: Scale,
+            items: poscosechaViews.map((view) => ({
               label: view.title,
               href: view.href,
               icon: view.icon,
@@ -96,10 +122,6 @@ export const mobileNavigation = [
   })),
 ];
 
-function getDashboardView(slug: string) {
-  return dashboardViews.find((view) => view.slug === slug);
-}
-
 export function isPathActive(pathname: string, href: string) {
   return pathname === href;
 }
@@ -107,13 +129,14 @@ export function isPathActive(pathname: string, href: string) {
 export function getPageContext(pathname: string) {
   if (pathname === "/dashboard") {
     return {
-      eyebrow: "Indicadores / Produccion / Campo",
+      eyebrow: "Indicadores / Produccion",
       title: "Indicadores",
     };
   }
 
-  const slug = pathname.split("/").filter(Boolean)[1];
-  const view = slug ? getDashboardView(slug) : null;
+  const view = dashboardViews.find((entry) => (
+    pathname === entry.href || pathname.startsWith(`${entry.href}/`)
+  ));
 
   if (!view) {
     return {

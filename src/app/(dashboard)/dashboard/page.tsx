@@ -22,13 +22,15 @@ export default function DashboardPage() {
         <CardContent className="flex h-full flex-col justify-between p-8">
           <div className="space-y-4">
             <Badge variant="outline" className="rounded-full px-3 py-1">
-              Indicadores / Produccion / Campo
+              Indicadores / Produccion
             </Badge>
             <div className="space-y-2">
               <h1 className="text-4xl font-semibold tracking-tight">
-                Indicadores de campo
+                Indicadores operativos
               </h1>
-              <p className="text-sm text-muted-foreground">Mapa, fenograma y comparacion.</p>
+              <p className="text-sm text-muted-foreground">
+                Campo y poscosecha sobre datos reales.
+              </p>
             </div>
           </div>
 

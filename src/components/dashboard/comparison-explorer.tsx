@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MultiSelectField } from "@/components/ui/multi-select-field";
 import { fetchJson } from "@/lib/fetch-json";
 import { cn } from "@/lib/utils";
 import type {
@@ -299,20 +300,13 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="comparison-area">Area</Label>
-              <select
-                id="comparison-area"
-                value={filters.area}
-                onChange={(event) => updateFilter("area", event.target.value)}
-                className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                <option value="all">Todas</option>
-                {initialData.filterOptions.areas.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </div>
+            <MultiSelectField
+              id="comparison-area"
+              label="Areas"
+              value={filters.area}
+              options={initialData.filterOptions.areas}
+              onChange={(value) => updateFilter("area", value)}
+            />
 
             <div className="space-y-2">
               <Label htmlFor="comparison-block">Bloque</Label>
@@ -324,20 +318,13 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="comparison-variety">Variedad</Label>
-              <select
-                id="comparison-variety"
-                value={filters.variety}
-                onChange={(event) => updateFilter("variety", event.target.value)}
-                className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                <option value="all">Todas</option>
-                {initialData.filterOptions.varieties.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </div>
+            <MultiSelectField
+              id="comparison-variety"
+              label="Variedades"
+              value={filters.variety}
+              options={initialData.filterOptions.varieties}
+              onChange={(value) => updateFilter("variety", value)}
+            />
           </div>
 
           {optionsLoading ? (
@@ -352,7 +339,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
 
               return (
                 <div
-                  key={option.cycleKey}
+                  key={`${option.cycleKey}-${option.block}-${option.spDate ?? ""}-${option.harvestStartDate ?? ""}`}
                   className={cn(
                     "rounded-[24px] border border-border/70 bg-background/72 p-4",
                     selectedLeft && "border-primary/30",

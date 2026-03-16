@@ -116,3 +116,58 @@
     radial-gradient(circle at 82% 0%, color-mix(in oklab, var(--color-accent) 18%, transparent), transparent 20rem),
     radial-gradient(circle at 60% 40%, color-mix(in oklab, var(--color-secondary) 40%, transparent), transparent 24rem);
 }
+
+.balanzas-process .djs-container,
+.balanzas-process .djs-container svg {
+  width: 100%;
+  height: 100%;
+}
+
+.balanzas-process .djs-outline,
+.balanzas-process .djs-selection-outline {
+  stroke: color-mix(in oklab, var(--color-primary) 70%, white 30%);
+  stroke-width: 2px;
+}
+
+.balanzas-process .balanzas-node-apertura .djs-visual > :first-child {
+  fill: rgba(191, 219, 254, 0.45) !important;
+  stroke: rgba(14, 116, 144, 0.9) !important;
+  stroke-width: 2.5px !important;
+}
+
+.balanzas-process .balanzas-node-b2 .djs-visual > :first-child {
+  fill: rgba(167, 243, 208, 0.42) !important;
+  stroke: rgba(5, 150, 105, 0.9) !important;
+  stroke-width: 2.5px !important;
+}
+
+.balanzas-process .balanzas-node-b2a .djs-visual > :first-child {
+  fill: rgba(253, 230, 138, 0.42) !important;
+  stroke: rgba(217, 119, 6, 0.92) !important;
+  stroke-width: 2.5px !important;
+}
+
+.balanzas-process .balanzas-node-selected .djs-visual > :first-child {
+  stroke-width: 4px !important;
+  filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.28));
+}
+
+.balanzas-process .balanzas-node-unavailable .djs-visual > :first-child {
+  fill: rgba(226, 232, 240, 0.36) !important;
+  stroke: rgba(100, 116, 139, 0.85) !important;
+  stroke-dasharray: 6 4;
+}
+
+.balanzas-node-overlay {
+  min-width: 156px;
+  max-width: 240px;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+.balanzas-node-overlay:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px -22px rgba(15, 23, 42, 0.65);
+}
