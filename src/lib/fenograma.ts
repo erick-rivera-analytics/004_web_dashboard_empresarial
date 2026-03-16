@@ -47,8 +47,9 @@ type CycleProfileQueryRow = {
   plants_dead: string | number | null;
   plants_reseeded: string | number | null;
   plants_current: string | number | null;
-  mortality_period: string | number | null;
-  mortality_cumulative: string | number | null;
+  availability_vs_scheduled_pct: string | number | null;
+  availability_vs_initial_pct: string | number | null;
+  mortality_pct: string | number | null;
 };
 
 type BedProfileQueryRow = {
@@ -72,8 +73,9 @@ type BedProfileQueryRow = {
   plants_dead: string | number | null;
   plants_reseeded: string | number | null;
   plants_current: string | number | null;
-  mortality_period: string | number | null;
-  mortality_cumulative: string | number | null;
+  availability_vs_scheduled_pct: string | number | null;
+  availability_vs_initial_pct: string | number | null;
+  mortality_pct: string | number | null;
 };
 
 type BedProfileBaseQueryRow = {
@@ -101,8 +103,9 @@ type BedPlantsQueryRow = {
   plants_dead: string | number | null;
   plants_reseeded: string | number | null;
   plants_current: string | number | null;
-  mortality_period: string | number | null;
-  mortality_cumulative: string | number | null;
+  availability_vs_scheduled_pct: string | number | null;
+  availability_vs_initial_pct: string | number | null;
+  mortality_pct: string | number | null;
 };
 
 type ValveProfileBaseQueryRow = {
@@ -126,8 +129,9 @@ type ValvePlantsQueryRow = {
   plants_dead: string | number | null;
   plants_reseeded: string | number | null;
   plants_current: string | number | null;
-  mortality_period: string | number | null;
-  mortality_cumulative: string | number | null;
+  availability_vs_scheduled_pct: string | number | null;
+  availability_vs_initial_pct: string | number | null;
+  mortality_pct: string | number | null;
 };
 
 type ValveProfileQueryRow = {
@@ -147,8 +151,9 @@ type ValveProfileQueryRow = {
   plants_dead: string | number | null;
   plants_reseeded: string | number | null;
   plants_current: string | number | null;
-  mortality_period: string | number | null;
-  mortality_cumulative: string | number | null;
+  availability_vs_scheduled_pct: string | number | null;
+  availability_vs_initial_pct: string | number | null;
+  mortality_pct: string | number | null;
 };
 
 type HarvestCurveQueryRow = {
@@ -264,8 +269,9 @@ export type CycleProfileCard = {
   deadPlants: number | null;
   reseededPlants: number | null;
   currentPlants: number | null;
-  mortalityPeriodPct: number | null;
-  mortalityCumulativePct: number | null;
+  availabilityVsScheduledPct: number | null;
+  availabilityVsInitialPct: number | null;
+  mortalityPct: number | null;
 };
 
 export type CycleProfileBlockPayload = {
@@ -303,8 +309,9 @@ export type BedProfileCard = {
   deadPlants: number | null;
   reseededPlants: number | null;
   currentPlants: number | null;
-  mortalityPeriodPct: number | null;
-  mortalityCumulativePct: number | null;
+  availabilityVsScheduledPct: number | null;
+  availabilityVsInitialPct: number | null;
+  mortalityPct: number | null;
 };
 
 export type BedProfilePayload = {
@@ -342,8 +349,9 @@ export type ValveProfileCard = {
   deadPlants: number | null;
   reseededPlants: number | null;
   currentPlants: number | null;
-  mortalityPeriodPct: number | null;
-  mortalityCumulativePct: number | null;
+  availabilityVsScheduledPct: number | null;
+  availabilityVsInitialPct: number | null;
+  mortalityPct: number | null;
 };
 
 export type ValveProfilePayload = {
@@ -519,12 +527,22 @@ function toNumber(value: string | number | null) {
   return Number.isFinite(numericValue) ? numericValue : null;
 }
 
+function toPercentRatio(value: string | number | null) {
+  const numericValue = toNumber(value);
+
+  if (numericValue === null) {
+    return null;
+  }
+
+  return Math.abs(numericValue) > 1.5 ? numericValue / 100 : numericValue;
+}
+
 function sumNumbers(values: Array<number | null | undefined>) {
   return roundValue(values.reduce<number>((sum, value) => sum + (value ?? 0), 0));
 }
 
 function toPercent(value: string | number | null) {
-  const numericValue = toNumber(value);
+  const numericValue = toPercentRatio(value);
 
   if (numericValue === null) {
     return null;
@@ -723,8 +741,9 @@ function mapBedProfileRow(row: BedProfileQueryRow): BedProfileCard {
     deadPlants: toNumber(row.plants_dead),
     reseededPlants: toNumber(row.plants_reseeded),
     currentPlants: toNumber(row.plants_current),
-    mortalityPeriodPct: toPercent(row.mortality_period),
-    mortalityCumulativePct: toPercent(row.mortality_cumulative),
+    availabilityVsScheduledPct: toPercent(row.availability_vs_scheduled_pct),
+    availabilityVsInitialPct: toPercent(row.availability_vs_initial_pct),
+    mortalityPct: toPercent(row.mortality_pct),
   };
 }
 
@@ -754,8 +773,9 @@ function mapValveProfileRow(
     deadPlants: toNumber(plants?.plants_dead ?? null),
     reseededPlants: toNumber(plants?.plants_reseeded ?? null),
     currentPlants: toNumber(plants?.plants_current ?? null),
-    mortalityPeriodPct: toPercent(plants?.mortality_period ?? null),
-    mortalityCumulativePct: toPercent(plants?.mortality_cumulative ?? null),
+    availabilityVsScheduledPct: toPercent(plants?.availability_vs_scheduled_pct ?? null),
+    availabilityVsInitialPct: toPercent(plants?.availability_vs_initial_pct ?? null),
+    mortalityPct: toPercent(plants?.mortality_pct ?? null),
   };
 }
 
@@ -811,8 +831,9 @@ function mergeBedProfileRows(
       plants_dead: plants?.plants_dead ?? null,
       plants_reseeded: plants?.plants_reseeded ?? null,
       plants_current: plants?.plants_current ?? null,
-      mortality_period: plants?.mortality_period ?? null,
-      mortality_cumulative: plants?.mortality_cumulative ?? null,
+      availability_vs_scheduled_pct: plants?.availability_vs_scheduled_pct ?? null,
+      availability_vs_initial_pct: plants?.availability_vs_initial_pct ?? null,
+      mortality_pct: plants?.mortality_pct ?? null,
     });
   });
 }
@@ -865,8 +886,9 @@ async function getBedProfiles(
         dead_plants_count as plants_dead,
         reseed_plants_count as plants_reseeded,
         final_plants_count as plants_current,
-        mortality as mortality_period,
-        cumulative_mortality as mortality_cumulative
+        pct_availability_vs_scheduled_plants as availability_vs_scheduled_pct,
+        pct_availability_vs_initial_plants as availability_vs_initial_pct,
+        pct_mortality as mortality_pct
       from ${BED_PLANTS_SOURCE}
       where cycle_key = $1
         and bed_id = any($2::text[])
@@ -1286,8 +1308,9 @@ export async function getCycleProfilesByBlock(
           plants.plants_dead,
           plants.plants_reseeded,
           plants.plants_current,
-          plants.mortality_period,
-          plants.mortality_cumulative
+          plants.availability_vs_scheduled_pct,
+          plants.availability_vs_initial_pct,
+          plants.mortality_pct
         from slv.camp_dim_cycle_profile_scd2 cp
         left join lateral (
           select
@@ -1303,8 +1326,9 @@ export async function getCycleProfilesByBlock(
             dead_plants_count as plants_dead,
             reseed_plants_count as plants_reseeded,
             final_plants_count as plants_current,
-            mortality as mortality_period,
-            cumulative_mortality as mortality_cumulative
+            pct_availability_vs_scheduled_plants as availability_vs_scheduled_pct,
+            pct_availability_vs_initial_plants as availability_vs_initial_pct,
+            pct_mortality as mortality_pct
           from ${CYCLE_PLANTS_SOURCE}
           where cycle_key = cp.cycle_key
           order by valid_from desc nulls last
@@ -1344,8 +1368,9 @@ export async function getCycleProfilesByBlock(
       deadPlants: toNumber(row.plants_dead),
       reseededPlants: toNumber(row.plants_reseeded),
       currentPlants: toNumber(row.plants_current),
-      mortalityPeriodPct: toPercent(row.mortality_period),
-      mortalityCumulativePct: toPercent(row.mortality_cumulative),
+      availabilityVsScheduledPct: toPercent(row.availability_vs_scheduled_pct),
+      availabilityVsInitialPct: toPercent(row.availability_vs_initial_pct),
+      mortalityPct: toPercent(row.mortality_pct),
     }));
 
     return {
@@ -1438,8 +1463,9 @@ export async function getValveProfilesByCycleKey(
           dead_plants_count as plants_dead,
           reseed_plants_count as plants_reseeded,
           final_plants_count as plants_current,
-          mortality as mortality_period,
-          cumulative_mortality as mortality_cumulative
+          pct_availability_vs_scheduled_plants as availability_vs_scheduled_pct,
+          pct_availability_vs_initial_plants as availability_vs_initial_pct,
+          pct_mortality as mortality_pct
         from ${VALVE_PLANTS_SOURCE}
         where cycle_key = $1
           and valve_id = any($2::text[])
@@ -1494,8 +1520,9 @@ export async function getValveProfileByCycleAndValve(
               plants.plants_dead,
               plants.plants_reseeded,
               plants.plants_current,
-              plants.mortality_period,
-              plants.mortality_cumulative
+              plants.availability_vs_scheduled_pct,
+              plants.availability_vs_initial_pct,
+              plants.mortality_pct
             from slv.camp_dim_valve_profile_scd2 vp
             left join lateral (
               select
@@ -1511,8 +1538,9 @@ export async function getValveProfileByCycleAndValve(
                 dead_plants_count as plants_dead,
                 reseed_plants_count as plants_reseeded,
               final_plants_count as plants_current,
-              mortality as mortality_period,
-              cumulative_mortality as mortality_cumulative
+              pct_availability_vs_scheduled_plants as availability_vs_scheduled_pct,
+              pct_availability_vs_initial_plants as availability_vs_initial_pct,
+              pct_mortality as mortality_pct
               from ${VALVE_PLANTS_SOURCE}
               where cycle_key = vp.cycle_key
                 and valve_id = vp.valve_id
@@ -1559,8 +1587,9 @@ export async function getValveProfileByCycleAndValve(
             deadPlants: toNumber(row.plants_dead),
             reseededPlants: toNumber(row.plants_reseeded),
             currentPlants: toNumber(row.plants_current),
-            mortalityPeriodPct: toPercent(row.mortality_period),
-            mortalityCumulativePct: toPercent(row.mortality_cumulative),
+            availabilityVsScheduledPct: toPercent(row.availability_vs_scheduled_pct),
+            availabilityVsInitialPct: toPercent(row.availability_vs_initial_pct),
+            mortalityPct: toPercent(row.mortality_pct),
           }
           : null,
         summary: summarizeBeds(beds),

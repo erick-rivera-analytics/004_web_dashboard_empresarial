@@ -162,8 +162,9 @@ function BedsTable({
               "Vigentes",
               "Bajas",
               "Resiembras",
-              "Mort. actual",
-              "Mort. acum.",
+              "Disp. vs prog.",
+              "Disp. vs inic.",
+              "Mortandad",
               "Pambiles",
               "Superficie",
               "Variedad",
@@ -210,8 +211,9 @@ function BedsTable({
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{formatNumber(bed.currentPlants)}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{formatNumber(bed.deadPlants)}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{formatNumber(bed.reseededPlants)}</td>
-                <td className="border-b border-r border-border/60 px-3 py-2.5">{formatPercent(bed.mortalityPeriodPct)}</td>
-                <td className="border-b border-r border-border/60 px-3 py-2.5">{formatPercent(bed.mortalityCumulativePct)}</td>
+                <td className="border-b border-r border-border/60 px-3 py-2.5">{formatPercent(bed.availabilityVsScheduledPct)}</td>
+                <td className="border-b border-r border-border/60 px-3 py-2.5">{formatPercent(bed.availabilityVsInitialPct)}</td>
+                <td className="border-b border-r border-border/60 px-3 py-2.5">{formatPercent(bed.mortalityPct)}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{formatNumber(bed.pambilesCount)}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{formatNumber(bed.bedArea)}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{bed.variety || "-"}</td>
@@ -568,8 +570,9 @@ function ValveDetailPanel({
         <MetricPill label="Plantas vigentes" value={formatNumber(data.valve.currentPlants)} />
         <MetricPill label="Bajas acumuladas" value={formatNumber(data.valve.deadPlants)} />
         <MetricPill label="Resiembras" value={formatNumber(data.valve.reseededPlants)} />
-        <MetricPill label="Mortandad actual" value={formatPercent(data.valve.mortalityPeriodPct)} />
-        <MetricPill label="Mortandad acumulada" value={formatPercent(data.valve.mortalityCumulativePct)} />
+        <MetricPill label="Disp. vs programadas" value={formatPercent(data.valve.availabilityVsScheduledPct)} />
+        <MetricPill label="Disp. vs iniciales" value={formatPercent(data.valve.availabilityVsInitialPct)} />
+        <MetricPill label="Mortandad" value={formatPercent(data.valve.mortalityPct)} />
         <MetricPill label="Superficie" value={formatNumber(data.summary.totalBedArea)} />
       </div>
 
@@ -692,12 +695,14 @@ function ValvesSection({
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     <MetricPill label="Pambiles" value={formatNumber(valve.pambilesCount)} />
                     <MetricPill label="Camas" value={formatNumber(valve.bedCount)} />
                     <MetricPill label="Plantas programadas" value={formatNumber(valve.programmedPlants)} />
                     <MetricPill label="Plantas vigentes" value={formatNumber(valve.currentPlants)} />
-                    <MetricPill label="Mortandad acum." value={formatPercent(valve.mortalityCumulativePct)} />
+                    <MetricPill label="Disp. vs prog." value={formatPercent(valve.availabilityVsScheduledPct)} />
+                    <MetricPill label="Disp. vs inic." value={formatPercent(valve.availabilityVsInitialPct)} />
+                    <MetricPill label="Mortandad" value={formatPercent(valve.mortalityPct)} />
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -1042,8 +1047,9 @@ export function BlockProfileModal({
                           <MetricPill label="Plantas vigentes" value={formatNumber(cycle.currentPlants)} />
                           <MetricPill label="Bajas acumuladas" value={formatNumber(cycle.deadPlants)} />
                           <MetricPill label="Resiembras" value={formatNumber(cycle.reseededPlants)} />
-                          <MetricPill label="Mortandad actual" value={formatPercent(cycle.mortalityPeriodPct)} />
-                          <MetricPill label="Mortandad acumulada" value={formatPercent(cycle.mortalityCumulativePct)} />
+                          <MetricPill label="Disp. vs programadas" value={formatPercent(cycle.availabilityVsScheduledPct)} />
+                          <MetricPill label="Disp. vs iniciales" value={formatPercent(cycle.availabilityVsInitialPct)} />
+                          <MetricPill label="Mortandad" value={formatPercent(cycle.mortalityPct)} />
                           <MetricPill label="Desde" value={formatDate(cycle.validFrom)} />
                           <MetricPill label="Hasta" value={formatDate(cycle.validTo)} />
                         </CardContent>

@@ -40,8 +40,9 @@ type ComparisonSnapshotQueryRow = {
   current_plants: string | number | null;
   dead_plants: string | number | null;
   reseeded_plants: string | number | null;
-  mortality_period: string | number | null;
-  mortality_cumulative: string | number | null;
+  availability_vs_scheduled_pct: string | number | null;
+  availability_vs_initial_pct: string | number | null;
+  mortality_pct: string | number | null;
   total_stems: string | number | null;
 };
 
@@ -78,8 +79,9 @@ export type ComparisonCycleSnapshot = ComparisonCycleOption & {
   currentPlants: number | null;
   deadPlants: number | null;
   reseededPlants: number | null;
-  mortalityCyclePct: number | null;
-  mortalityCumulativePct: number | null;
+  availabilityVsScheduledPct: number | null;
+  availabilityVsInitialPct: number | null;
+  mortalityPct: number | null;
 };
 
 export type ComparisonMetric = {
@@ -164,6 +166,16 @@ function toNumber(value: string | number | null) {
 
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+function toPercentRatio(value: string | number | null) {
+  const numericValue = toNumber(value);
+
+  if (numericValue === null) {
+    return null;
+  }
+
+  return Math.abs(numericValue) > 1.5 ? numericValue / 100 : numericValue;
 }
 
 function formatNumber(value: number | null, options?: Intl.NumberFormatOptions) {
@@ -448,8 +460,9 @@ function mapSnapshot(row: ComparisonSnapshotQueryRow | undefined, fallback?: Com
     currentPlants: toNumber(row?.current_plants ?? null),
     deadPlants: toNumber(row?.dead_plants ?? null),
     reseededPlants: toNumber(row?.reseeded_plants ?? null),
-    mortalityCyclePct: toNumber(row?.mortality_period ?? null),
-    mortalityCumulativePct: toNumber(row?.mortality_cumulative ?? null),
+    availabilityVsScheduledPct: toPercentRatio(row?.availability_vs_scheduled_pct ?? null),
+    availabilityVsInitialPct: toPercentRatio(row?.availability_vs_initial_pct ?? null),
+    mortalityPct: toPercentRatio(row?.mortality_pct ?? null),
   } satisfies ComparisonCycleSnapshot;
 }
 
@@ -499,8 +512,9 @@ export async function getComparisonPair(
               plants.current_plants,
               plants.dead_plants,
               plants.reseeded_plants,
-              plants.mortality_period,
-              plants.mortality_cumulative,
+              plants.availability_vs_scheduled_pct,
+              plants.availability_vs_initial_pct,
+              plants.mortality_pct,
               meta.total_stems
             from slv.camp_dim_cycle_profile_scd2 cp
             left join lateral (
@@ -511,8 +525,9 @@ export async function getComparisonPair(
                 final_plants_count as current_plants,
                 dead_plants_count as dead_plants,
                 reseed_plants_count as reseeded_plants,
-                mortality as mortality_period,
-                cumulative_mortality as mortality_cumulative
+                pct_availability_vs_scheduled_plants as availability_vs_scheduled_pct,
+                pct_availability_vs_initial_plants as availability_vs_initial_pct,
+                pct_mortality as mortality_pct
               from ${CYCLE_PLANTS_SOURCE}
               where cycle_key = cp.cycle_key
               order by valid_from desc nulls last
@@ -557,18 +572,26 @@ export async function getComparisonPair(
           { range: { min: 0, max: 289160 }, preference: "higher" },
         ),
         buildMetric(
-          "mortalityCumulativePct",
-          "Mortandad acumulada",
-          left?.mortalityCumulativePct ?? null,
-          right?.mortalityCumulativePct ?? null,
+          "availabilityVsScheduledPct",
+          "Disp. vs programadas",
+          left?.availabilityVsScheduledPct ?? null,
+          right?.availabilityVsScheduledPct ?? null,
           formatPercent,
-          { range: { min: -0.53, max: 0.35 }, preference: "lower" },
+          { range: { min: 0, max: 1.2 }, preference: "higher" },
         ),
         buildMetric(
-          "mortalityCyclePct",
-          "Mortandad ciclo",
-          left?.mortalityCyclePct ?? null,
-          right?.mortalityCyclePct ?? null,
+          "availabilityVsInitialPct",
+          "Disp. vs iniciales",
+          left?.availabilityVsInitialPct ?? null,
+          right?.availabilityVsInitialPct ?? null,
+          formatPercent,
+          { range: { min: 0, max: 1.2 }, preference: "higher" },
+        ),
+        buildMetric(
+          "mortalityPct",
+          "Mortandad",
+          left?.mortalityPct ?? null,
+          right?.mortalityPct ?? null,
           formatPercent,
           { range: { min: -0.53, max: 0.35 }, preference: "lower" },
         ),
