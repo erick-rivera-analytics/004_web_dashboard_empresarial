@@ -135,8 +135,8 @@ const AREA_SQL = `
   end
 `;
 
-const FENOGRAMA_SOURCE = "mtlz.mv_prod_fenograma_cur";
-const CYCLE_PLANTS_SOURCE = "mtlz.mv_camp_kardex_cycle_plants_cur";
+const FENOGRAMA_SOURCE = "gld.mv_prod_fenograma_cur";
+const CYCLE_PLANTS_SOURCE = "gld.mv_camp_kardex_cycle_plants_cur";
 const COMPARISON_OPTIONS_TTL_MS = 5 * 60 * 1000;
 const COMPARISON_SEARCH_TTL_MS = 30 * 1000;
 const COMPARISON_PAIR_TTL_MS = 60 * 1000;

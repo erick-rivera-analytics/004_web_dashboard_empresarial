@@ -39,7 +39,7 @@ El modulo resuelve tres necesidades:
 
 Fuente:
 
-- `mtlz.mv_prod_fenograma_cur`
+- `gld.mv_prod_fenograma_cur`
 
 Columnas utilizadas directamente o derivadas:
 
@@ -86,7 +86,7 @@ Uso:
 
 Fuente:
 
-- `mtlz.mv_camp_kardex_cycle_plants_cur`
+- `gld.mv_camp_kardex_cycle_plants_cur`
 
 Uso:
 
@@ -101,7 +101,7 @@ Uso:
 
 Fuente:
 
-- `mtlz.mv_camp_kardex_bed_plants_cur`
+- `gld.mv_camp_kardex_bed_plants_cur`
 
 Uso:
 
@@ -112,7 +112,7 @@ Uso:
 Fuentes:
 
 - `slv.camp_dim_valve_profile_scd2`
-- `mtlz.mv_camp_kardex_valve_plants_cur`
+- `gld.mv_camp_kardex_valve_plants_cur`
 
 Uso:
 

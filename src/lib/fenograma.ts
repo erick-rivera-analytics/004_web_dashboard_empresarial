@@ -421,11 +421,11 @@ const AREA_SQL = `
   end
 `;
 
-const FENOGRAMA_SOURCE = "mtlz.mv_prod_fenograma_cur";
-const FENOGRAMA_DAY_SOURCE = "mtlz.mv_prod_fenograma_day_cur";
-const BED_PLANTS_SOURCE = "mtlz.mv_camp_kardex_bed_plants_cur";
-const CYCLE_PLANTS_SOURCE = "mtlz.mv_camp_kardex_cycle_plants_cur";
-const VALVE_PLANTS_SOURCE = "mtlz.mv_camp_kardex_valve_plants_cur";
+const FENOGRAMA_SOURCE = "gld.mv_prod_fenograma_cur";
+const FENOGRAMA_DAY_SOURCE = "gld.mv_prod_fenograma_day_cur";
+const BED_PLANTS_SOURCE = "gld.mv_camp_kardex_bed_plants_cur";
+const CYCLE_PLANTS_SOURCE = "gld.mv_camp_kardex_cycle_plants_cur";
+const VALVE_PLANTS_SOURCE = "gld.mv_camp_kardex_valve_plants_cur";
 
 const FENOGRAMA_OPTIONS_QUERY = `
   select

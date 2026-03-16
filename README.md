@@ -120,12 +120,12 @@ DATABASE_SSL=false
 
 ### Fenograma
 
-- `mtlz.mv_prod_fenograma_cur`
+- `gld.mv_prod_fenograma_cur`
 - `slv.camp_dim_cycle_profile_scd2`
 - `slv.camp_dim_bed_profile_scd2`
-- `mtlz.mv_camp_kardex_cycle_plants_cur`
-- `mtlz.mv_camp_kardex_bed_plants_cur`
-- `mtlz.mv_camp_kardex_valve_plants_cur`
+- `gld.mv_camp_kardex_cycle_plants_cur`
+- `gld.mv_camp_kardex_bed_plants_cur`
+- `gld.mv_camp_kardex_valve_plants_cur`
 
 ### Campo
 
