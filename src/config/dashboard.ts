@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
   CalendarRange,
   Factory,
   Gauge,
@@ -37,6 +38,15 @@ export const dashboardViews: DashboardView[] = [
     summary: "Historial espacial de bloques con apertura por parent_block.",
     href: "/dashboard/campo",
     icon: Map,
+    category: "campo",
+  },
+  {
+    slug: "mortality",
+    title: "Mortandades",
+    eyebrow: "Indicadores / Produccion / Campo",
+    summary: "Mortandad por ciclo con curva ponderada y apertura al historial completo del bloque.",
+    href: "/dashboard/mortality",
+    icon: Activity,
     category: "campo",
   },
   {

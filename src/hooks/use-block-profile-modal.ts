@@ -12,6 +12,7 @@ import type {
   ValveProfilePayload,
   ValveProfilesByCyclePayload,
 } from "@/lib/fenograma";
+import type { MortalityCurvePayload } from "@/lib/mortality";
 
 export type SelectedValveState = {
   cycleKey: string;
@@ -28,6 +29,26 @@ type KeyedValveState = {
   cycleKey: string;
   valveId: string;
 };
+
+export type SelectedMortalityCurveState =
+  | {
+    entityType: "cycle";
+    cycleKey: string;
+  }
+  | {
+    entityType: "valve";
+    cycleKey: string;
+    valveId: string;
+  }
+  | {
+    entityType: "bed";
+    cycleKey: string;
+    bedId: string;
+  };
+
+type KeyedMortalityCurveState = {
+  rowKey: string;
+} & SelectedMortalityCurveState;
 
 function buildBlockRequestUrl(row: BlockModalRow) {
   const params = new URLSearchParams();
@@ -55,6 +76,7 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
   const [selectedValveCycleState, setSelectedValveCycleState] = useState<KeyedCycleState | null>(null);
   const [selectedValveState, setSelectedValveState] = useState<KeyedValveState | null>(null);
   const [selectedCurveState, setSelectedCurveState] = useState<KeyedCycleState | null>(null);
+  const [selectedMortalityCurveState, setSelectedMortalityCurveState] = useState<KeyedMortalityCurveState | null>(null);
 
   const selectedRowKey = useMemo(
     () => (selectedRow ? buildBlockCacheKey(selectedRow) : null),
@@ -71,6 +93,9 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     : null;
   const selectedCurveCycleKey = selectedRowKey && selectedCurveState?.rowKey === selectedRowKey
     ? selectedCurveState.cycleKey
+    : null;
+  const selectedMortalityCurve = selectedRowKey && selectedMortalityCurveState?.rowKey === selectedRowKey
+    ? selectedMortalityCurveState
     : null;
 
   const blockRequest = selectedRow
@@ -90,6 +115,16 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     : null;
   const curveRequest = selectedCurveCycleKey
     ? [`/api/fenograma/cycle/${encodeURIComponent(selectedCurveCycleKey)}/curve`, "No se pudo cargar la curva de cosecha."] as const
+    : null;
+  const mortalityCurveRequest = selectedMortalityCurve
+    ? [
+      selectedMortalityCurve.entityType === "cycle"
+        ? `/api/mortality/cycle/${encodeURIComponent(selectedMortalityCurve.cycleKey)}/curve`
+        : selectedMortalityCurve.entityType === "valve"
+          ? `/api/mortality/cycle/${encodeURIComponent(selectedMortalityCurve.cycleKey)}/valves/${encodeURIComponent(selectedMortalityCurve.valveId)}/curve`
+          : `/api/mortality/cycle/${encodeURIComponent(selectedMortalityCurve.cycleKey)}/beds/${encodeURIComponent(selectedMortalityCurve.bedId)}/curve`,
+      "No se pudo cargar la curva de mortandad.",
+    ] as const
     : null;
 
   const {
@@ -125,6 +160,13 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     error: curveRequestError,
     isLoading: curveLoading,
   } = useSWRImmutable<HarvestCurvePayload>(curveRequest, swrFenogramaFetcher, {
+    revalidateOnFocus: false,
+  });
+  const {
+    data: mortalityCurveData,
+    error: mortalityCurveRequestError,
+    isLoading: mortalityCurveLoading,
+  } = useSWRImmutable<MortalityCurvePayload>(mortalityCurveRequest, swrFenogramaFetcher, {
     revalidateOnFocus: false,
   });
 
@@ -194,6 +236,54 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     setSelectedCurveState(null);
   }
 
+  function openCycleMortalityCurve(cycleKey: string) {
+    if (!selectedRowKey) {
+      return;
+    }
+
+    setSelectedMortalityCurveState((current) => (
+      current?.rowKey === selectedRowKey
+      && current.entityType === "cycle"
+      && current.cycleKey === cycleKey
+        ? null
+        : { rowKey: selectedRowKey, entityType: "cycle", cycleKey }
+    ));
+  }
+
+  function openValveMortalityCurve(cycleKey: string, valveId: string) {
+    if (!selectedRowKey) {
+      return;
+    }
+
+    setSelectedMortalityCurveState((current) => (
+      current?.rowKey === selectedRowKey
+      && current.entityType === "valve"
+      && current.cycleKey === cycleKey
+      && current.valveId === valveId
+        ? null
+        : { rowKey: selectedRowKey, entityType: "valve", cycleKey, valveId }
+    ));
+  }
+
+  function openBedMortalityCurve(cycleKey: string, bedId: string) {
+    if (!selectedRowKey) {
+      return;
+    }
+
+    setSelectedMortalityCurveState((current) => (
+      current?.rowKey === selectedRowKey
+      && current.entityType === "bed"
+      && current.cycleKey === cycleKey
+      && current.bedId === bedId
+        ? null
+        : { rowKey: selectedRowKey, entityType: "bed", cycleKey, bedId }
+    ));
+  }
+
+  function closeMortalityCurve() {
+    setSelectedMortalityCurveState(null);
+  }
+
   return {
     blockData: blockData ?? null,
     blockLoading,
@@ -214,6 +304,10 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     curveData: curveData ?? null,
     curveLoading,
     curveError: curveRequestError?.message ?? null,
+    selectedMortalityCurve,
+    mortalityCurveData: mortalityCurveData ?? null,
+    mortalityCurveLoading,
+    mortalityCurveError: mortalityCurveRequestError?.message ?? null,
     openBeds,
     closeBeds,
     openValves,
@@ -221,5 +315,9 @@ export function useBlockProfileModal(selectedRow: BlockModalRow | null) {
     openValve,
     openCurve,
     closeCurve,
+    openCycleMortalityCurve,
+    openValveMortalityCurve,
+    openBedMortalityCurve,
+    closeMortalityCurve,
   };
 }

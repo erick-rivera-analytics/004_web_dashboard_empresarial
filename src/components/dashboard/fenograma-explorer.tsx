@@ -279,6 +279,10 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
         curveData={blockModal.curveData}
         curveLoading={blockModal.curveLoading}
         curveError={blockModal.curveError}
+        selectedMortalityCurve={blockModal.selectedMortalityCurve}
+        mortalityCurveData={blockModal.mortalityCurveData}
+        mortalityCurveLoading={blockModal.mortalityCurveLoading}
+        mortalityCurveError={blockModal.mortalityCurveError}
         onOpenBeds={blockModal.openBeds}
         onCloseBeds={blockModal.closeBeds}
         onOpenValves={blockModal.openValves}
@@ -286,6 +290,10 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
         onOpenValve={blockModal.openValve}
         onOpenCurve={blockModal.openCurve}
         onCloseCurve={blockModal.closeCurve}
+        onOpenCycleMortalityCurve={blockModal.openCycleMortalityCurve}
+        onOpenValveMortalityCurve={blockModal.openValveMortalityCurve}
+        onOpenBedMortalityCurve={blockModal.openBedMortalityCurve}
+        onCloseMortalityCurve={blockModal.closeMortalityCurve}
         onClose={() => setSelectedRow(null)}
       />
     </div>

@@ -550,6 +550,10 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
         curveData={blockModal.curveData}
         curveLoading={blockModal.curveLoading}
         curveError={blockModal.curveError}
+        selectedMortalityCurve={blockModal.selectedMortalityCurve}
+        mortalityCurveData={blockModal.mortalityCurveData}
+        mortalityCurveLoading={blockModal.mortalityCurveLoading}
+        mortalityCurveError={blockModal.mortalityCurveError}
         onOpenBeds={blockModal.openBeds}
         onCloseBeds={blockModal.closeBeds}
         onOpenValves={blockModal.openValves}
@@ -557,6 +561,10 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
         onOpenValve={blockModal.openValve}
         onOpenCurve={blockModal.openCurve}
         onCloseCurve={blockModal.closeCurve}
+        onOpenCycleMortalityCurve={blockModal.openCycleMortalityCurve}
+        onOpenValveMortalityCurve={blockModal.openValveMortalityCurve}
+        onOpenBedMortalityCurve={blockModal.openBedMortalityCurve}
+        onCloseMortalityCurve={blockModal.closeMortalityCurve}
         onClose={() => setSelectedFeature(null)}
       />
     </div>

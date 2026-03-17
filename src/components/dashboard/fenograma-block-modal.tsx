@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { LineChart, LoaderCircle, Rows3, X } from "lucide-react";
 
 import { HarvestCurvePanel } from "@/components/dashboard/harvest-curve-panel";
+import { MortalityCurvePanel } from "@/components/dashboard/mortality-curve-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +23,8 @@ import type {
   ValveProfilePayload,
   ValveProfilesByCyclePayload,
 } from "@/lib/fenograma";
+import type { MortalityCurvePayload } from "@/lib/mortality";
+import type { SelectedMortalityCurveState } from "@/hooks/use-block-profile-modal";
 
 function formatDate(value: string | null) {
   if (!value || value.startsWith("9999-")) {
@@ -133,10 +136,12 @@ function BedsTable({
   beds,
   selectedValveId,
   onOpenValve,
+  onOpenMortalityCurve,
 }: {
   beds: BedProfileCard[];
   selectedValveId?: string | null;
   onOpenValve?: (valveId: string) => void;
+  onOpenMortalityCurve?: (bedId: string) => void;
 }) {
   const sortedBeds = [...beds].sort((left, right) => {
     const leftSortValue = getBedSortValue(left.bedId);
@@ -170,6 +175,7 @@ function BedsTable({
               "Variedad",
               "SP",
               "Vigencia",
+              "Acciones",
             ].map((label) => (
               <th
                 key={label}
@@ -221,6 +227,19 @@ function BedsTable({
                 <td className="border-b border-border/60 px-3 py-2.5">
                   {formatDate(bed.validFrom)} / {formatDate(bed.validTo)}
                 </td>
+                <td className="border-b border-border/60 px-3 py-2.5">
+                  {onOpenMortalityCurve ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={() => onOpenMortalityCurve(bed.bedId)}
+                    >
+                      <LineChart className="size-4" />
+                      Curva de mortandad
+                    </Button>
+                  ) : null}
+                </td>
               </tr>
             );
           })}
@@ -241,6 +260,8 @@ function BedsOverlay({
   valveError,
   onOpenValve,
   onOpenValveBedsOverlay,
+  onOpenBedMortalityCurve,
+  onOpenValveMortalityCurve,
   onClose,
 }: {
   cycleKey: string;
@@ -253,6 +274,8 @@ function BedsOverlay({
   valveError: string | null;
   onOpenValve: (cycleKey: string, valveId: string) => void;
   onOpenValveBedsOverlay: (cycleKey: string, valveId: string) => void;
+  onOpenBedMortalityCurve: (cycleKey: string, bedId: string) => void;
+  onOpenValveMortalityCurve: (cycleKey: string, valveId: string) => void;
   onClose: () => void;
 }) {
   const selectedValveId = selectedValve?.cycleKey === cycleKey ? selectedValve.valveId : null;
@@ -310,6 +333,7 @@ function BedsOverlay({
                     beds={data.beds}
                     selectedValveId={selectedValveId}
                     onOpenValve={(valveId) => onOpenValve(cycleKey, valveId)}
+                    onOpenMortalityCurve={(bedId) => onOpenBedMortalityCurve(cycleKey, bedId)}
                   />
                 </div>
 
@@ -335,6 +359,14 @@ function BedsOverlay({
                           <Rows3 className="size-4" />
                           Abrir tabla flotante de camas
                         </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => onOpenValveMortalityCurve(cycleKey, selectedValveId)}
+                        >
+                          <LineChart className="size-4" />
+                          Curva de mortandad
+                        </Button>
                         <Button variant="outline" className="rounded-xl" onClick={() => onOpenValve(cycleKey, selectedValveId)}>
                           Ocultar detalle
                         </Button>
@@ -345,6 +377,7 @@ function BedsOverlay({
                       loading={valveLoading}
                       error={valveError}
                       onOpenBedsOverlay={() => onOpenValveBedsOverlay(cycleKey, selectedValveId)}
+                      onOpenMortalityCurve={() => onOpenValveMortalityCurve(cycleKey, selectedValveId)}
                     />
                   </div>
                 ) : null}
@@ -369,11 +402,13 @@ function ValveBedsOverlay({
   data,
   loading,
   error,
+  onOpenBedMortalityCurve,
   onClose,
 }: {
   data: ValveProfilePayload | null;
   loading: boolean;
   error: string | null;
+  onOpenBedMortalityCurve: (cycleKey: string, bedId: string) => void;
   onClose: () => void;
 }) {
   return (
@@ -423,7 +458,11 @@ function ValveBedsOverlay({
                   ]}
                 />
                 <div className="max-h-[56vh] overflow-auto rounded-[24px] border border-border/70 bg-background/72 p-3">
-                  <BedsTable beds={data.beds} selectedValveId={data.valve.valveId} />
+                  <BedsTable
+                    beds={data.beds}
+                    selectedValveId={data.valve.valveId}
+                    onOpenMortalityCurve={(bedId) => onOpenBedMortalityCurve(data.cycleKey, bedId)}
+                  />
                 </div>
               </div>
             ) : (
@@ -526,16 +565,114 @@ function HarvestCurveOverlay({
   );
 }
 
+function buildMortalityBadge(data: MortalityCurvePayload | null, selectedCurve: SelectedMortalityCurveState) {
+  if (data?.label) {
+    return data.label;
+  }
+
+  if (selectedCurve.entityType === "valve") {
+    return selectedCurve.valveId;
+  }
+
+  if (selectedCurve.entityType === "bed") {
+    return selectedCurve.bedId;
+  }
+
+  return selectedCurve.cycleKey;
+}
+
+function MortalityCurveOverlay({
+  selectedCurve,
+  data,
+  loading,
+  error,
+  onClose,
+}: {
+  selectedCurve: SelectedMortalityCurveState;
+  data: MortalityCurvePayload | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  const badgeLabel = buildMortalityBadge(data, selectedCurve);
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+      <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar curva de mortandad" />
+      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))]">
+        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="rounded-full px-3 py-1">
+                Curva de mortandad
+              </Badge>
+              <Badge variant="secondary" className="rounded-full px-3 py-1">
+                {badgeLabel}
+              </Badge>
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-2xl font-semibold tracking-tight">Tendencia diaria de mortandad</h3>
+              <p className="break-words text-sm text-muted-foreground">
+                Mortandad diaria y acumulada segun bajas, resiembras y plantas iniciales del ciclo.
+              </p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="overflow-y-auto px-4 py-5 sm:px-6">
+          {loading ? (
+            <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
+              <LoaderCircle className="size-4 animate-spin" />
+              Cargando curva de mortandad.
+            </div>
+          ) : error ? (
+            <div className="py-8 text-sm text-destructive">{error}</div>
+          ) : data ? (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <MetricPill label="Mortandad actual" value={formatPercent(data.summary.lastCumulativeMortalityPct)} />
+                <MetricPill label="Mortandad diaria actual" value={formatPercent(data.summary.lastDailyMortalityPct)} />
+                <MetricPill label="Pico diario" value={formatPercent(data.summary.maxDailyMortalityPct)} />
+                <MetricPill label="Bajas" value={formatNumber(data.summary.totalDeadPlants)} />
+                <MetricPill label="Resiembras" value={formatNumber(data.summary.totalReseededPlants)} />
+              </div>
+
+              {data.points.length ? (
+                <div className="rounded-[24px] border border-border/70 bg-background/72 p-4">
+                  <MortalityCurvePanel data={data.points} />
+                </div>
+              ) : (
+                <div className="rounded-[22px] border border-border/70 bg-background/72 p-6 text-sm text-muted-foreground">
+                  No hay datos diarios de mortandad para esta seleccion.
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="py-8 text-sm text-muted-foreground">
+              No hay curva de mortandad disponible para esta seleccion.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ValveDetailPanel({
   data,
   loading,
   error,
   onOpenBedsOverlay,
+  onOpenMortalityCurve,
 }: {
   data: ValveProfilePayload | null;
   loading: boolean;
   error: string | null;
   onOpenBedsOverlay?: () => void;
+  onOpenMortalityCurve?: () => void;
 }) {
   if (loading) {
     return (
@@ -600,6 +737,12 @@ function ValveDetailPanel({
                 Abrir tabla flotante de camas
               </Button>
             ) : null}
+            {onOpenMortalityCurve ? (
+              <Button variant="outline" className="rounded-xl" onClick={onOpenMortalityCurve}>
+                <LineChart className="size-4" />
+                Curva de mortandad
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -618,6 +761,7 @@ function ValvesSection({
   valveError,
   onOpenValve,
   onOpenValveBedsOverlay,
+  onOpenValveMortalityCurve,
 }: {
   cycleKey: string;
   data: ValveProfilesByCyclePayload | null;
@@ -629,6 +773,7 @@ function ValvesSection({
   valveError: string | null;
   onOpenValve: (cycleKey: string, valveId: string) => void;
   onOpenValveBedsOverlay: (cycleKey: string, valveId: string) => void;
+  onOpenValveMortalityCurve: (cycleKey: string, valveId: string) => void;
 }) {
   return (
     <div className="rounded-[22px] border border-border/70 bg-card/88 p-4">
@@ -721,6 +866,14 @@ function ValvesSection({
                       <Rows3 className="size-4" />
                       Abrir tabla flotante de camas
                     </Button>
+                    <Button
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => onOpenValveMortalityCurve(cycleKey, valve.valveId)}
+                    >
+                      <LineChart className="size-4" />
+                      Curva de mortandad
+                    </Button>
                   </div>
 
                   {isSelected ? (
@@ -730,6 +883,7 @@ function ValvesSection({
                         loading={valveLoading}
                         error={valveError}
                         onOpenBedsOverlay={() => onOpenValveBedsOverlay(cycleKey, valve.valveId)}
+                        onOpenMortalityCurve={() => onOpenValveMortalityCurve(cycleKey, valve.valveId)}
                       />
                     </div>
                   ) : null}
@@ -758,6 +912,7 @@ function ValvesOverlay({
   valveError,
   onOpenValve,
   onOpenValveBedsOverlay,
+  onOpenValveMortalityCurve,
   onClose,
 }: {
   cycleKey: string;
@@ -770,6 +925,7 @@ function ValvesOverlay({
   valveError: string | null;
   onOpenValve: (cycleKey: string, valveId: string) => void;
   onOpenValveBedsOverlay: (cycleKey: string, valveId: string) => void;
+  onOpenValveMortalityCurve: (cycleKey: string, valveId: string) => void;
   onClose: () => void;
 }) {
   return (
@@ -810,6 +966,7 @@ function ValvesOverlay({
             valveError={valveError}
             onOpenValve={onOpenValve}
             onOpenValveBedsOverlay={onOpenValveBedsOverlay}
+            onOpenValveMortalityCurve={onOpenValveMortalityCurve}
           />
         </div>
       </div>
@@ -838,6 +995,10 @@ export function BlockProfileModal({
   curveData,
   curveLoading,
   curveError,
+  selectedMortalityCurve,
+  mortalityCurveData,
+  mortalityCurveLoading,
+  mortalityCurveError,
   onOpenBeds,
   onCloseBeds,
   onOpenValves,
@@ -845,6 +1006,10 @@ export function BlockProfileModal({
   onOpenValve,
   onOpenCurve,
   onCloseCurve,
+  onOpenCycleMortalityCurve,
+  onOpenValveMortalityCurve,
+  onOpenBedMortalityCurve,
+  onCloseMortalityCurve,
   onClose,
 }: {
   row: BlockModalRow | null;
@@ -867,6 +1032,10 @@ export function BlockProfileModal({
   curveData: HarvestCurvePayload | null;
   curveLoading: boolean;
   curveError: string | null;
+  selectedMortalityCurve: SelectedMortalityCurveState | null;
+  mortalityCurveData: MortalityCurvePayload | null;
+  mortalityCurveLoading: boolean;
+  mortalityCurveError: string | null;
   onOpenBeds: (cycleKey: string) => void;
   onCloseBeds: () => void;
   onOpenValves: (cycleKey: string) => void;
@@ -874,6 +1043,10 @@ export function BlockProfileModal({
   onOpenValve: (cycleKey: string, valveId: string) => void;
   onOpenCurve: (cycleKey: string) => void;
   onCloseCurve: () => void;
+  onOpenCycleMortalityCurve: (cycleKey: string) => void;
+  onOpenValveMortalityCurve: (cycleKey: string, valveId: string) => void;
+  onOpenBedMortalityCurve: (cycleKey: string, bedId: string) => void;
+  onCloseMortalityCurve: () => void;
   onClose: () => void;
 }) {
   const [selectedValveBeds, setSelectedValveBeds] = useState<{ cycleKey: string; valveId: string } | null>(null);
@@ -898,6 +1071,11 @@ export function BlockProfileModal({
         return;
       }
 
+      if (selectedMortalityCurve) {
+        onCloseMortalityCurve();
+        return;
+      }
+
       if (selectedValveCycleKey) {
         onCloseValves();
         return;
@@ -917,10 +1095,12 @@ export function BlockProfileModal({
     onClose,
     onCloseBeds,
     onCloseCurve,
+    onCloseMortalityCurve,
     onCloseValves,
     row,
     selectedCurveCycleKey,
     selectedCycleKey,
+    selectedMortalityCurve,
     selectedValveCycleKey,
     selectedValveBeds,
   ]);
@@ -973,7 +1153,7 @@ export function BlockProfileModal({
             <MetricPill label="Fecha SP" value={formatDate(row.spDate)} />
             <MetricPill label="Fecha Ini Cos" value={formatDate(row.harvestStartDate)} />
             <MetricPill label="Fecha Fin Cos" value={formatDate(row.harvestEndDate)} />
-            <MetricPill label="Tallos visibles" value={formatNumber(row.totalStems)} />
+            <MetricPill label={row.primaryMetricLabel || "Tallos visibles"} value={row.primaryMetricText || formatNumber(row.totalStems)} />
           </div>
 
           {loading ? (
@@ -997,6 +1177,8 @@ export function BlockProfileModal({
                   {data.cycles.map((cycle) => {
                     const showValvesActive = selectedValveCycleKey === cycle.cycleKey;
                     const showCurveActive = selectedCurveCycleKey === cycle.cycleKey;
+                    const showMortalityCurveActive = selectedMortalityCurve?.entityType === "cycle"
+                      && selectedMortalityCurve.cycleKey === cycle.cycleKey;
 
                     return (
                       <Card
@@ -1069,7 +1251,15 @@ export function BlockProfileModal({
                             onClick={() => onOpenCurve(cycle.cycleKey)}
                           >
                             <LineChart className="size-4" />
-                            Curva de la cosecha por cycle
+                            Curva de cosecha por ciclo
+                          </Button>
+                          <Button
+                            variant={showMortalityCurveActive ? "secondary" : "outline"}
+                            className="rounded-xl"
+                            onClick={() => onOpenCycleMortalityCurve(cycle.cycleKey)}
+                          >
+                            <LineChart className="size-4" />
+                            Curva de mortandad
                           </Button>
                         </CardContent>
                       </Card>
@@ -1098,6 +1288,8 @@ export function BlockProfileModal({
           valveError={valveError}
           onOpenValve={onOpenValve}
           onOpenValveBedsOverlay={openValveBedsOverlay}
+          onOpenBedMortalityCurve={onOpenBedMortalityCurve}
+          onOpenValveMortalityCurve={onOpenValveMortalityCurve}
           onClose={onCloseBeds}
         />
       ) : null}
@@ -1109,6 +1301,16 @@ export function BlockProfileModal({
           loading={curveLoading}
           error={curveError}
           onClose={onCloseCurve}
+        />
+      ) : null}
+
+      {selectedMortalityCurve ? (
+        <MortalityCurveOverlay
+          selectedCurve={selectedMortalityCurve}
+          data={mortalityCurveData}
+          loading={mortalityCurveLoading}
+          error={mortalityCurveError}
+          onClose={onCloseMortalityCurve}
         />
       ) : null}
 
@@ -1124,6 +1326,7 @@ export function BlockProfileModal({
           valveError={valveError}
           onOpenValve={onOpenValve}
           onOpenValveBedsOverlay={openValveBedsOverlay}
+          onOpenValveMortalityCurve={onOpenValveMortalityCurve}
           onClose={onCloseValves}
         />
       ) : null}
@@ -1136,6 +1339,7 @@ export function BlockProfileModal({
           data={valveData}
           loading={valveLoading}
           error={valveError}
+          onOpenBedMortalityCurve={onOpenBedMortalityCurve}
           onClose={() => setSelectedValveBeds(null)}
         />
       ) : null}

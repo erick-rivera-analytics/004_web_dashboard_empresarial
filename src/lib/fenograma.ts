@@ -196,6 +196,8 @@ export type BlockModalRow = {
   harvestStartDate: string | null;
   harvestEndDate: string | null;
   totalStems: number;
+  primaryMetricLabel?: string | null;
+  primaryMetricText?: string | null;
 };
 
 export type FenogramaPivotRow = {
