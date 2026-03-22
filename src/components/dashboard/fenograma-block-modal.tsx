@@ -1,12 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useMemo, useState } from "react";
 import { LineChart, LoaderCircle, Rows3, X } from "lucide-react";
 
 import { HarvestCurvePanel } from "@/components/dashboard/harvest-curve-panel";
 import { MortalityCurvePanel } from "@/components/dashboard/mortality-curve-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+
+const ProcessViewerOverlay = dynamic(
+  () =>
+    import("@/components/dashboard/process-viewer-overlay").then(
+      (mod) => mod.ProcessViewerOverlay,
+    ),
+  { ssr: false },
+);
 import {
   Card,
   CardContent,
@@ -19,6 +28,7 @@ import type {
   BedProfilePayload,
   BlockModalRow,
   CycleProfileBlockPayload,
+  CycleProfileCard,
   HarvestCurvePayload,
   ValveProfilePayload,
   ValveProfilesByCyclePayload,
@@ -77,6 +87,116 @@ function getValveDisplayName(valveName: string | null | undefined, valveId: stri
   }
 
   return getTrailingSegment(valveId ?? "");
+}
+
+/**
+ * Deriva el estado operativo del ciclo desde isCurrent + isValid + status.
+ * Mapping:
+ * - isCurrent && isValid → Activo
+ * - !isCurrent && isValid → Cerrado
+ * - !isValid → Planificado
+ * Si el status raw es "planned" o similar, se fuerza Planificado.
+ */
+function deriveCycleOperationalStatus(cycle: CycleProfileCard): string {
+  const rawStatus = cycle.status?.toLowerCase().trim() ?? "";
+
+  if (rawStatus === "planned" || rawStatus === "planificado") {
+    return "Planificado";
+  }
+
+  if (cycle.isCurrent && cycle.isValid) {
+    return "Activo";
+  }
+
+  if (!cycle.isCurrent && cycle.isValid) {
+    return "Cerrado";
+  }
+
+  return "Planificado";
+}
+
+/**
+ * Traduce el estado raw a Fase en español.
+ * Mapping aplicado:
+ * - active / activo / harvesting → Vegetativo (ciclo vivo pre-cosecha o en cosecha)
+ * - closed / cerrado → Cerrado
+ * - planned / planificado → Planificado
+ * - harvest / cosecha → Cosecha
+ * Si no coincide, se devuelve capitalizado.
+ */
+function deriveCyclePhase(cycle: CycleProfileCard): string {
+  const rawStatus = cycle.status?.toLowerCase().trim() ?? "";
+
+  if (rawStatus.includes("harvest") || rawStatus.includes("cosecha")) {
+    return "Cosecha";
+  }
+
+  if (rawStatus === "active" || rawStatus === "activo") {
+    return "Vegetativo";
+  }
+
+  if (rawStatus === "closed" || rawStatus === "cerrado") {
+    return "Cerrado";
+  }
+
+  if (rawStatus === "planned" || rawStatus === "planificado") {
+    return "Planificado";
+  }
+
+  if (cycle.isCurrent) {
+    return "Vegetativo";
+  }
+
+  if (!cycle.isCurrent && cycle.isValid) {
+    return "Cerrado";
+  }
+
+  return "Planificado";
+}
+
+/** Camas 30 m² = superficie / 30. Retorna null si no hay superficie confiable. */
+function computeCamas30(bedArea: number | null): number | null {
+  if (bedArea === null || bedArea <= 0) {
+    return null;
+  }
+
+  return Math.round((bedArea / 30) * 100) / 100;
+}
+
+/**
+ * Plantas del programa: macro-ponderado sobre todos los ciclos visibles.
+ * Suma programmedPlants de todos los ciclos.
+ */
+function computeProgrammedPlantsAcrossCycles(cycles: CycleProfileCard[]): number | null {
+  const values = cycles.map((c) => c.programmedPlants).filter((v): v is number => v !== null);
+
+  if (!values.length) {
+    return null;
+  }
+
+  return values.reduce((sum, v) => sum + v, 0);
+}
+
+/**
+ * Resuelve el "Estado actual" agregado más útil del bloque/modal.
+ * Prioridad: Activo > Cosecha > Vegetativo > Planificado > Cerrado.
+ */
+function resolveAggregatedOperationalStatus(cycles: CycleProfileCard[]): string {
+  if (!cycles.length) {
+    return "-";
+  }
+
+  const statuses = cycles.map(deriveCycleOperationalStatus);
+
+  if (statuses.includes("Activo")) {
+    return "Activo";
+  }
+
+  if (statuses.includes("Planificado")) {
+    return "Planificado";
+  }
+
+  return "Cerrado";
 }
 
 function getBedSortValue(bedId: string) {
@@ -168,10 +288,9 @@ function BedsTable({
               "Bajas",
               "Resiembras",
               "Disp. vs prog.",
-              "Disp. vs inic.",
               "Mortandad",
               "Pambiles",
-              "Superficie",
+              "Camas 30 m²",
               "Variedad",
               "SP",
               "Vigencia",
@@ -218,10 +337,9 @@ function BedsTable({
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{formatNumber(bed.deadPlants)}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{formatNumber(bed.reseededPlants)}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{formatPercent(bed.availabilityVsScheduledPct)}</td>
-                <td className="border-b border-r border-border/60 px-3 py-2.5">{formatPercent(bed.availabilityVsInitialPct)}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{formatPercent(bed.mortalityPct)}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{formatNumber(bed.pambilesCount)}</td>
-                <td className="border-b border-r border-border/60 px-3 py-2.5">{formatNumber(bed.bedArea)}</td>
+                <td className="border-b border-r border-border/60 px-3 py-2.5">{formatNumber(computeCamas30(bed.bedArea))}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{bed.variety || "-"}</td>
                 <td className="border-b border-r border-border/60 px-3 py-2.5">{bed.spType || "-"}</td>
                 <td className="border-b border-border/60 px-3 py-2.5">
@@ -359,14 +477,6 @@ function BedsOverlay({
                           <Rows3 className="size-4" />
                           Abrir tabla flotante de camas
                         </Button>
-                        <Button
-                          variant="outline"
-                          className="rounded-xl"
-                          onClick={() => onOpenValveMortalityCurve(cycleKey, selectedValveId)}
-                        >
-                          <LineChart className="size-4" />
-                          Curva de mortandad
-                        </Button>
                         <Button variant="outline" className="rounded-xl" onClick={() => onOpenValve(cycleKey, selectedValveId)}>
                           Ocultar detalle
                         </Button>
@@ -502,14 +612,14 @@ function HarvestCurveOverlay({
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="rounded-full px-3 py-1">
-                Curva de la cosecha
+                Curva de cosecha por ciclo
               </Badge>
               <Badge variant="secondary" className="rounded-full px-3 py-1">
                 {cycleKey}
               </Badge>
             </div>
             <div className="min-w-0">
-              <h3 className="text-2xl font-semibold tracking-tight">Curva acumulada por dia</h3>
+              <h3 className="text-2xl font-semibold tracking-tight">Curva de cosecha por ciclo</h3>
               <p className="break-words text-sm text-muted-foreground">
                 Acumulado diario de tallos con separacion visual entre dato real y proyectado.
               </p>
@@ -531,14 +641,32 @@ function HarvestCurveOverlay({
           ) : data && data.cycleKey === cycleKey ? (
             <div className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <MetricPill label="Tallos acumulados" value={formatNumber(data.summary.totalStems)} />
+                <MetricPill label="Tallos ciclo" value={formatNumber(data.summary.totalStems)} />
                 <MetricPill label="Tallos reales" value={formatNumber(data.summary.observedStems)} />
                 <MetricPill label="Tallos proyectados" value={formatNumber(data.summary.projectedStems)} />
+                <MetricPill
+                  label="% avance"
+                  value={
+                    data.summary.totalStems > 0
+                      ? formatPercent(
+                        Math.round((data.summary.observedStems / data.summary.totalStems) * 10000) / 100,
+                      )
+                      : "-"
+                  }
+                  hint="Reales / tallos ciclo"
+                />
                 <MetricPill
                   label="Inicio proyeccion"
                   value={data.projectionStartDay ? `Dia ${data.projectionStartDay}` : "Sin proyeccion"}
                   hint={data.projectionStartDate ? formatDate(data.projectionStartDate) : undefined}
                 />
+                {/*
+                  Métricas de peso: no existen en la fuente actual
+                  (gld.mv_prod_fenograma_day_cur solo tiene stems_count).
+                  Se muestran como "-" hasta conectar fuente de peso.
+                */}
+                <MetricPill label="Peso ciclo" value="-" hint="Sin fuente de peso conectada" />
+                <MetricPill label="Peso / tallo ciclo" value="-" hint="Sin fuente de peso conectada" />
               </div>
 
               {data.points.length ? (
@@ -632,12 +760,30 @@ function MortalityCurveOverlay({
             <div className="py-8 text-sm text-destructive">{error}</div>
           ) : data ? (
             <div className="space-y-5">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <MetricPill label="Mortandad actual" value={formatPercent(data.summary.lastCumulativeMortalityPct)} />
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricPill label="Plantas inicio ciclo" value={formatNumber(data.summary.initialPlantsCycle)} />
+                <MetricPill label="Resiembras" value={formatNumber(data.summary.totalReseededPlants)} />
+                <MetricPill label="Plantas muertas" value={formatNumber(data.summary.totalDeadPlants)} />
+                <MetricPill
+                  label="Plantas vigentes"
+                  value={
+                    data.summary.initialPlantsCycle > 0
+                      ? formatNumber(
+                        data.summary.initialPlantsCycle
+                          - data.summary.totalDeadPlants
+                          + data.summary.totalReseededPlants,
+                      )
+                      : "-"
+                  }
+                />
+                <MetricPill label="Mortandad" value={formatPercent(data.summary.lastCumulativeMortalityPct)} />
                 <MetricPill label="Mortandad diaria actual" value={formatPercent(data.summary.lastDailyMortalityPct)} />
                 <MetricPill label="Pico diario" value={formatPercent(data.summary.maxDailyMortalityPct)} />
-                <MetricPill label="Bajas" value={formatNumber(data.summary.totalDeadPlants)} />
-                <MetricPill label="Resiembras" value={formatNumber(data.summary.totalReseededPlants)} />
+                {/*
+                  Disp. vs programadas: requiere programmedPlants del ciclo,
+                  no disponible en MortalityCurvePayload. Se muestra "-".
+                */}
+                <MetricPill label="Disp. vs programadas" value="-" hint="Requiere plantas programadas del ciclo" />
               </div>
 
               {data.points.length ? (
@@ -657,6 +803,229 @@ function MortalityCurveOverlay({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CycleSelector({
+  cycles,
+  selectedCycleKey,
+  onSelect,
+}: {
+  cycles: CycleProfileCard[];
+  selectedCycleKey: string | null;
+  onSelect: (cycleKey: string) => void;
+}) {
+  const sortedCycles = useMemo(
+    () => [...cycles].sort((a, b) => {
+      const dateA = a.validFrom ?? "";
+      const dateB = b.validFrom ?? "";
+      return dateB.localeCompare(dateA);
+    }),
+    [cycles],
+  );
+
+  return (
+    <div className="relative">
+      <select
+        className="w-full appearance-none rounded-2xl border border-border/70 bg-background/80 px-4 py-3 pr-10 text-sm font-medium focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
+        value={selectedCycleKey ?? ""}
+        onChange={(event) => onSelect(event.target.value)}
+      >
+        {sortedCycles.map((cycle) => (
+          <option key={cycle.cycleKey} value={cycle.cycleKey}>
+            {cycle.cycleKey} — {deriveCycleOperationalStatus(cycle)}
+          </option>
+        ))}
+      </select>
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
+        <svg className="size-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function ModalContent({
+  data,
+  filteredCycleKey,
+  selectedValveCycleKey,
+  selectedCurveCycleKey,
+  selectedMortalityCurve,
+  onOpenBeds,
+  onOpenValves,
+  onOpenCurve,
+  onOpenCycleMortalityCurve,
+}: {
+  data: CycleProfileBlockPayload;
+  filteredCycleKey: string | null;
+  selectedValveCycleKey: string | null;
+  selectedCurveCycleKey: string | null;
+  selectedMortalityCurve: SelectedMortalityCurveState | null;
+  onOpenBeds: (cycleKey: string) => void;
+  onOpenValves: (cycleKey: string) => void;
+  onOpenCurve: (cycleKey: string) => void;
+  onOpenCycleMortalityCurve: (cycleKey: string) => void;
+}) {
+  const initialCycleKey = filteredCycleKey ?? data.cycles[0]?.cycleKey ?? null;
+  const [activeCycleKey, setActiveCycleKey] = useState<string | null>(initialCycleKey);
+  const [showProcessViewer, setShowProcessViewer] = useState(false);
+
+  const cycle = useMemo(
+    () => data.cycles.find((c) => c.cycleKey === activeCycleKey) ?? null,
+    [data.cycles, activeCycleKey],
+  );
+
+  const aggregatedStatus = useMemo(
+    () => resolveAggregatedOperationalStatus(data.cycles),
+    [data.cycles],
+  );
+
+  const programmedPlantsTotal = useMemo(
+    () => computeProgrammedPlantsAcrossCycles(data.cycles),
+    [data.cycles],
+  );
+
+  const showValvesActive = selectedValveCycleKey === activeCycleKey;
+  const showCurveActive = selectedCurveCycleKey === activeCycleKey;
+  const showMortalityCurveActive = selectedMortalityCurve?.entityType === "cycle"
+    && selectedMortalityCurve.cycleKey === activeCycleKey;
+
+  return (
+    <div className="space-y-6">
+      {/* B1: Summary row — Estado actual + new KPIs */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <MetricPill
+          label="Estado actual"
+          value={aggregatedStatus}
+          hint="Click para ver macroproceso"
+          onClick={() => setShowProcessViewer(true)}
+        />
+        {/*
+          Tallos planta, Cajas cama, Horas cama, Costo cama:
+          No existen en las fuentes actuales (fenograma/cycle_profile/kardex).
+          Se muestran como "-" hasta que se conecten las fuentes reales.
+        */}
+        <MetricPill label="Tallos planta" value="-" hint="Sin fuente conectada" />
+        <MetricPill label="Cajas cama" value="-" hint="Sin fuente conectada" />
+        <MetricPill label="Horas cama" value="-" hint="Sin fuente conectada" />
+        <MetricPill label="Costo cama" value="-" hint="Sin fuente conectada" />
+        <MetricPill
+          label="Plantas del programa"
+          value={formatNumber(programmedPlantsTotal)}
+          hint="Macro-ponderado de todos los ciclos"
+        />
+      </div>
+
+      {/* B2: Cycle selector */}
+      {data.cycles.length > 1 ? (
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Seleccionar ciclo</p>
+          <CycleSelector
+            cycles={data.cycles}
+            selectedCycleKey={activeCycleKey}
+            onSelect={setActiveCycleKey}
+          />
+        </div>
+      ) : null}
+
+      {/* B3: Selected cycle detail */}
+      {cycle ? (
+        <Card className="rounded-[24px] border-border/70 bg-background/80">
+          <CardHeader className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="rounded-full px-3 py-1">{cycle.cycleKey}</Badge>
+              <Badge
+                variant={deriveCycleOperationalStatus(cycle) === "Activo" ? "secondary" : "outline"}
+                className="rounded-full px-3 py-1"
+              >
+                {deriveCycleOperationalStatus(cycle)}
+              </Badge>
+            </div>
+            <CardTitle className="text-base">
+              Bloque {cycle.blockId || cycle.parentBlock}
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricPill label="Variedad" value={cycle.variety || "-"} />
+            <MetricPill label="Tipo SP" value={cycle.spType || "-"} />
+            <MetricPill label="Fase" value={deriveCyclePhase(cycle)} />
+            <MetricPill label="Invernadero" value={cycle.greenhouse ? "Si" : "No"} />
+            <MetricPill label="Luz" value={cycle.lightType && cycle.lightType.toLowerCase() !== "unknown" ? cycle.lightType : "-"} />
+            <MetricPill
+              label="Camas fisicas"
+              value={formatNumber(cycle.bedCount)}
+              hint="Abrir tabla flotante de camas"
+              onClick={() => onOpenBeds(cycle.cycleKey)}
+            />
+            <MetricPill
+              label="Valvulas"
+              value={formatNumber(cycle.valveCount)}
+              hint="Abrir ventana flotante de valvulas"
+              onClick={() => onOpenValves(cycle.cycleKey)}
+            />
+            <MetricPill label="Pambiles" value={formatNumber(cycle.pambilesCount)} />
+            <MetricPill label="Camas 30 m²" value={formatNumber(computeCamas30(cycle.bedArea))} />
+            <MetricPill label="Plantas programadas" value={formatNumber(cycle.programmedPlants)} />
+            <MetricPill label="Plantas vigentes" value={formatNumber(cycle.currentPlants)} />
+            <MetricPill label="Disp. vs programadas" value={formatPercent(cycle.availabilityVsScheduledPct)} />
+            {/* Fecha inicio cosecha: no disponible directamente en cycle_profile, se deja preparado */}
+            <MetricPill label="Fecha inicio cosecha" value="-" hint="Sin fuente conectada" />
+            {/*
+              Tallos planta, Cajas cama, Horas cama, Costo cama (ciclo),
+              Cajas en verde, Cajas en blanco, Peso tallo:
+              No existen en las fuentes actuales. Se muestran como "-".
+            */}
+            <MetricPill label="Tallos planta" value="-" hint="Sin fuente conectada" />
+            <MetricPill label="Cajas cama" value="-" hint="Sin fuente conectada" />
+            <MetricPill label="Horas cama" value="-" hint="Sin fuente conectada" />
+            <MetricPill label="Costo cama" value="-" hint="Sin fuente conectada" />
+            <MetricPill label="Cajas en verde" value="-" hint="Sin fuente conectada" />
+            <MetricPill label="Cajas en blanco" value="-" hint="Estimada — sin fuente conectada" />
+            <MetricPill label="Peso tallo" value="-" hint="Sin fuente conectada" />
+            <MetricPill
+              label="Mortandad"
+              value={formatPercent(cycle.mortalityPct)}
+              hint="Click para ver curva de mortandad"
+              onClick={() => onOpenCycleMortalityCurve(cycle.cycleKey)}
+            />
+            <MetricPill label="Desde" value={formatDate(cycle.validFrom)} />
+            <MetricPill label="Hasta" value={formatDate(cycle.validTo)} />
+          </CardContent>
+
+          <CardContent className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+            <Button
+              variant={showCurveActive ? "secondary" : "outline"}
+              className="rounded-xl"
+              onClick={() => onOpenCurve(cycle.cycleKey)}
+            >
+              <LineChart className="size-4" />
+              Curva de cosecha por ciclo
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="rounded-[22px] border border-border/70 bg-background/72 p-6 text-sm text-muted-foreground">
+          No hay ciclos disponibles para este bloque con el criterio actual.
+        </div>
+      )}
+
+      {/*
+        BPMN del macroproceso de campo.
+        Asset esperado: public/processes/campo-macroproceso-es.bpmn
+        Si el archivo no existe, el visor mostrará un error informativo.
+        Para conectar: crear el archivo BPMN y colocarlo en public/processes/.
+      */}
+      {showProcessViewer ? (
+        <ProcessViewerOverlay
+          title="Macroproceso de campo"
+          subtitle="Flujo operativo del ciclo productivo. El asset BPMN debe colocarse en public/processes/campo-macroproceso-es.bpmn"
+          assetPath="/processes/campo-macroproceso-es.bpmn"
+          onClose={() => setShowProcessViewer(false)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -700,7 +1069,8 @@ function ValveDetailPanel({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricPill label="Valvula" value={getValveDisplayName(data.valve.valveName, data.valve.valveId)} />
         <MetricPill label="Bloque" value={data.valve.blockId || data.valve.parentBlock || "-"} />
-        <MetricPill label="Camas" value={formatNumber(data.valve.bedCount)} />
+        <MetricPill label="Camas fisicas" value={formatNumber(data.valve.bedCount)} />
+        <MetricPill label="Camas 30 m²" value={formatNumber(computeCamas30(data.summary.totalBedArea))} />
         <MetricPill label="Pambiles" value={formatNumber(data.valve.pambilesCount)} />
         <MetricPill label="Plantas programadas" value={formatNumber(data.valve.programmedPlants)} />
         <MetricPill label="Inicio de ciclo" value={formatNumber(data.valve.cycleStartPlants)} />
@@ -708,9 +1078,12 @@ function ValveDetailPanel({
         <MetricPill label="Bajas acumuladas" value={formatNumber(data.valve.deadPlants)} />
         <MetricPill label="Resiembras" value={formatNumber(data.valve.reseededPlants)} />
         <MetricPill label="Disp. vs programadas" value={formatPercent(data.valve.availabilityVsScheduledPct)} />
-        <MetricPill label="Disp. vs iniciales" value={formatPercent(data.valve.availabilityVsInitialPct)} />
-        <MetricPill label="Mortandad" value={formatPercent(data.valve.mortalityPct)} />
-        <MetricPill label="Superficie" value={formatNumber(data.summary.totalBedArea)} />
+        <MetricPill
+          label="Mortandad"
+          value={formatPercent(data.valve.mortalityPct)}
+          hint="Click para ver curva de mortandad"
+          onClick={onOpenMortalityCurve}
+        />
       </div>
 
       <div className="rounded-[20px] border border-border/70 bg-background/72 p-4">
@@ -723,27 +1096,13 @@ function ValveDetailPanel({
               {getValveDisplayName(data.valve.valveName, data.valve.valveId)} / Bloque {data.valve.blockId || data.valve.parentBlock || "-"}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <DetailBadges
-              items={[
-                `${data.summary.totalBeds} camas`,
-                `${formatNumber(data.summary.totalProgrammedPlants)} programadas`,
-                `${formatNumber(data.summary.totalCurrentPlants)} vigentes`,
-              ]}
-            />
-            {data.beds.length && onOpenBedsOverlay ? (
-              <Button variant="outline" className="rounded-xl" onClick={onOpenBedsOverlay}>
-                <Rows3 className="size-4" />
-                Abrir tabla flotante de camas
-              </Button>
-            ) : null}
-            {onOpenMortalityCurve ? (
-              <Button variant="outline" className="rounded-xl" onClick={onOpenMortalityCurve}>
-                <LineChart className="size-4" />
-                Curva de mortandad
-              </Button>
-            ) : null}
-          </div>
+          <DetailBadges
+            items={[
+              `${data.summary.totalBeds} camas fisicas`,
+              `${formatNumber(data.summary.totalProgrammedPlants)} programadas`,
+              `${formatNumber(data.summary.totalCurrentPlants)} vigentes`,
+            ]}
+          />
         </div>
       </div>
     </div>
@@ -827,66 +1186,41 @@ function ValvesSection({
                           Bloque {valve.blockId || valve.parentBlock}
                         </Badge>
                       ) : null}
-                      {valve.isCurrent ? (
-                        <Badge variant="secondary" className="rounded-full px-3 py-1">
-                          Actual
-                        </Badge>
-                      ) : null}
-                      {valve.isValid ? (
-                        <Badge variant="outline" className="rounded-full px-3 py-1">
-                          Valido
-                        </Badge>
-                      ) : null}
+                      <Badge
+                        variant={valve.isCurrent && valve.isValid ? "secondary" : "outline"}
+                        className="rounded-full px-3 py-1"
+                      >
+                        {valve.isCurrent && valve.isValid
+                          ? "Activo"
+                          : !valve.isCurrent && valve.isValid
+                            ? "Cerrado"
+                            : "Planificado"}
+                      </Badge>
                     </div>
                   </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     <MetricPill label="Pambiles" value={formatNumber(valve.pambilesCount)} />
-                    <MetricPill label="Camas" value={formatNumber(valve.bedCount)} />
+                    <MetricPill label="Camas fisicas" value={formatNumber(valve.bedCount)} />
                     <MetricPill label="Plantas programadas" value={formatNumber(valve.programmedPlants)} />
                     <MetricPill label="Plantas vigentes" value={formatNumber(valve.currentPlants)} />
+                    <MetricPill label="Inicio de ciclo" value={formatNumber(valve.cycleStartPlants)} />
+                    <MetricPill label="Bajas acumuladas" value={formatNumber(valve.deadPlants)} />
+                    <MetricPill label="Resiembras" value={formatNumber(valve.reseededPlants)} />
                     <MetricPill label="Disp. vs prog." value={formatPercent(valve.availabilityVsScheduledPct)} />
-                    <MetricPill label="Disp. vs inic." value={formatPercent(valve.availabilityVsInitialPct)} />
-                    <MetricPill label="Mortandad" value={formatPercent(valve.mortalityPct)} />
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button
-                      variant={isSelected ? "secondary" : "outline"}
-                      className="rounded-xl"
-                      onClick={() => onOpenValve(cycleKey, valve.valveId)}
-                    >
-                      {isSelected ? "Ocultar detalle de valvula" : "Abrir detalle de valvula"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={() => onOpenValveBedsOverlay(cycleKey, valve.valveId)}
-                    >
-                      <Rows3 className="size-4" />
-                      Abrir tabla flotante de camas
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="rounded-xl"
+                    <MetricPill
+                      label="Mortandad"
+                      value={formatPercent(valve.mortalityPct)}
+                      hint="Click para ver curva"
                       onClick={() => onOpenValveMortalityCurve(cycleKey, valve.valveId)}
-                    >
-                      <LineChart className="size-4" />
-                      Curva de mortandad
-                    </Button>
+                    />
+                    <MetricPill
+                      label="Camas"
+                      value={`${formatNumber(valve.bedCount)} camas`}
+                      hint="Click para ver camas"
+                      onClick={() => onOpenValveBedsOverlay(cycleKey, valve.valveId)}
+                    />
                   </div>
-
-                  {isSelected ? (
-                    <div className="mt-4 rounded-[20px] border border-border/70 bg-card/92 p-4">
-                      <ValveDetailPanel
-                        data={valveData}
-                        loading={valveLoading}
-                        error={valveError}
-                        onOpenBedsOverlay={() => onOpenValveBedsOverlay(cycleKey, valve.valveId)}
-                        onOpenMortalityCurve={() => onOpenValveMortalityCurve(cycleKey, valve.valveId)}
-                      />
-                    </div>
-                  ) : null}
                 </div>
               );
             })}
@@ -1149,13 +1483,6 @@ export function BlockProfileModal({
         </div>
 
         <div className="overflow-y-auto px-4 py-5 sm:px-6">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricPill label="Fecha SP" value={formatDate(row.spDate)} />
-            <MetricPill label="Fecha Ini Cos" value={formatDate(row.harvestStartDate)} />
-            <MetricPill label="Fecha Fin Cos" value={formatDate(row.harvestEndDate)} />
-            <MetricPill label={row.primaryMetricLabel || "Tallos visibles"} value={row.primaryMetricText || formatNumber(row.totalStems)} />
-          </div>
-
           {loading ? (
             <div className="flex items-center gap-3 py-10 text-sm text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" />
@@ -1164,114 +1491,17 @@ export function BlockProfileModal({
           ) : error ? (
             <div className="py-10 text-sm text-destructive">{error}</div>
           ) : data ? (
-            <div className="mt-6 space-y-6">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <MetricPill label="Ciclos visibles" value={`${data.summary.totalCycles}`} />
-                <MetricPill label="Ciclos vigentes" value={`${data.summary.currentCycles}`} />
-                <MetricPill label="Ciclos validos" value={`${data.summary.validCycles}`} />
-                <MetricPill label="Variedades" value={data.summary.varieties.join(", ") || "-"} />
-              </div>
-
-              {data.cycles.length ? (
-                <div className="grid gap-4">
-                  {data.cycles.map((cycle) => {
-                    const showValvesActive = selectedValveCycleKey === cycle.cycleKey;
-                    const showCurveActive = selectedCurveCycleKey === cycle.cycleKey;
-                    const showMortalityCurveActive = selectedMortalityCurve?.entityType === "cycle"
-                      && selectedMortalityCurve.cycleKey === cycle.cycleKey;
-
-                    return (
-                      <Card
-                        key={cycle.recordId}
-                        className="rounded-[24px] border-border/70 bg-background/80"
-                      >
-                        <CardHeader className="space-y-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge className="rounded-full px-3 py-1">{cycle.cycleKey}</Badge>
-                            {cycle.isCurrent ? (
-                              <Badge variant="secondary" className="rounded-full px-3 py-1">
-                                Actual
-                              </Badge>
-                            ) : null}
-                            {cycle.isValid ? (
-                              <Badge variant="outline" className="rounded-full px-3 py-1">
-                                Valido
-                              </Badge>
-                            ) : null}
-                          </div>
-                          <CardTitle className="text-base">
-                            Bloque {cycle.blockId || cycle.parentBlock}
-                          </CardTitle>
-                        </CardHeader>
-
-                        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                          <MetricPill label="Variedad" value={cycle.variety || "-"} />
-                          <MetricPill label="Tipo SP" value={cycle.spType || "-"} />
-                          <MetricPill label="Estado" value={cycle.status || "-"} />
-                          <MetricPill label="Invernadero" value={cycle.greenhouse ? "Si" : "No"} />
-                          <MetricPill label="Luz" value={cycle.lightType || "-"} />
-                          <MetricPill
-                            label="Camas"
-                            value={formatNumber(cycle.bedCount)}
-                            hint="Abrir tabla flotante de camas"
-                            onClick={() => onOpenBeds(cycle.cycleKey)}
-                          />
-                          <MetricPill
-                            label="Valvulas"
-                            value={formatNumber(cycle.valveCount)}
-                            hint="Abrir ventana flotante de valvulas"
-                            onClick={() => onOpenValves(cycle.cycleKey)}
-                          />
-                          <MetricPill label="Pambiles" value={formatNumber(cycle.pambilesCount)} />
-                          <MetricPill label="Superficie" value={formatNumber(cycle.bedArea)} />
-                          <MetricPill label="Plantas programadas" value={formatNumber(cycle.programmedPlants)} />
-                          <MetricPill label="Inicio de ciclo" value={formatNumber(cycle.cycleStartPlants)} />
-                          <MetricPill label="Plantas vigentes" value={formatNumber(cycle.currentPlants)} />
-                          <MetricPill label="Bajas acumuladas" value={formatNumber(cycle.deadPlants)} />
-                          <MetricPill label="Resiembras" value={formatNumber(cycle.reseededPlants)} />
-                          <MetricPill label="Disp. vs programadas" value={formatPercent(cycle.availabilityVsScheduledPct)} />
-                          <MetricPill label="Disp. vs iniciales" value={formatPercent(cycle.availabilityVsInitialPct)} />
-                          <MetricPill label="Mortandad" value={formatPercent(cycle.mortalityPct)} />
-                          <MetricPill label="Desde" value={formatDate(cycle.validFrom)} />
-                          <MetricPill label="Hasta" value={formatDate(cycle.validTo)} />
-                        </CardContent>
-
-                        <CardContent className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
-                          <Button
-                            variant={showValvesActive ? "secondary" : "outline"}
-                            className="rounded-xl"
-                            onClick={() => onOpenValves(cycle.cycleKey)}
-                          >
-                            <Rows3 className="size-4" />
-                            {showValvesActive ? "Ocultar valvulas" : "Abrir valvulas"}
-                          </Button>
-                          <Button
-                            variant={showCurveActive ? "secondary" : "outline"}
-                            className="rounded-xl"
-                            onClick={() => onOpenCurve(cycle.cycleKey)}
-                          >
-                            <LineChart className="size-4" />
-                            Curva de cosecha por ciclo
-                          </Button>
-                          <Button
-                            variant={showMortalityCurveActive ? "secondary" : "outline"}
-                            className="rounded-xl"
-                            onClick={() => onOpenCycleMortalityCurve(cycle.cycleKey)}
-                          >
-                            <LineChart className="size-4" />
-                            Curva de mortandad
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-[22px] border border-border/70 bg-background/72 p-6 text-sm text-muted-foreground">
-                  No hay ciclos disponibles para este bloque con el criterio actual.
-                </div>
-              )}
-            </div>
+            <ModalContent
+              data={data}
+              filteredCycleKey={data.filteredCycleKey}
+              selectedValveCycleKey={selectedValveCycleKey}
+              selectedCurveCycleKey={selectedCurveCycleKey}
+              selectedMortalityCurve={selectedMortalityCurve}
+              onOpenBeds={onOpenBeds}
+              onOpenValves={onOpenValves}
+              onOpenCurve={onOpenCurve}
+              onOpenCycleMortalityCurve={onOpenCycleMortalityCurve}
+            />
           ) : null}
         </div>
       </div>

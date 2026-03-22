@@ -418,20 +418,19 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
                     top: hoverPreview.y,
                   }}
                 >
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-                    Preliminar del bloque
-                  </p>
                   <p className="mt-2 text-xl font-semibold">
                     Bloque {hoverPreview.feature.block}
                   </p>
                   <p className="mt-2 text-sm text-muted-foreground">
                     Area actual: {buildPreviewLines(hoverPreview.feature).area}
                   </p>
+                  {/*
+                    Camas 30 m²: requiere bedArea del cycle_profile (superficie operativa real).
+                    mapArea proviene del GeoJSON y no equivale a superficie operativa verificada.
+                    Se muestra "-" hasta que el mapa reciba bedArea desde el perfil de ciclo.
+                  */}
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Tallos ultimo ciclo: {buildPreviewLines(hoverPreview.feature).stems}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Area mapa: {formatNumber(hoverPreview.feature.mapArea ?? 0)}
+                    Camas 30 m²: -
                   </p>
                 </div>
               ) : null}
@@ -511,11 +510,12 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
                     <p className="mt-1 text-sm text-muted-foreground">
                       Area actual: {selectedPreview?.area}
                     </p>
+                    {/*
+                      Camas 30 m²: requiere bedArea del cycle_profile (superficie operativa real).
+                      mapArea del GeoJSON no es equivalente sin verificación.
+                    */}
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Tallos ultimo ciclo: {selectedPreview?.stems}
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Area mapa: {formatNumber(selectedFeature.mapArea ?? 0)}
+                      Camas 30 m²: -
                     </p>
                   </div>
                 ) : (
