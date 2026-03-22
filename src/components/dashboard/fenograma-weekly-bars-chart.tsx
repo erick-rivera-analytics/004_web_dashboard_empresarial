@@ -1,10 +1,12 @@
+import { memo } from "react";
+
 import type { FenogramaWeeklyTotal } from "@/lib/fenograma";
 
 function formatNumber(value: number) {
   return value.toLocaleString("en-US");
 }
 
-export function FenogramaWeeklyBarsChart({
+export const FenogramaWeeklyBarsChart = memo(function FenogramaWeeklyBarsChart({
   data,
 }: {
   data: FenogramaWeeklyTotal[];
@@ -105,4 +107,4 @@ export function FenogramaWeeklyBarsChart({
       </svg>
     </div>
   );
-}
+});

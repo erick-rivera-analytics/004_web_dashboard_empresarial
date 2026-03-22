@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { handleApiError } from "@/lib/api-error";
 import { getBedProfilesByCycleKey } from "@/lib/fenograma";
 
 export const dynamic = "force-dynamic";
@@ -18,14 +19,6 @@ export async function GET(
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        message:
-          error instanceof Error
-            ? error.message
-            : "No se pudo cargar el beds profile del ciclo.",
-      },
-      { status: 500 },
-    );
+    return handleApiError(error, "No se pudo cargar el beds profile del ciclo.");
   }
 }

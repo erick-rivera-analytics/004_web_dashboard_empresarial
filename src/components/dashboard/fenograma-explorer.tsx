@@ -1,8 +1,10 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useEffect, useDeferredValue, useMemo, useState } from "react";
 import { LoaderCircle, RefreshCcw, Sprout } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import useSWR from "swr";
+import { toast } from "sonner";
 
 import { BlockProfileModal } from "@/components/dashboard/fenograma-block-modal";
 import { FenogramaPivotTable } from "@/components/dashboard/fenograma-pivot-table";
@@ -134,6 +136,8 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
   const data = dashboardData ?? initialData;
   const blockModal = useBlockProfileModal(selectedRow);
 
+  useEffect(() => { if (dashboardError) toast.error(dashboardError.message || "Error al cargar datos"); }, [dashboardError]);
+
   function updateFilter<Key extends keyof FenogramaFilters>(key: Key, value: FenogramaFilters[Key]) {
     setFilters((current) => ({ ...current, [key]: value }));
   }
@@ -237,7 +241,14 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
             <MetricPill label="Hoy" value={formatDate(data.today)} />
           </div>
 
-          {isValidating ? <div className="flex items-center gap-3 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Actualizando fenograma.</div> : null}
+          {!dashboardData && isValidating ? (
+            <div className="space-y-3">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-3/4" />
+              <Skeleton className="h-10 w-1/2" />
+            </div>
+          ) : isValidating ? <div className="flex items-center gap-3 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Actualizando fenograma.</div> : null}
           {dashboardError ? <div className="flex items-center gap-3 text-sm text-destructive">{dashboardError.message}<button type="button" className="underline underline-offset-2 hover:text-destructive/80" onClick={() => mutate()}>Reintentar</button></div> : null}
         </CardContent>
       </Card>

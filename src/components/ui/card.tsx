@@ -27,8 +27,4 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return <div className={cn("px-6 pb-6", className)} {...props} />;
 }
 
-function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("px-6 pb-6", className)} {...props} />;
-}
-
-export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle };
+export { Card, CardContent, CardDescription, CardHeader, CardTitle };

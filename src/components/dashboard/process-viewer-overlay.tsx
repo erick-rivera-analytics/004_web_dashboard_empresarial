@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Maximize2, Minus, Plus, X } from "lucide-react";
+import useSWR from "swr";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,12 @@ type ViewerApi = {
   };
 };
 
+const textFetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error("Failed to load");
+    return r.text();
+  });
+
 /**
  * Componente reusable para mostrar un BPMN en ventana flotante.
  * Sigue el patrón técnico de balanzas-process-viewer.tsx pero sin overlays.
@@ -40,33 +47,26 @@ export function ProcessViewerOverlay({
 }: ProcessViewerOverlayProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<ViewerApi | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [viewerError, setViewerError] = useState<string | null>(null);
+
+  const { data: xmlData, error: fetchError, isLoading } = useSWR(assetPath, textFetcher);
 
   useEffect(() => {
+    if (!xmlData || !containerRef.current) {
+      return;
+    }
+
     let cancelled = false;
 
-    async function loadViewer() {
+    async function initViewer() {
       if (!containerRef.current) {
         return;
       }
 
-      setLoading(true);
-      setError(null);
+      setViewerError(null);
 
       try {
-        const [{ default: NavigatedViewer }, response] = await Promise.all([
-          import("bpmn-js/lib/NavigatedViewer"),
-          fetch(assetPath),
-        ]);
-
-        if (!response.ok) {
-          throw new Error(
-            "No se pudo cargar el diagrama BPMN. Verifica que el archivo existe en la ruta configurada.",
-          );
-        }
-
-        const xml = await response.text();
+        const { default: NavigatedViewer } = await import("bpmn-js/lib/NavigatedViewer");
 
         if (cancelled || !containerRef.current) {
           return;
@@ -77,35 +77,30 @@ export function ProcessViewerOverlay({
           container: containerRef.current,
         }) as ViewerApi;
 
-        await viewer.importXML(xml);
+        await viewer.importXML(xmlData!);
 
         const canvas = viewer.get("canvas");
         canvas.zoom("fit-viewport", "auto");
         viewerRef.current = viewer;
-
-        if (!cancelled) {
-          setLoading(false);
-        }
       } catch (loadError) {
         if (!cancelled) {
-          setError(
+          setViewerError(
             loadError instanceof Error
               ? loadError.message
               : "No se pudo preparar el visor del proceso.",
           );
-          setLoading(false);
         }
       }
     }
 
-    loadViewer();
+    initViewer();
 
     return () => {
       cancelled = true;
       viewerRef.current?.destroy();
       viewerRef.current = null;
     };
-  }, [assetPath]);
+  }, [xmlData]);
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -136,6 +131,11 @@ export function ProcessViewerOverlay({
     const canvas = viewerRef.current.get("canvas");
     canvas.zoom("fit-viewport", "auto");
   }
+
+  const loading = isLoading || (!fetchError && !viewerError && xmlData && !viewerRef.current);
+  const error = fetchError
+    ? "No se pudo cargar el diagrama BPMN. Verifica que el archivo existe en la ruta configurada."
+    : viewerError;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">

@@ -1,3 +1,5 @@
+const MAX_CACHE_ENTRIES = 200;
+
 type CacheEntry = {
   expiresAt: number;
   value: unknown;
@@ -46,6 +48,17 @@ export async function cachedAsync<T>(
 
   const promise = load()
     .then((value) => {
+      // Evict expired entries
+      const now2 = Date.now();
+      for (const [k, v] of cacheStore) {
+        if (v.expiresAt < now2) cacheStore.delete(k);
+      }
+      // If still at capacity, delete oldest entry (Map insertion order)
+      if (cacheStore.size >= MAX_CACHE_ENTRIES) {
+        const oldest = cacheStore.keys().next().value;
+        if (oldest !== undefined) cacheStore.delete(oldest);
+      }
+
       cacheStore.set(key, {
         value,
         expiresAt: Date.now() + ttlMs,

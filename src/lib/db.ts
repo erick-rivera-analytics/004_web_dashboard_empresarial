@@ -42,8 +42,8 @@ function buildPoolConfig(): PoolConfig | null {
     return {
       connectionString: process.env.DATABASE_URL,
       ssl: sslEnabled() ? { rejectUnauthorized: false } : undefined,
-      max: 10,
-      idleTimeoutMillis: 30000,
+      max: Number(process.env.DATABASE_POOL_MAX) || 10,
+      idleTimeoutMillis: Number(process.env.DATABASE_IDLE_TIMEOUT_MS) || 30000,
     };
   }
 
@@ -58,8 +58,8 @@ function buildPoolConfig(): PoolConfig | null {
     user: process.env.DATABASE_USER,
     password: process.env.DATABASE_PASSWORD,
     ssl: sslEnabled() ? { rejectUnauthorized: false } : undefined,
-    max: 10,
-    idleTimeoutMillis: 30000,
+    max: Number(process.env.DATABASE_POOL_MAX) || 10,
+    idleTimeoutMillis: Number(process.env.DATABASE_IDLE_TIMEOUT_MS) || 30000,
   };
 }
 
@@ -135,5 +135,14 @@ export async function query<T extends QueryResultRow>(text: string, values: unkn
     throw new Error("Database is not configured.");
   }
 
-  return pool.query<T>(text, values);
+  const SLOW_QUERY_MS = Number(process.env.SLOW_QUERY_THRESHOLD_MS) || 500;
+  const start = Date.now();
+  const result = await pool.query<T>(text, values);
+  const elapsed = Date.now() - start;
+
+  if (elapsed > SLOW_QUERY_MS) {
+    console.warn(`[DB] Slow query (${elapsed}ms): ${text.slice(0, 120)}`);
+  }
+
+  return result;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   Area,
   CartesianGrid,
@@ -28,7 +29,7 @@ function formatNumber(value: number) {
   });
 }
 
-export function MortalityCurveChart({ data }: MortalityCurveChartProps) {
+export const MortalityCurveChart = memo(function MortalityCurveChart({ data }: MortalityCurveChartProps) {
   return (
     <div className="h-[420px] w-full">
       <ResponsiveContainer width="100%" height="100%" minHeight={420}>
@@ -106,4 +107,4 @@ export function MortalityCurveChart({ data }: MortalityCurveChartProps) {
       </ResponsiveContainer>
     </div>
   );
-}
+});

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Maximize2, Minus, Plus } from "lucide-react";
+import useSWR from "swr";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -76,6 +77,12 @@ const NODE_CLASS_MAP: Record<BalanzasNodeKey, string> = {
   b2a: "balanzas-node-b2a",
 };
 
+const textFetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error("Failed to load");
+    return r.text();
+  });
+
 function matchesSingleBinding(binding: BalanzasProcessBinding, element: ProcessElement) {
   const name = element.businessObject?.name?.trim() ?? "";
   const y = element.y ?? 0;
@@ -147,32 +154,27 @@ export function BalanzasProcessViewer({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<ViewerApi | null>(null);
   const elementIdsRef = useRef<Record<string, string[]>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [viewerError, setViewerError] = useState<string | null>(null);
   const [viewerReady, setViewerReady] = useState(false);
 
+  const { data: xmlData, error: fetchError, isLoading } = useSWR(assetPath, textFetcher);
+
   useEffect(() => {
+    if (!xmlData || !containerRef.current) {
+      return;
+    }
+
     let cancelled = false;
 
-    async function loadViewer() {
+    async function initViewer() {
       if (!containerRef.current) {
         return;
       }
 
-      setLoading(true);
-      setError(null);
+      setViewerError(null);
 
       try {
-        const [{ default: NavigatedViewer }, response] = await Promise.all([
-          import("bpmn-js/lib/NavigatedViewer"),
-          fetch(assetPath),
-        ]);
-
-        if (!response.ok) {
-          throw new Error("No se pudo cargar el diagrama BPMN de postcosecha.");
-        }
-
-        const xml = await response.text();
+        const { default: NavigatedViewer } = await import("bpmn-js/lib/NavigatedViewer");
 
         if (cancelled || !containerRef.current) {
           return;
@@ -183,7 +185,7 @@ export function BalanzasProcessViewer({
           container: containerRef.current,
         }) as ViewerApi;
 
-        await viewer.importXML(xml);
+        await viewer.importXML(xmlData!);
 
         const canvas = viewer.get("canvas");
         const eventBus = viewer.get("eventBus");
@@ -217,22 +219,20 @@ export function BalanzasProcessViewer({
 
         if (!cancelled) {
           setViewerReady(true);
-          setLoading(false);
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(
+          setViewerError(
             loadError instanceof Error
               ? loadError.message
               : "No se pudo preparar el flujo de postcosecha.",
           );
           setViewerReady(false);
-          setLoading(false);
         }
       }
     }
 
-    loadViewer();
+    initViewer();
 
     return () => {
       cancelled = true;
@@ -240,7 +240,7 @@ export function BalanzasProcessViewer({
       viewerRef.current = null;
       setViewerReady(false);
     };
-  }, [assetPath, nodes, onNodeSelect]);
+  }, [xmlData, nodes, onNodeSelect]);
 
   useEffect(() => {
     if (!viewerReady || !viewerRef.current) {
@@ -319,6 +319,11 @@ export function BalanzasProcessViewer({
     const canvas = viewerRef.current.get("canvas");
     canvas.zoom("fit-viewport", "auto");
   }
+
+  const loading = isLoading || (!fetchError && !viewerError && xmlData && !viewerReady);
+  const error = fetchError
+    ? "No se pudo cargar el diagrama BPMN de postcosecha."
+    : viewerError;
 
   return (
     <div className="rounded-[30px] border border-border/70 bg-[linear-gradient(180deg,rgba(254,254,252,0.98),rgba(238,245,242,0.96))] p-3 shadow-[0_18px_50px_-30px_rgba(15,23,42,0.35)] dark:bg-[linear-gradient(180deg,rgba(34,43,48,0.98),rgba(22,29,33,0.98))]">

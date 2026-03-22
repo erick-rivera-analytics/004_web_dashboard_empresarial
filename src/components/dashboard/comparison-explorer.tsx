@@ -1,8 +1,9 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useEffect, useDeferredValue, useMemo, useState } from "react";
 import { ArrowLeftRight, Search, ShieldAlert, Swords, Trophy } from "lucide-react";
 import useSWR from "swr";
+import { toast } from "sonner";
 
 import { ComparisonRadarPanel } from "@/components/dashboard/comparison-radar-panel";
 import { Badge } from "@/components/ui/badge";
@@ -223,6 +224,9 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
       revalidateOnFocus: false,
     },
   );
+  useEffect(() => { if (optionsError) toast.error(optionsError.message || "Error al cargar datos"); }, [optionsError]);
+  useEffect(() => { if (comparisonError) toast.error(comparisonError.message || "Error al cargar datos"); }, [comparisonError]);
+
   const options = optionsData ?? initialData.options;
   const comparison = pairQuery
     ? comparisonData ?? (pairQuery === initialPairQuery ? initialData.comparison : null)

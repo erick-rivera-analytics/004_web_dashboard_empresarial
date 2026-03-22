@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   Area,
   CartesianGrid,
@@ -27,7 +28,7 @@ function formatNumber(value: number) {
   });
 }
 
-export function HarvestCurveChart({
+export const HarvestCurveChart = memo(function HarvestCurveChart({
   data,
   projectionStartDay,
 }: HarvestCurveChartProps) {
@@ -149,4 +150,4 @@ export function HarvestCurveChart({
       </ResponsiveContainer>
     </div>
   );
-}
+});

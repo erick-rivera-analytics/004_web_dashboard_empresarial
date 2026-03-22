@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -23,7 +24,7 @@ type ComparisonRadarChartProps = {
   rightLabel: string;
 };
 
-export function ComparisonRadarChart({
+export const ComparisonRadarChart = memo(function ComparisonRadarChart({
   data,
   leftLabel,
   rightLabel,
@@ -73,4 +74,4 @@ export function ComparisonRadarChart({
       </ResponsiveContainer>
     </div>
   );
-}
+});

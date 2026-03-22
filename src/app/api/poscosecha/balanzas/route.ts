@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { handleApiError } from "@/lib/api-error";
 import {
   getBalanzasDashboardData,
   normalizeBalanzasFilters,
@@ -28,14 +29,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        message:
-          error instanceof Error
-            ? error.message
-            : "No se pudo cargar el indicador de balanzas.",
-      },
-      { status: 500 },
-    );
+    return handleApiError(error, "No se pudo cargar el indicador de balanzas.");
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { handleApiError } from "@/lib/api-error";
 import { getValveProfileByCycleAndValve } from "@/lib/fenograma";
 
 export const dynamic = "force-dynamic";
@@ -21,14 +22,6 @@ export async function GET(
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        message:
-          error instanceof Error
-            ? error.message
-            : "No se pudo cargar el detalle de la valvula.",
-      },
-      { status: 500 },
-    );
+    return handleApiError(error, "No se pudo cargar el detalle de la valvula.");
   }
 }

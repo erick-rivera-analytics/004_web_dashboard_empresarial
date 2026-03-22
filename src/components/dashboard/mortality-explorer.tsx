@@ -1,8 +1,9 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useEffect, useDeferredValue, useMemo, useState } from "react";
 import { Activity, LoaderCircle, RefreshCcw } from "lucide-react";
 import useSWR from "swr";
+import { toast } from "sonner";
 
 import { BlockProfileModal } from "@/components/dashboard/fenograma-block-modal";
 import { MortalityCurvePanel } from "@/components/dashboard/mortality-curve-panel";
@@ -105,6 +106,9 @@ export function MortalityExplorer({ initialData }: { initialData: MortalityDashb
     },
   );
   const data = dashboardData ?? initialData;
+
+  useEffect(() => { if (dashboardError) toast.error(dashboardError.message || "Error al cargar datos"); }, [dashboardError]);
+
   const {
     data: curveData,
     error: curveError,

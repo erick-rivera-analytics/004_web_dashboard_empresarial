@@ -463,7 +463,8 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
           </Badge>
         </div>
 
-        <div className="max-h-[min(74vh,820px)] w-full overflow-auto rounded-[24px] border border-border/70">
+        <div className="relative">
+        <div className="max-h-[min(74vh,820px)] w-full overflow-auto rounded-[24px] border border-border/70" role="region" aria-label="Tabla fenograma pivot" tabIndex={0}>
           <table className="min-w-full w-max border-separate border-spacing-0 text-sm">
             <thead className="sticky top-0 z-30 bg-card/95 backdrop-blur">
               <tr>
@@ -610,6 +611,8 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
               </tr>
             </tfoot>
           </table>
+        </div>
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-card to-transparent rounded-r-[24px] md:hidden" aria-hidden="true" />
         </div>
       </CardContent>
     </Card>

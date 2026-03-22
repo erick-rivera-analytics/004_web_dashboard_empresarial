@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+import { Toaster } from "sonner";
+
 import { ThemeProvider } from "@/components/theme-provider";
 import { manrope } from "@/lib/fonts";
 
@@ -25,6 +27,7 @@ export default function RootLayout({
         <ThemeProvider defaultTheme="system" storageKey="dashboard-starter-theme">
           {children}
         </ThemeProvider>
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

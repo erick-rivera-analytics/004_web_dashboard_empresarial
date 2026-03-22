@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useEffect, useDeferredValue, useMemo, useState } from "react";
 import {
   AlertCircle,
   Layers3,
@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import useSWR from "swr";
+import { toast } from "sonner";
 
 import { BalanzasGroupedTable } from "@/components/dashboard/balanzas-grouped-table";
 import { BalanzasProcessViewer } from "@/components/dashboard/balanzas-process-viewer";
@@ -509,6 +510,9 @@ export function BalanzasExplorer({
     },
   );
   const data = dashboardData ?? initialData;
+
+  useEffect(() => { if (dashboardError) toast.error(dashboardError.message || "Error al cargar datos"); }, [dashboardError]);
+
   const activeMessage = dashboardError?.message ?? data.summary.statusMessage ?? initialError ?? null;
   const weekOptions = data.options.isoWeeks;
   const effectiveWeekValue = data.filters.weekValue;
