@@ -120,6 +120,7 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
     data: dashboardData,
     error: dashboardError,
     isValidating,
+    mutate,
   } = useSWR(
     `/api/fenograma/pivot?${filterKey}`,
     fenogramaFetcher,
@@ -223,7 +224,7 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
             </div>
             <div className="flex items-end">
               <Button variant="outline" className="w-full rounded-xl" onClick={resetFilters}>
-                <RefreshCcw className="size-4" />
+                <RefreshCcw className="size-4" aria-hidden="true" />
                 Restablecer
               </Button>
             </div>
@@ -236,8 +237,8 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
             <MetricPill label="Hoy" value={formatDate(data.today)} />
           </div>
 
-          {isValidating ? <div className="flex items-center gap-3 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Actualizando fenograma.</div> : null}
-          {dashboardError ? <div className="text-sm text-destructive">{dashboardError.message}</div> : null}
+          {isValidating ? <div className="flex items-center gap-3 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Actualizando fenograma.</div> : null}
+          {dashboardError ? <div className="flex items-center gap-3 text-sm text-destructive">{dashboardError.message}<button type="button" className="underline underline-offset-2 hover:text-destructive/80" onClick={() => mutate()}>Reintentar</button></div> : null}
         </CardContent>
       </Card>
 
@@ -246,7 +247,7 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
       <Card className="starter-panel border-border/70 bg-card/82">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-primary/12 p-3 text-primary"><Sprout className="size-5" /></div>
+            <div className="rounded-full bg-primary/12 p-3 text-primary"><Sprout className="size-5" aria-hidden="true" /></div>
             <div className="min-w-0">
               <CardTitle>Acumulado semanal</CardTitle>
               <p className="text-sm text-muted-foreground">Tallos por semana para el rango visible actual.</p>

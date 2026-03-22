@@ -442,7 +442,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="rounded-full bg-primary/12 p-3 text-primary">
-                    <MapPinned className="size-5" />
+                    <MapPinned className="size-5" aria-hidden="true" />
                   </div>
                   <div>
                     <CardTitle className="text-lg">Navegacion</CardTitle>
@@ -463,7 +463,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="rounded-full bg-primary/12 p-3 text-primary">
-                    <Move className="size-5" />
+                    <Move className="size-5" aria-hidden="true" />
                   </div>
                   <div>
                     <CardTitle className="text-lg">Areas identificadas</CardTitle>
@@ -486,7 +486,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="rounded-full bg-primary/12 p-3 text-primary">
-                    <Sprout className="size-5" />
+                    <Sprout className="size-5" aria-hidden="true" />
                   </div>
                   <div>
                     <CardTitle className="text-lg">Seleccion actual</CardTitle>

@@ -155,7 +155,7 @@ export function MortalityTable({
                       onClick={() => toggleSort(column.key)}
                     >
                       {column.label}
-                      <ArrowDownUp className="size-3.5" />
+                      <ArrowDownUp className="size-3.5" aria-hidden="true" />
                     </button>
                   </th>
                 ))}

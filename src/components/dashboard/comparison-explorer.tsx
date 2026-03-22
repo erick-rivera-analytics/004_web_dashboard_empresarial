@@ -200,6 +200,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
     data: optionsData,
     error: optionsError,
     isValidating: optionsLoading,
+    mutate: mutateOptions,
   } = useSWR(
     `/api/comparacion/options?${optionsQuery}`,
     comparisonOptionsFetcher,
@@ -257,7 +258,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
           <ComparisonSlotCard label="Ciclo A" cycle={leftCycle} tone="left" />
           <div className="flex items-center justify-center">
             <div className="rounded-full border border-border/70 bg-background/90 px-4 py-4 text-center">
-              <Swords className="mx-auto size-6 text-primary" />
+              <Swords className="mx-auto size-6 text-primary" aria-hidden="true" />
               <p className="mt-2 text-xs uppercase tracking-[0.28em] text-muted-foreground">VS</p>
             </div>
           </div>
@@ -289,7 +290,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
             <div className="space-y-2">
               <Label htmlFor="comparison-q">Buscar</Label>
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                 <Input
                   id="comparison-q"
                   value={filters.q}
@@ -330,7 +331,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
           {optionsLoading ? (
             <div className="text-sm text-muted-foreground">Buscando ciclos...</div>
           ) : null}
-          {optionsError ? <div className="text-sm text-destructive">{optionsError.message}</div> : null}
+          {optionsError ? <div className="flex items-center gap-3 text-sm text-destructive">{optionsError.message}<button type="button" className="underline underline-offset-2 hover:text-destructive/80" onClick={() => mutateOptions()}>Reintentar</button></div> : null}
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {options.map((option) => {
@@ -408,7 +409,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="rounded-full bg-primary/12 p-3 text-primary">
-                    <Trophy className="size-5" />
+                    <Trophy className="size-5" aria-hidden="true" />
                   </div>
                   <div>
                     <CardTitle>Radar comparativo</CardTitle>
@@ -431,7 +432,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="rounded-full bg-primary/12 p-3 text-primary">
-                    <ArrowLeftRight className="size-5" />
+                    <ArrowLeftRight className="size-5" aria-hidden="true" />
                   </div>
                   <div>
                     <CardTitle>Lectura rapida</CardTitle>
@@ -474,7 +475,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="rounded-full bg-primary/12 p-3 text-primary">
-                  <ShieldAlert className="size-5" />
+                  <ShieldAlert className="size-5" aria-hidden="true" />
                 </div>
                 <div>
                   <CardTitle>Duelos por metrica</CardTitle>

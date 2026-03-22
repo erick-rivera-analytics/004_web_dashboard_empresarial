@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   ChevronRight,
@@ -103,7 +104,7 @@ function SidebarItem({
               : "bg-background/52 text-muted-foreground group-hover:bg-muted group-hover:text-foreground",
           )}
         >
-          <Icon className="size-4" />
+          <Icon className="size-4" aria-hidden="true" />
         </span>
       ) : null}
       <span className="truncate">{node.label}</span>
@@ -149,7 +150,7 @@ function SidebarBranch({
                 : "bg-background/52 text-muted-foreground group-hover:bg-muted group-hover:text-foreground",
             )}
           >
-            <Icon className="size-4" />
+            <Icon className="size-4" aria-hidden="true" />
           </span>
         ) : null}
 
@@ -166,9 +167,9 @@ function SidebarBranch({
               {node.label}
             </span>
             {open ? (
-              <ChevronDown className="size-4 shrink-0" />
+              <ChevronDown className="size-4 shrink-0" aria-hidden="true" />
             ) : (
-              <ChevronRight className="size-4 shrink-0" />
+              <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
             )}
           </>
         ) : null}
@@ -249,9 +250,15 @@ export function AppSidebar({
   onCollapsedChange,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [openBranches, setOpenBranches] = useState(() =>
     buildOpenState(sidebarTree),
   );
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+  }
 
   function toggleBranch(key: string) {
     setOpenBranches((current) => ({
@@ -310,9 +317,9 @@ export function AppSidebar({
           title={collapsed ? "Expandir sidebar" : "Contraer sidebar"}
         >
           {collapsed ? (
-            <PanelLeftOpen className="size-4" />
+            <PanelLeftOpen className="size-4" aria-hidden="true" />
           ) : (
-            <PanelLeftClose className="size-4" />
+            <PanelLeftClose className="size-4" aria-hidden="true" />
           )}
         </button>
       </div>
@@ -369,8 +376,9 @@ export function AppSidebar({
           {!collapsed ? <span>Estado DB</span> : null}
         </Link>
 
-        <Link
-          href="/login"
+        <button
+          type="button"
+          onClick={handleLogout}
           title="Salir"
           className={cn(
             "flex items-center transition-colors",
@@ -383,7 +391,7 @@ export function AppSidebar({
             <LogOut className="size-4" />
           </span>
           {!collapsed ? <span>Salir</span> : null}
-        </Link>
+        </button>
       </div>
     </div>
   );

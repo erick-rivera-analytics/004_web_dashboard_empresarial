@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { LineChart, LoaderCircle, Rows3, X } from "lucide-react";
+import { LineChart, LoaderCircle, Rows3, Sprout, X } from "lucide-react";
 
 import { HarvestCurvePanel } from "@/components/dashboard/harvest-curve-panel";
 import { MortalityCurvePanel } from "@/components/dashboard/mortality-curve-panel";
@@ -353,7 +353,7 @@ function BedsTable({
                       className="rounded-lg"
                       onClick={() => onOpenMortalityCurve(bed.bedId)}
                     >
-                      <LineChart className="size-4" />
+                      <LineChart className="size-4" aria-hidden="true" />
                       Curva de mortandad
                     </Button>
                   ) : null}
@@ -399,9 +399,9 @@ function BedsOverlay({
   const selectedValveId = selectedValve?.cycleKey === cycleKey ? selectedValve.valveId : null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/46 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/46 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-beds">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar detalle de camas" />
-      <div className="starter-panel relative z-10 flex max-h-[90vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/22 sm:w-[min(1480px,calc(100vw-2rem))]">
+      <div className="starter-panel relative z-10 flex max-h-[90vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/22 sm:w-[min(1480px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
@@ -413,7 +413,7 @@ function BedsOverlay({
               </Badge>
             </div>
             <div className="min-w-0">
-              <h3 className="text-2xl font-semibold tracking-tight">Detalle de camas</h3>
+              <h3 id="modal-title-beds" className="text-2xl font-semibold tracking-tight">Detalle de camas</h3>
               <p className="break-words text-sm text-muted-foreground">
                 Vista completa del ciclo con acceso directo al detalle de valvulas por cama.
               </p>
@@ -427,7 +427,7 @@ function BedsOverlay({
         <div className="overflow-y-auto px-4 py-5 sm:px-6">
           {loading ? (
             <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
-              <LoaderCircle className="size-4 animate-spin" />
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
               Cargando detalle de camas.
             </div>
           ) : error ? (
@@ -474,7 +474,7 @@ function BedsOverlay({
                           className="rounded-xl"
                           onClick={() => onOpenValveBedsOverlay(cycleKey, selectedValveId)}
                         >
-                          <Rows3 className="size-4" />
+                          <Rows3 className="size-4" aria-hidden="true" />
                           Abrir tabla flotante de camas
                         </Button>
                         <Button variant="outline" className="rounded-xl" onClick={() => onOpenValve(cycleKey, selectedValveId)}>
@@ -493,12 +493,14 @@ function BedsOverlay({
                 ) : null}
               </div>
             ) : (
-              <div className="py-8 text-sm text-muted-foreground">
+              <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
+                <Rows3 className="size-5 opacity-40" aria-hidden="true" />
                 No hay detalle de camas para este ciclo.
               </div>
             )
           ) : (
-            <div className="py-8 text-sm text-muted-foreground">
+            <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
+              <Rows3 className="size-5 opacity-40" aria-hidden="true" />
               No hay detalle de camas disponible para esta seleccion.
             </div>
           )}
@@ -522,9 +524,9 @@ function ValveBedsOverlay({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-valve-beds">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar camas de la valvula" />
-      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))]">
+      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
@@ -538,7 +540,7 @@ function ValveBedsOverlay({
               ) : null}
             </div>
             <div className="min-w-0">
-              <h3 className="text-2xl font-semibold tracking-tight">Tabla flotante de camas</h3>
+              <h3 id="modal-title-valve-beds" className="text-2xl font-semibold tracking-tight">Tabla flotante de camas</h3>
               <p className="break-words text-sm text-muted-foreground">
                 Solo las camas asignadas a la valvula seleccionada del bloque {data?.valve?.blockId || data?.valve?.parentBlock || "-"}.
               </p>
@@ -552,7 +554,7 @@ function ValveBedsOverlay({
         <div className="overflow-y-auto px-4 py-5 sm:px-6">
           {loading ? (
             <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
-              <LoaderCircle className="size-4 animate-spin" />
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
               Cargando camas de la valvula.
             </div>
           ) : error ? (
@@ -605,9 +607,9 @@ function HarvestCurveOverlay({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-harvest-curve">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar curva de cosecha" />
-      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))]">
+      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
@@ -619,7 +621,7 @@ function HarvestCurveOverlay({
               </Badge>
             </div>
             <div className="min-w-0">
-              <h3 className="text-2xl font-semibold tracking-tight">Curva de cosecha por ciclo</h3>
+              <h3 id="modal-title-harvest-curve" className="text-2xl font-semibold tracking-tight">Curva de cosecha por ciclo</h3>
               <p className="break-words text-sm text-muted-foreground">
                 Acumulado diario de tallos con separacion visual entre dato real y proyectado.
               </p>
@@ -633,7 +635,7 @@ function HarvestCurveOverlay({
         <div className="overflow-y-auto px-4 py-5 sm:px-6">
           {loading ? (
             <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
-              <LoaderCircle className="size-4 animate-spin" />
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
               Cargando curva de cosecha.
             </div>
           ) : error ? (
@@ -683,7 +685,8 @@ function HarvestCurveOverlay({
               )}
             </div>
           ) : (
-            <div className="py-8 text-sm text-muted-foreground">
+            <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
+              <LineChart className="size-5 opacity-40" aria-hidden="true" />
               No hay curva disponible para esta seleccion.
             </div>
           )}
@@ -725,9 +728,9 @@ function MortalityCurveOverlay({
   const badgeLabel = buildMortalityBadge(data, selectedCurve);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-mortality">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar curva de mortandad" />
-      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))]">
+      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
@@ -739,7 +742,7 @@ function MortalityCurveOverlay({
               </Badge>
             </div>
             <div className="min-w-0">
-              <h3 className="text-2xl font-semibold tracking-tight">Tendencia diaria de mortandad</h3>
+              <h3 id="modal-title-mortality" className="text-2xl font-semibold tracking-tight">Tendencia diaria de mortandad</h3>
               <p className="break-words text-sm text-muted-foreground">
                 Mortandad diaria y acumulada segun bajas, resiembras y plantas iniciales del ciclo.
               </p>
@@ -753,7 +756,7 @@ function MortalityCurveOverlay({
         <div className="overflow-y-auto px-4 py-5 sm:px-6">
           {loading ? (
             <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
-              <LoaderCircle className="size-4 animate-spin" />
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
               Cargando curva de mortandad.
             </div>
           ) : error ? (
@@ -797,7 +800,8 @@ function MortalityCurveOverlay({
               )}
             </div>
           ) : (
-            <div className="py-8 text-sm text-muted-foreground">
+            <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
+              <LineChart className="size-5 opacity-40" aria-hidden="true" />
               No hay curva de mortandad disponible para esta seleccion.
             </div>
           )}
@@ -1001,13 +1005,14 @@ function ModalContent({
               className="rounded-xl"
               onClick={() => onOpenCurve(cycle.cycleKey)}
             >
-              <LineChart className="size-4" />
+              <LineChart className="size-4" aria-hidden="true" />
               Curva de cosecha por ciclo
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="rounded-[22px] border border-border/70 bg-background/72 p-6 text-sm text-muted-foreground">
+        <div className="flex flex-col items-center gap-2 rounded-[22px] border border-border/70 bg-background/72 p-6 text-center text-sm text-muted-foreground">
+          <Sprout className="size-5 opacity-40" aria-hidden="true" />
           No hay ciclos disponibles para este bloque con el criterio actual.
         </div>
       )}
@@ -1046,7 +1051,7 @@ function ValveDetailPanel({
   if (loading) {
     return (
       <div className="flex items-center gap-3 py-4 text-sm text-muted-foreground">
-        <LoaderCircle className="size-4 animate-spin" />
+        <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
         Cargando detalle de la valvula.
       </div>
     );
@@ -1058,7 +1063,8 @@ function ValveDetailPanel({
 
   if (!data || !data.valve) {
     return (
-      <div className="py-4 text-sm text-muted-foreground">
+      <div className="flex flex-col items-center gap-2 py-4 text-center text-sm text-muted-foreground">
+        <Rows3 className="size-5 opacity-40" aria-hidden="true" />
         No hay detalle de valvula disponible para esta seleccion.
       </div>
     );
@@ -1069,8 +1075,8 @@ function ValveDetailPanel({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricPill label="Valvula" value={getValveDisplayName(data.valve.valveName, data.valve.valveId)} />
         <MetricPill label="Bloque" value={data.valve.blockId || data.valve.parentBlock || "-"} />
-        <MetricPill label="Camas fisicas" value={formatNumber(data.valve.bedCount)} />
         <MetricPill label="Camas 30 m²" value={formatNumber(computeCamas30(data.summary.totalBedArea))} />
+        <MetricPill label="Camas fisicas" value={formatNumber(data.valve.bedCount)} />
         <MetricPill label="Pambiles" value={formatNumber(data.valve.pambilesCount)} />
         <MetricPill label="Plantas programadas" value={formatNumber(data.valve.programmedPlants)} />
         <MetricPill label="Inicio de ciclo" value={formatNumber(data.valve.cycleStartPlants)} />
@@ -1156,7 +1162,7 @@ function ValvesSection({
 
       {loading ? (
         <div className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
-          <LoaderCircle className="size-4 animate-spin" />
+          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
           Cargando detalle de valvulas.
         </div>
       ) : error ? (
@@ -1201,7 +1207,6 @@ function ValvesSection({
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     <MetricPill label="Pambiles" value={formatNumber(valve.pambilesCount)} />
-                    <MetricPill label="Camas fisicas" value={formatNumber(valve.bedCount)} />
                     <MetricPill label="Plantas programadas" value={formatNumber(valve.programmedPlants)} />
                     <MetricPill label="Plantas vigentes" value={formatNumber(valve.currentPlants)} />
                     <MetricPill label="Inicio de ciclo" value={formatNumber(valve.cycleStartPlants)} />
@@ -1214,9 +1219,10 @@ function ValvesSection({
                       hint="Click para ver curva"
                       onClick={() => onOpenValveMortalityCurve(cycleKey, valve.valveId)}
                     />
+                    <MetricPill label="Camas 30 m²" value={formatNumber(computeCamas30(valve.bedArea))} />
                     <MetricPill
-                      label="Camas"
-                      value={`${formatNumber(valve.bedCount)} camas`}
+                      label="Camas fisicas"
+                      value={formatNumber(valve.bedCount)}
                       hint="Click para ver camas"
                       onClick={() => onOpenValveBedsOverlay(cycleKey, valve.valveId)}
                     />
@@ -1226,7 +1232,8 @@ function ValvesSection({
             })}
           </div>
         ) : (
-          <div className="py-6 text-sm text-muted-foreground">
+          <div className="flex flex-col items-center gap-2 py-6 text-center text-sm text-muted-foreground">
+            <Rows3 className="size-5 opacity-40" aria-hidden="true" />
             No hay valvulas registradas para este ciclo.
           </div>
         )
@@ -1263,9 +1270,9 @@ function ValvesOverlay({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/50 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/50 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-valves">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar valvulas del ciclo" />
-      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1480px,calc(100vw-2rem))]">
+      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1480px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
@@ -1277,7 +1284,7 @@ function ValvesOverlay({
               </Badge>
             </div>
             <div className="min-w-0">
-              <h3 className="text-2xl font-semibold tracking-tight">Ventana flotante de valvulas</h3>
+              <h3 id="modal-title-valves" className="text-2xl font-semibold tracking-tight">Ventana flotante de valvulas</h3>
               <p className="break-words text-sm text-muted-foreground">
                 Vista completa del ciclo con apertura de detalle y camas asociadas por valvula.
               </p>
@@ -1451,9 +1458,9 @@ export function BlockProfileModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/38 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/38 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-block">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar ficha del bloque" />
-      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1320px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/96 shadow-2xl shadow-slate-950/20 sm:w-[min(1320px,calc(100vw-2rem))]">
+      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1320px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/96 shadow-2xl shadow-slate-950/20 sm:w-[min(1320px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
@@ -1471,7 +1478,7 @@ export function BlockProfileModal({
               )}
             </div>
             <div className="min-w-0">
-              <h2 className="text-2xl font-semibold tracking-tight">Ficha del bloque</h2>
+              <h2 id="modal-title-block" className="text-2xl font-semibold tracking-tight">Ficha del bloque</h2>
               <p className="break-words text-sm text-muted-foreground">
                 {row.area || "Sin area"} / {row.variety || "Sin variedad"} / {row.spType || "Sin SP"} / {showingFilteredCycle ? "ciclo filtrado" : "todos los ciclos del bloque"}
               </p>
@@ -1485,7 +1492,7 @@ export function BlockProfileModal({
         <div className="overflow-y-auto px-4 py-5 sm:px-6">
           {loading ? (
             <div className="flex items-center gap-3 py-10 text-sm text-muted-foreground">
-              <LoaderCircle className="size-4 animate-spin" />
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
               Cargando ciclos del bloque.
             </div>
           ) : error ? (

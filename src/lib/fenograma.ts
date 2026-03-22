@@ -119,6 +119,7 @@ type ValveProfileBaseQueryRow = {
   is_current: boolean | null;
   attributes: string | null;
   pambiles_count: string | number | null;
+  bed_area: string | number | null;
   is_valid: boolean | null;
   change_reason: string | null;
 };
@@ -145,6 +146,7 @@ type ValveProfileQueryRow = {
   is_current: boolean | null;
   attributes: string | null;
   pambiles_count: string | number | null;
+  bed_area: string | number | null;
   is_valid: boolean | null;
   change_reason: string | null;
   programmed_plants: string | number | null;
@@ -341,6 +343,7 @@ export type ValveProfileCard = {
   parentBlock: string;
   status: string;
   bedCount: number | null;
+  bedArea: number | null;
   pambilesCount: number | null;
   validFrom: string | null;
   validTo: string | null;
@@ -761,6 +764,7 @@ function mapValveProfileRow(
     parentBlock: cleanText(attributes.parent_block),
     status: cleanText(attributes.status),
     bedCount: toNumber(attributes.bed_count ?? null),
+    bedArea: toNumber(row.bed_area),
     pambilesCount: toNumber(row.pambiles_count),
     validFrom: row.valid_from,
     validTo: row.valid_to,
@@ -1425,12 +1429,14 @@ export async function getValveProfilesByCycleKey(
           vp.is_current,
           vp.attributes,
           valve_beds.pambiles_count,
+          valve_beds.bed_area,
           vp.is_valid,
           vp.change_reason
         from slv.camp_dim_valve_profile_scd2 vp
         left join lateral (
           select
-            sum(coalesce(bp.pambiles_count, 0)) as pambiles_count
+            sum(coalesce(bp.pambiles_count, 0)) as pambiles_count,
+            sum(coalesce((bp.attributes::jsonb ->> 'bed_area')::numeric, 0)) as bed_area
           from slv.camp_dim_bed_profile_scd2 bp
           where bp.cycle_key = vp.cycle_key
             and bp.valve_id = vp.valve_id
@@ -1515,6 +1521,7 @@ export async function getValveProfileByCycleAndValve(
               vp.is_current,
               vp.attributes,
               valve_beds.pambiles_count,
+              valve_beds.bed_area,
               vp.is_valid,
               vp.change_reason,
               plants.programmed_plants,
@@ -1528,7 +1535,8 @@ export async function getValveProfileByCycleAndValve(
             from slv.camp_dim_valve_profile_scd2 vp
             left join lateral (
               select
-                sum(coalesce(bp.pambiles_count, 0)) as pambiles_count
+                sum(coalesce(bp.pambiles_count, 0)) as pambiles_count,
+                sum(coalesce((bp.attributes::jsonb ->> 'bed_area')::numeric, 0)) as bed_area
               from slv.camp_dim_bed_profile_scd2 bp
               where bp.cycle_key = vp.cycle_key
                 and bp.valve_id = vp.valve_id
@@ -1578,6 +1586,7 @@ export async function getValveProfileByCycleAndValve(
             parentBlock: cleanText(attributes.parent_block),
             status: cleanText(attributes.status),
             bedCount: toNumber(attributes.bed_count ?? null),
+            bedArea: toNumber(row.bed_area),
             pambilesCount: toNumber(row.pambiles_count),
             validFrom: row.valid_from,
             validTo: row.valid_to,

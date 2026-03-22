@@ -93,6 +93,7 @@ export function MortalityExplorer({ initialData }: { initialData: MortalityDashb
     data: dashboardData,
     error: dashboardError,
     isValidating,
+    mutate,
   } = useSWR(
     `/api/mortality?${filterKey}`,
     mortalityDashboardFetcher,
@@ -155,7 +156,7 @@ export function MortalityExplorer({ initialData }: { initialData: MortalityDashb
             <MultiSelectField id="mortality-block" label="Bloque" value={filters.block} options={data.options.blocks} onChange={(value) => updateFilter("block", value)} />
             <div className="flex items-end">
               <Button variant="outline" className="w-full rounded-xl" onClick={resetFilters}>
-                <RefreshCcw className="size-4" />
+                <RefreshCcw className="size-4" aria-hidden="true" />
                 Restablecer
               </Button>
             </div>
@@ -170,11 +171,11 @@ export function MortalityExplorer({ initialData }: { initialData: MortalityDashb
 
           {isValidating ? (
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <LoaderCircle className="size-4 animate-spin" />
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
               Actualizando dashboard de mortandades.
             </div>
           ) : null}
-          {dashboardError ? <div className="text-sm text-destructive">{dashboardError.message}</div> : null}
+          {dashboardError ? <div className="flex items-center gap-3 text-sm text-destructive">{dashboardError.message}<button type="button" className="underline underline-offset-2 hover:text-destructive/80" onClick={() => mutate()}>Reintentar</button></div> : null}
         </CardContent>
       </Card>
 
@@ -182,7 +183,7 @@ export function MortalityExplorer({ initialData }: { initialData: MortalityDashb
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-primary/12 p-3 text-primary">
-              <Activity className="size-5" />
+              <Activity className="size-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <CardTitle>Curva de mortandades</CardTitle>
@@ -205,7 +206,7 @@ export function MortalityExplorer({ initialData }: { initialData: MortalityDashb
 
               {curveLoading ? (
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <LoaderCircle className="size-4 animate-spin" />
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
                   Cargando curva agregada.
                 </div>
               ) : curveError ? (

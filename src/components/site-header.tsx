@@ -45,7 +45,7 @@ export function SiteHeader() {
                     : "border-border/70 bg-background/82 text-muted-foreground",
                 )}
               >
-                <Icon className="size-4" />
+                <Icon className="size-4" aria-hidden="true" />
                 <span>{item.label}</span>
               </Link>
             );

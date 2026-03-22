@@ -328,15 +328,15 @@ export function BalanzasProcessViewer({
         </div>
         <div className="flex items-center gap-1 rounded-full border border-border/70 bg-background/88 p-1 shadow-sm">
           <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={() => zoomBy(-0.1)}>
-            <Minus className="size-4" />
+            <Minus className="size-4" aria-hidden="true" />
             <span className="sr-only">Reducir zoom</span>
           </Button>
           <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={fitViewport}>
-            <Maximize2 className="size-4" />
+            <Maximize2 className="size-4" aria-hidden="true" />
             <span className="sr-only">Ajustar al viewport</span>
           </Button>
           <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={() => zoomBy(0.1)}>
-            <Plus className="size-4" />
+            <Plus className="size-4" aria-hidden="true" />
             <span className="sr-only">Aumentar zoom</span>
           </Button>
         </div>

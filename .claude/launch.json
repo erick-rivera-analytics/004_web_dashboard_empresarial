@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "Next.js Dev Server",
-      "runtimeExecutable": "C:/Users/erick.rivera/nodejs/node/node.exe",
-      "runtimeArgs": ["C:/Users/erick.rivera/nodejs/node/node_modules/npm/bin/npm-cli.js", "run", "dev"],
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": ["/c", "set PATH=C:\\Users\\erick.rivera\\nodejs\\node;%PATH% && npm run dev"],
       "port": 3000
     }
   ]

@@ -441,7 +441,7 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
                 className="h-10 w-full rounded-xl"
                 onClick={() => setSortDirection((current) => (current === "asc" ? "desc" : "asc"))}
               >
-                <ArrowDownUp className="size-4" />
+                <ArrowDownUp className="size-4" aria-hidden="true" />
                 {sortDirection === "asc" ? "Ascendente" : "Descendente"}
               </Button>
             </div>

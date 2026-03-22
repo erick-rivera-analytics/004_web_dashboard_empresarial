@@ -80,7 +80,7 @@ export function DashboardScaleToggle() {
         onClick={() => persistScale(1)}
         title="Restablecer tamano del dashboard"
       >
-        <Frame className="size-4" />
+        <Frame className="size-4" aria-hidden="true" />
         <span className="sr-only">Restablecer tamano del dashboard</span>
       </Button>
 
@@ -92,7 +92,7 @@ export function DashboardScaleToggle() {
         disabled={scale <= MIN_SCALE}
         title="Reducir tamano del dashboard"
       >
-        <Minus className="size-4" />
+        <Minus className="size-4" aria-hidden="true" />
         <span className="sr-only">Reducir tamano del dashboard</span>
       </Button>
 
@@ -113,7 +113,7 @@ export function DashboardScaleToggle() {
         disabled={scale >= MAX_SCALE}
         title="Aumentar tamano del dashboard"
       >
-        <Plus className="size-4" />
+        <Plus className="size-4" aria-hidden="true" />
         <span className="sr-only">Aumentar tamano del dashboard</span>
       </Button>
     </div>

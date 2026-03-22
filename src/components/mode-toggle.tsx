@@ -45,7 +45,7 @@ export function ModeToggle() {
       onClick={() => setTheme(displayTheme === "dark" ? "light" : "dark")}
       disabled={!mounted}
     >
-      {displayTheme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+      {displayTheme === "dark" ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
       <span className="sr-only">Cambiar tema</span>
     </Button>
   );

@@ -160,7 +160,7 @@ export function MultiSelectField({
               Limpiar
             </Button>
           </div>
-          <div className="max-h-60 space-y-2 overflow-auto pr-1" role="listbox" aria-multiselectable="true">
+          <div className="max-h-60 space-y-2 overflow-auto pr-1" role="listbox" aria-multiselectable="true" aria-labelledby={id}>
             {options.length ? options.map((option) => (
               <label
                 key={option}

@@ -223,7 +223,7 @@ export const BalanzasGroupedTable = memo(function BalanzasGroupedTable({
                 className="rounded-xl"
                 onClick={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")}
               >
-                <ArrowDownUp className="size-4" />
+                <ArrowDownUp className="size-4" aria-hidden="true" />
                 {sortDirection === "asc" ? "Asc" : "Desc"}
               </Button>
             </div>

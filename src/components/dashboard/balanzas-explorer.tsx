@@ -386,7 +386,7 @@ function NodeDetailModal({
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="rounded-full bg-primary/12 p-3 text-primary">
-                    <Layers3 className="size-5" />
+                    <Layers3 className="size-5" aria-hidden="true" />
                   </div>
                     <div>
                       <p className="text-base font-semibold">Tabla agrupable del nodo</p>
@@ -402,7 +402,7 @@ function NodeDetailModal({
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="rounded-full bg-primary/12 p-3 text-primary">
-                      <TableProperties className="size-5" />
+                      <TableProperties className="size-5" aria-hidden="true" />
                     </div>
                     <div>
                       <p className="text-base font-semibold">Detalle crudo del tramo</p>
@@ -497,6 +497,7 @@ export function BalanzasExplorer({
     data: dashboardData,
     error: dashboardError,
     isValidating,
+    mutate,
   } = useSWR(
     `/api/poscosecha/balanzas?${filterKey}`,
     balanzasFetcher,
@@ -678,7 +679,7 @@ export function BalanzasExplorer({
               </div>
               <div className="flex items-end">
                 <Button variant="outline" className="w-full rounded-xl" onClick={resetFilters}>
-                  <RefreshCcw className="size-4" />
+                  <RefreshCcw className="size-4" aria-hidden="true" />
                   Restablecer
                 </Button>
               </div>
@@ -688,7 +689,7 @@ export function BalanzasExplorer({
 
           {isValidating ? (
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <LoaderCircle className="size-4 animate-spin" />
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
               Actualizando indicadores de balanzas.
             </div>
           ) : null}
@@ -696,10 +697,11 @@ export function BalanzasExplorer({
           {activeMessage ? (
             <div className="rounded-[24px] border border-amber-300/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
               <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 <div className="min-w-0">
                   <p className="font-medium">Estado del origen</p>
                   <p className="mt-1 text-sm opacity-90">{activeMessage}</p>
+                  {dashboardError ? <button type="button" className="mt-2 text-sm underline underline-offset-2 opacity-80 hover:opacity-100" onClick={() => mutate()}>Reintentar</button> : null}
                 </div>
               </div>
             </div>
@@ -711,7 +713,7 @@ export function BalanzasExplorer({
         <CardHeader className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-primary/12 p-3 text-primary">
-              <Scale className="size-5" />
+              <Scale className="size-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <CardTitle className="text-lg">Flujo de postcosecha</CardTitle>
