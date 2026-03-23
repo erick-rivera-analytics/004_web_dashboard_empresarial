@@ -92,11 +92,11 @@ export const BalanzasGroupedTable = memo(function BalanzasGroupedTable({
       && column.key !== node.columnMap.target
       && column.key !== node.columnMap.gap
       && column.key !== node.columnMap.ratio
+      && column.key !== node.columnMap.destination
       && column.kind !== "number"
       && column.kind !== "ratio"
-      && !(column.key === node.columnMap.destination && (node.key === "apertura_pelado_patas" || node.key === "b2a"))
     )),
-    [node.columnMap.destination, node.columnMap.gap, node.columnMap.ratio, node.columnMap.source, node.columnMap.target, node.key, node.tableColumns],
+    [node.columnMap.destination, node.columnMap.gap, node.columnMap.ratio, node.columnMap.source, node.columnMap.target, node.tableColumns],
   );
   const [selectedDimensions, setSelectedDimensions] = useState<string[]>(
     node.groupDefaults.length

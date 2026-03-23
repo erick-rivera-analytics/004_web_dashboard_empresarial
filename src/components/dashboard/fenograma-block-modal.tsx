@@ -663,12 +663,26 @@ function HarvestCurveOverlay({
                   hint={data.projectionStartDate ? formatDate(data.projectionStartDate) : undefined}
                 />
                 {/*
-                  Métricas de peso: no existen en la fuente actual
-                  (gld.mv_prod_fenograma_day_cur solo tiene stems_count).
-                  Se muestran como "-" hasta conectar fuente de peso.
+                  Métricas de peso: ahora conectadas desde productivity_green_cur / post_cur.
                 */}
-                <MetricPill label="Peso ciclo" value="-" hint="Sin fuente de peso conectada" />
-                <MetricPill label="Peso / tallo ciclo" value="-" hint="Sin fuente de peso conectada" />
+                <MetricPill
+                  label="Peso ciclo"
+                  value={
+                    data.summary.totalGreenWeightKg > 0
+                      ? `${formatNumber(data.summary.totalGreenWeightKg)} kg`
+                      : "-"
+                  }
+                  hint={data.summary.totalGreenWeightKg > 0 ? "Peso verde acumulado" : "Sin datos de peso"}
+                />
+                <MetricPill
+                  label="Peso / tallo ciclo"
+                  value={
+                    data.summary.weightPerStemG !== null
+                      ? `${formatNumber(data.summary.weightPerStemG)} g`
+                      : "-"
+                  }
+                  hint={data.summary.weightPerStemG !== null ? "Peso verde / tallos" : "Sin datos de peso"}
+                />
               </div>
 
               {data.points.length ? (
@@ -676,6 +690,7 @@ function HarvestCurveOverlay({
                   <HarvestCurvePanel
                     data={data.points}
                     projectionStartDay={data.projectionStartDay}
+                    summary={data.summary}
                   />
                 </div>
               ) : (
@@ -764,6 +779,7 @@ function MortalityCurveOverlay({
           ) : data ? (
             <div className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricPill label="Plantas programadas" value={formatNumber(data.summary.programmedPlants)} />
                 <MetricPill label="Plantas inicio ciclo" value={formatNumber(data.summary.initialPlantsCycle)} />
                 <MetricPill label="Resiembras" value={formatNumber(data.summary.totalReseededPlants)} />
                 <MetricPill label="Plantas muertas" value={formatNumber(data.summary.totalDeadPlants)} />
@@ -782,11 +798,19 @@ function MortalityCurveOverlay({
                 <MetricPill label="Mortandad" value={formatPercent(data.summary.lastCumulativeMortalityPct)} />
                 <MetricPill label="Mortandad diaria actual" value={formatPercent(data.summary.lastDailyMortalityPct)} />
                 <MetricPill label="Pico diario" value={formatPercent(data.summary.maxDailyMortalityPct)} />
-                {/*
-                  Disp. vs programadas: requiere programmedPlants del ciclo,
-                  no disponible en MortalityCurvePayload. Se muestra "-".
-                */}
-                <MetricPill label="Disp. vs programadas" value="-" hint="Requiere plantas programadas del ciclo" />
+                <MetricPill
+                  label="Disp. vs programadas"
+                  value={
+                    data.summary.programmedPlants && data.summary.programmedPlants > 0
+                      ? formatPercent(
+                        Math.round(
+                          (((data.summary.initialPlantsCycle - data.summary.totalDeadPlants + data.summary.totalReseededPlants) / data.summary.programmedPlants) * 100) * 100,
+                        ) / 100,
+                      )
+                      : "-"
+                  }
+                  hint="Plantas vigentes / plantas programadas"
+                />
               </div>
 
               {data.points.length ? (
@@ -891,6 +915,25 @@ function ModalContent({
     [data.cycles],
   );
 
+  const blockAggregates = useMemo(() => {
+    let totalStems = 0;
+    let totalCurrentPlants = 0;
+    let totalGreenKg = 0;
+    let totalBedArea = 0;
+    for (const c of data.cycles) {
+      totalStems += c.totalStems ?? 0;
+      totalCurrentPlants += c.currentPlants ?? 0;
+      totalGreenKg += c.greenWeightKg ?? 0;
+      totalBedArea += c.bedArea ?? 0;
+    }
+    const camas30 = totalBedArea > 0 ? totalBedArea / 30 : null;
+    const cajasVerde = totalGreenKg > 0 ? totalGreenKg / 10 : null;
+    return {
+      tallosPlanta: totalStems > 0 && totalCurrentPlants > 0 ? Math.round((totalStems / totalCurrentPlants) * 100) / 100 : null,
+      cajasCama: cajasVerde && camas30 ? Math.round((cajasVerde / camas30) * 100) / 100 : null,
+    };
+  }, [data.cycles]);
+
   const showValvesActive = selectedValveCycleKey === activeCycleKey;
   const showCurveActive = selectedCurveCycleKey === activeCycleKey;
   const showMortalityCurveActive = selectedMortalityCurve?.entityType === "cycle"
@@ -906,13 +949,8 @@ function ModalContent({
           hint="Click para ver macroproceso"
           onClick={() => setShowProcessViewer(true)}
         />
-        {/*
-          Tallos planta, Cajas cama, Horas cama, Costo cama:
-          No existen en las fuentes actuales (fenograma/cycle_profile/kardex).
-          Se muestran como "-" hasta que se conecten las fuentes reales.
-        */}
-        <MetricPill label="Tallos planta" value="-" hint="Sin fuente conectada" />
-        <MetricPill label="Cajas cama" value="-" hint="Sin fuente conectada" />
+        <MetricPill label="Tallos planta" value={formatNumber(blockAggregates.tallosPlanta)} hint="Tallos / plantas vigentes (todos ciclos)" />
+        <MetricPill label="Cajas cama" value={formatNumber(blockAggregates.cajasCama)} hint="Cajas verde / camas 30m² (todos ciclos)" />
         <MetricPill label="Horas cama" value="-" hint="Sin fuente conectada" />
         <MetricPill label="Costo cama" value="-" hint="Sin fuente conectada" />
         <MetricPill
@@ -975,20 +1013,31 @@ function ModalContent({
             <MetricPill label="Plantas programadas" value={formatNumber(cycle.programmedPlants)} />
             <MetricPill label="Plantas vigentes" value={formatNumber(cycle.currentPlants)} />
             <MetricPill label="Disp. vs programadas" value={formatPercent(cycle.availabilityVsScheduledPct)} />
-            {/* Fecha inicio cosecha: no disponible directamente en cycle_profile, se deja preparado */}
-            <MetricPill label="Fecha inicio cosecha" value="-" hint="Sin fuente conectada" />
-            {/*
-              Tallos planta, Cajas cama, Horas cama, Costo cama (ciclo),
-              Cajas en verde, Cajas en blanco, Peso tallo:
-              No existen en las fuentes actuales. Se muestran como "-".
-            */}
-            <MetricPill label="Tallos planta" value="-" hint="Sin fuente conectada" />
-            <MetricPill label="Cajas cama" value="-" hint="Sin fuente conectada" />
-            <MetricPill label="Horas cama" value="-" hint="Sin fuente conectada" />
-            <MetricPill label="Costo cama" value="-" hint="Sin fuente conectada" />
-            <MetricPill label="Cajas en verde" value="-" hint="Sin fuente conectada" />
-            <MetricPill label="Cajas en blanco" value="-" hint="Estimada — sin fuente conectada" />
-            <MetricPill label="Peso tallo" value="-" hint="Sin fuente conectada" />
+            <MetricPill label="Fecha inicio cosecha" value={formatDate(cycle.harvestStartDate)} />
+            <MetricPill
+              label="Tallos planta"
+              value={cycle.totalStems && cycle.currentPlants ? formatNumber(Math.round((cycle.totalStems / cycle.currentPlants) * 100) / 100) : "-"}
+            />
+            <MetricPill
+              label="Cajas en verde"
+              value={cycle.greenWeightKg ? formatNumber(Math.round((cycle.greenWeightKg / 10) * 100) / 100) : "-"}
+              hint="green_weight_kg / 10"
+            />
+            <MetricPill
+              label="Cajas en blanco"
+              value={cycle.postWeightKg ? formatNumber(Math.round((cycle.postWeightKg / 10) * 100) / 100) : "-"}
+              hint="post_weight_kg / 10"
+            />
+            <MetricPill
+              label="Cajas cama"
+              value={cycle.greenWeightKg && cycle.bedArea ? formatNumber(Math.round(((cycle.greenWeightKg / 10) / computeCamas30(cycle.bedArea)!) * 100) / 100) : "-"}
+              hint="Cajas verde / camas 30m²"
+            />
+            <MetricPill
+              label="Peso tallo"
+              value={cycle.greenWeightKg && cycle.totalStems ? formatNumber(Math.round((cycle.greenWeightKg / cycle.totalStems) * 100) / 100) : "-"}
+              hint="green_weight_kg / tallos"
+            />
             <MetricPill
               label="Mortandad"
               value={formatPercent(cycle.mortalityPct)}

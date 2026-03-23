@@ -256,15 +256,9 @@ function NodeDetailModal({
   const targetKey = node.columnMap.target;
   const ratioKey = node.columnMap.ratio;
   const gapKey = node.columnMap.gap;
-  const hideDestination = node.key === "b2a" || node.key === "apertura_pelado_patas";
-  const visibleColumns = node.tableColumns.filter((column) => !(hideDestination && column.key === node.columnMap.destination));
+  const visibleColumns = node.tableColumns.filter((column) => column.key !== node.columnMap.destination);
   const visibleSummary = buildVisibleSummary(node, rows);
   const tableFilters = [
-    {
-      key: "destination" as const,
-      label: "Destino interno",
-      options: node.localOptions.destinations,
-    },
     {
       key: "grade" as const,
       label: "Grado",
@@ -300,7 +294,7 @@ function NodeDetailModal({
       label: "Fecha",
       options: node.localOptions.dates,
     },
-  ].filter((entry) => entry.options.length > 1 && !(hideDestination && entry.key === "destination"));
+  ].filter((entry) => entry.options.length > 1);
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">

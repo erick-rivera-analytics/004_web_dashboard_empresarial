@@ -51,6 +51,10 @@ type CycleProfileQueryRow = {
   availability_vs_scheduled_pct: string | number | null;
   availability_vs_initial_pct: string | number | null;
   mortality_pct: string | number | null;
+  harvest_start_date: string | null;
+  total_stems: string | number | null;
+  green_weight_kg: string | number | null;
+  post_weight_kg: string | number | null;
 };
 
 type BedProfileQueryRow = {
@@ -277,6 +281,10 @@ export type CycleProfileCard = {
   availabilityVsScheduledPct: number | null;
   availabilityVsInitialPct: number | null;
   mortalityPct: number | null;
+  harvestStartDate: string | null;
+  totalStems: number | null;
+  greenWeightKg: number | null;
+  postWeightKg: number | null;
 };
 
 export type CycleProfileBlockPayload = {
@@ -411,6 +419,11 @@ export type HarvestCurvePayload = {
     observedStems: number;
     projectedStems: number;
     totalDays: number;
+    totalGreenWeightKg: number;
+    totalPostWeightKg: number;
+    greenBoxes: number;
+    postBoxes: number;
+    weightPerStemG: number | null;
   };
   points: HarvestCurvePoint[];
 };
@@ -418,7 +431,7 @@ export type HarvestCurvePayload = {
 export const defaultFenogramaFilters: FenogramaFilters = {
   includeActive: true,
   includePlanned: true,
-  includeHistory: false,
+  includeHistory: true,
   area: "all",
   variety: "all",
   spType: "all",
@@ -1316,7 +1329,11 @@ export async function getCycleProfilesByBlock(
           plants.plants_current,
           plants.availability_vs_scheduled_pct,
           plants.availability_vs_initial_pct,
-          plants.mortality_pct
+          plants.mortality_pct,
+          feno.harvest_start_date,
+          feno.total_stems,
+          green.green_weight_kg,
+          post.post_weight_kg
         from slv.camp_dim_cycle_profile_scd2 cp
         left join lateral (
           select
@@ -1340,6 +1357,23 @@ export async function getCycleProfilesByBlock(
           order by valid_from desc nulls last
           limit 1
         ) plants on true
+        left join lateral (
+          select
+            to_char(min(harvest_start_date), 'YYYY-MM-DD') as harvest_start_date,
+            coalesce(sum(stems_count), 0) as total_stems
+          from ${FENOGRAMA_SOURCE}
+          where cycle_key = cp.cycle_key
+        ) feno on true
+        left join lateral (
+          select coalesce(sum(green_weight_kg), 0) as green_weight_kg
+          from gld.mv_prod_productivity_green_cur
+          where cycle_key = cp.cycle_key
+        ) green on true
+        left join lateral (
+          select coalesce(sum(post_weight_kg), 0) as post_weight_kg
+          from gld.mv_prod_productivity_post_cur
+          where cycle_key = cp.cycle_key
+        ) post on true
         where cp.parent_block = $1
           and ($2::text is null or cp.cycle_key = $2)
         order by
@@ -1377,6 +1411,10 @@ export async function getCycleProfilesByBlock(
       availabilityVsScheduledPct: toPercent(row.availability_vs_scheduled_pct),
       availabilityVsInitialPct: toPercent(row.availability_vs_initial_pct),
       mortalityPct: toPercent(row.mortality_pct),
+      harvestStartDate: row.harvest_start_date ?? null,
+      totalStems: toNumber(row.total_stems),
+      greenWeightKg: toNumber(row.green_weight_kg),
+      postWeightKg: toNumber(row.post_weight_kg),
     }));
 
     return {
@@ -1616,17 +1654,30 @@ export async function getHarvestCurveByCycleKey(
   const normalizedCycleKey = cycleKey.trim();
 
   return cachedAsync(`fenograma:curve:${normalizedCycleKey}`, FENOGRAMA_CURVE_TTL_MS, async () => {
-    const result = await query<HarvestCurveQueryRow>(
-      `
-        select
-          to_char(event_date::date, 'YYYY-MM-DD') as event_date,
-          coalesce(stems_count, 0) as stems_count
-        from ${FENOGRAMA_DAY_SOURCE}
-        where cycle_key = $1
-        order by event_date asc
-      `,
-      [normalizedCycleKey],
-    );
+    const [result, greenResult, postResult] = await Promise.all([
+      query<HarvestCurveQueryRow>(
+        `
+          select
+            to_char(event_date::date, 'YYYY-MM-DD') as event_date,
+            coalesce(stems_count, 0) as stems_count
+          from ${FENOGRAMA_DAY_SOURCE}
+          where cycle_key = $1
+          order by event_date asc
+        `,
+        [normalizedCycleKey],
+      ),
+      query<{ total: string | number }>(
+        `select coalesce(sum(green_weight_kg), 0) as total from gld.mv_prod_productivity_green_cur where cycle_key = $1`,
+        [normalizedCycleKey],
+      ),
+      query<{ total: string | number }>(
+        `select coalesce(sum(post_weight_kg), 0) as total from gld.mv_prod_productivity_post_cur where cycle_key = $1`,
+        [normalizedCycleKey],
+      ),
+    ]);
+
+    const totalGreenWeightKg = roundValue(Number(greenResult.rows[0]?.total ?? 0));
+    const totalPostWeightKg = roundValue(Number(postResult.rows[0]?.total ?? 0));
 
     let cumulativeStems = 0;
     const rawPoints = result.rows.map((row, index) => {
@@ -1653,16 +1704,23 @@ export async function getHarvestCurveByCycleKey(
       } satisfies HarvestCurvePoint;
     });
 
+    const totalStems = sumNumbers(points.map((point) => point.dailyStems));
+
     return {
       cycleKey: normalizedCycleKey,
       generatedAt: new Date().toISOString(),
       projectionStartDay: projectionStartIndex === -1 ? null : rawPoints[projectionStartIndex]?.eventDay ?? null,
       projectionStartDate: projectionStartIndex === -1 ? null : rawPoints[projectionStartIndex]?.eventDate ?? null,
       summary: {
-        totalStems: sumNumbers(points.map((point) => point.dailyStems)),
+        totalStems,
         observedStems: sumNumbers(points.filter((point) => !point.isProjected).map((point) => point.dailyStems)),
         projectedStems: sumNumbers(points.filter((point) => point.isProjected).map((point) => point.dailyStems)),
         totalDays: points.length,
+        totalGreenWeightKg,
+        totalPostWeightKg,
+        greenBoxes: roundValue(totalGreenWeightKg / 10),
+        postBoxes: roundValue(totalPostWeightKg / 10),
+        weightPerStemG: totalStems > 0 ? roundValue((totalGreenWeightKg * 1000) / totalStems) : null,
       },
       points,
     };

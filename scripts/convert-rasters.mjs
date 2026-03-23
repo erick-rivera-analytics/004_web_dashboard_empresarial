@@ -41,8 +41,8 @@ const RAMP = {
 };
 const NO_DATA = [0, 0, 0, 0];  // transparent
 
-// ── Downsample factor (higher = faster, lower resolution) ─────────────────────
-const MAX_SIDE = 2000;
+// ── Downsample factor: 2 = sample every 2nd pixel (high quality) ──────────────
+const FIXED_FACTOR = 2;
 
 const LAYERS = [
   { name: "ndvi", file: "NDVI.tif" },
@@ -70,8 +70,8 @@ for (const { name, file } of LAYERS) {
   console.log(`  Source: ${srcWidth}×${srcHeight}px`);
   console.log(`  Bounds: SW=[${swLng.toFixed(6)}, ${swLat.toFixed(6)}] NE=[${neLng.toFixed(6)}, ${neLat.toFixed(6)}]`);
 
-  // Compute downsample factor
-  const factor = Math.max(1, Math.ceil(Math.max(srcWidth, srcHeight) / MAX_SIDE));
+  // Compute downsample factor: fixed factor 2 (sample every 2nd pixel)
+  const factor = FIXED_FACTOR;
   const outWidth  = Math.ceil(srcWidth  / factor);
   const outHeight = Math.ceil(srcHeight / factor);
   console.log(`  Downsampling ×${factor} → ${outWidth}×${outHeight}px`);
@@ -108,7 +108,7 @@ for (const { name, file } of LAYERS) {
     }
   }
 
-  const buf = PNG.sync.write(png);
+  const buf = PNG.sync.write(png, { deflateLevel: 9 });
   const outPath = join(outDir, `${name}.png`);
   writeFileSync(outPath, buf);
 

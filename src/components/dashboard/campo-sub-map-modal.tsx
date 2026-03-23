@@ -6,9 +6,11 @@ import type { Feature, FeatureCollection, GeoJsonObject } from "geojson";
 import L from "leaflet";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GeoJSON, MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import { GeoJSON, ImageOverlay, MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 
 import { CampoCycleSelectorModal } from "@/components/dashboard/campo-cycle-selector";
+import { CampoLayerSwitcher } from "@/components/dashboard/campo-map";
+import type { ActiveLayer } from "@/components/dashboard/campo-map";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -410,12 +412,19 @@ export function CampoSubMapModal({
   const [loading,     setLoading]     = useState(true);
   // Bed cycle selector state
   const [bedPending,  setBedPending]  = useState<{ bedId: string; bloquePad: string } | null>(null);
+  // Layer switcher state
+  const [activeLayer,  setActiveLayer]  = useState<ActiveLayer>("none");
+  const [rasterBounds, setRasterBounds] = useState<Record<string, [[number, number], [number, number]]>>({});
 
   useEffect(() => {
     fetch("/data/campo-geo.json")
       .then((r) => r.json())
       .then((data: FeatureCollection) => { setAllFeatures(data.features); setLoading(false); })
       .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetch("/rasters/bounds.json").then(r => r.json()).then(setRasterBounds).catch(() => {});
   }, []);
 
   const features = useMemo(() => {
@@ -464,9 +473,12 @@ export function CampoSubMapModal({
               </p>
               <h2 id="sub-map-title" className="mt-0.5 text-lg font-semibold">{title}</h2>
             </div>
-            <Button variant="ghost" size="icon" className="rounded-full" onClick={onClose} aria-label="Cerrar">
-              <X className="size-4" aria-hidden="true" />
-            </Button>
+            <div className="flex items-center gap-3">
+              <CampoLayerSwitcher active={activeLayer} onChange={setActiveLayer} />
+              <Button variant="ghost" size="icon" className="rounded-full" onClick={onClose} aria-label="Cerrar">
+                <X className="size-4" aria-hidden="true" />
+              </Button>
+            </div>
           </div>
 
           {/* Map */}
@@ -491,6 +503,16 @@ export function CampoSubMapModal({
                     subdomains="abcd"
                     maxZoom={22}
                   />
+
+                  {/* Drone raster PNG overlay */}
+                  {activeLayer !== "none" && rasterBounds[activeLayer] && (
+                    <ImageOverlay
+                      url={`/rasters/${activeLayer}.png`}
+                      bounds={rasterBounds[activeLayer]}
+                      opacity={0.75}
+                      zIndex={400}
+                    />
+                  )}
 
                   {mode === "valves" ? (
                     <ValveMap

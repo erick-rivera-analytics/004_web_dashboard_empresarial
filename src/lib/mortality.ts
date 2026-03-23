@@ -101,6 +101,7 @@ export type MortalityCurvePayload = {
   generatedAt: string;
   summary: {
     initialPlantsCycle: number;
+    programmedPlants: number | null;
     totalDeadPlants: number;
     totalReseededPlants: number;
     lastDailyMortalityPct: number | null;
@@ -123,6 +124,7 @@ const CYCLE_MORTALITY_SOURCE = "gld.mv_camp_kardex_cycle_plants_cur";
 const CYCLE_MORTALITY_DAY_SOURCE = "gld.mv_camp_kardex_cycle_plants_day_cur";
 const VALVE_MORTALITY_DAY_SOURCE = "gld.mv_camp_kardex_valve_plants_day_cur";
 const BED_MORTALITY_DAY_SOURCE = "gld.mv_camp_kardex_bed_plants_day_cur";
+const BED_PLANTS_SOURCE = "gld.mv_camp_kardex_bed_plants_cur";
 const MORTALITY_BASE_TTL_MS = 60 * 1000;
 const MORTALITY_CURVE_TTL_MS = 60 * 1000;
 
@@ -405,21 +407,28 @@ async function loadMortalityCurve(
   },
 ) {
   return cachedAsync(key, MORTALITY_CURVE_TTL_MS, async () => {
-    const result = await query<MortalityCurveQueryRow>(
-      `
-        select
-          cycle_key,
-          to_char(calendar_date::date, 'YYYY-MM-DD') as calendar_date,
-          coalesce(dead_plants_count, 0) as dead_plants_count,
-          coalesce(reseed_plants_count, 0) as reseed_plants_count,
-          coalesce(initial_plants_cycle, 0) as initial_plants_cycle
-        from ${source}
-        ${whereClause}
-        order by calendar_date asc
-      `,
-      values,
-    );
+    const [result, programmedResult] = await Promise.all([
+      query<MortalityCurveQueryRow>(
+        `
+          select
+            cycle_key,
+            to_char(calendar_date::date, 'YYYY-MM-DD') as calendar_date,
+            coalesce(dead_plants_count, 0) as dead_plants_count,
+            coalesce(reseed_plants_count, 0) as reseed_plants_count,
+            coalesce(initial_plants_cycle, 0) as initial_plants_cycle
+          from ${source}
+          ${whereClause}
+          order by calendar_date asc
+        `,
+        values,
+      ),
+      query<{ total: string | number }>(
+        `select coalesce(sum(initial_plants), 0) as total from ${BED_PLANTS_SOURCE} where cycle_key = $1`,
+        [meta.cycleKey],
+      ),
+    ]);
 
+    const programmedPlants = toNumber(programmedResult.rows[0]?.total) ?? null;
     const { initialPlantsCycle, points } = buildMortalityCurvePoints(result.rows);
     const lastPoint = points[points.length - 1] ?? null;
 
@@ -432,6 +441,7 @@ async function loadMortalityCurve(
       generatedAt: new Date().toISOString(),
       summary: {
         initialPlantsCycle,
+        programmedPlants,
         totalDeadPlants: sumNumbers(points.map((point) => point.deadPlantsCount)),
         totalReseededPlants: sumNumbers(points.map((point) => point.reseedPlantsCount)),
         lastDailyMortalityPct: lastPoint?.dailyMortalityPct ?? null,
@@ -466,6 +476,7 @@ export async function getAggregatedMortalityCurve(
       generatedAt: new Date().toISOString(),
       summary: {
         initialPlantsCycle: 0,
+        programmedPlants: null,
         totalDeadPlants: 0,
         totalReseededPlants: 0,
         lastDailyMortalityPct: null,
@@ -587,6 +598,7 @@ export async function getAggregatedMortalityCurve(
         generatedAt: new Date().toISOString(),
         summary: {
           initialPlantsCycle: totalInitialPlantsCycle,
+          programmedPlants: sumNumbers(filteredRows.map((row) => row.initialPlants)),
           totalDeadPlants: sumNumbers(points.map((point) => point.deadPlantsCount)),
           totalReseededPlants: sumNumbers(points.map((point) => point.reseedPlantsCount)),
           lastDailyMortalityPct: lastPoint?.dailyMortalityPct ?? null,

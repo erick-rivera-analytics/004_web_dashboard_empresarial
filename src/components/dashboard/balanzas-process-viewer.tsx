@@ -154,8 +154,13 @@ export function BalanzasProcessViewer({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<ViewerApi | null>(null);
   const elementIdsRef = useRef<Record<string, string[]>>({});
+  const onNodeSelectRef = useRef(onNodeSelect);
   const [viewerError, setViewerError] = useState<string | null>(null);
   const [viewerReady, setViewerReady] = useState(false);
+
+  // Keep the ref current on every render so event handlers always call the
+  // latest version without needing to be part of any effect dependency array.
+  onNodeSelectRef.current = onNodeSelect;
 
   const { data: xmlData, error: fetchError, isLoading } = useSWR(assetPath, textFetcher);
 
@@ -209,7 +214,7 @@ export function BalanzasProcessViewer({
           const matchedSelection = resolveNodeSelection(nodes, event.element);
 
           if (matchedSelection) {
-            onNodeSelect(matchedSelection.nodeKey, matchedSelection.destination);
+            onNodeSelectRef.current(matchedSelection.nodeKey, matchedSelection.destination);
           }
         });
 
@@ -240,7 +245,7 @@ export function BalanzasProcessViewer({
       viewerRef.current = null;
       setViewerReady(false);
     };
-  }, [xmlData, nodes, onNodeSelect]);
+  }, [xmlData, nodes]);
 
   useEffect(() => {
     if (!viewerReady || !viewerRef.current) {
@@ -278,7 +283,7 @@ export function BalanzasProcessViewer({
             ? node.destinationBreakdown.find((entry) => entry.destination === binding.destination)
             : undefined;
           const overlay = createOverlayElement(node, breakdown, binding.pathLabel);
-          overlay.addEventListener("click", () => onNodeSelect(node.key, binding.destination ?? null));
+          overlay.addEventListener("click", () => onNodeSelectRef.current(node.key, binding.destination ?? null));
 
           overlays.add(elementId, {
             position: {
@@ -299,7 +304,7 @@ export function BalanzasProcessViewer({
         }
       }
     }
-  }, [nodes, onNodeSelect, selectedNodeKey, viewerReady]);
+  }, [nodes, selectedNodeKey, viewerReady]);
 
   function zoomBy(step: number) {
     if (!viewerRef.current) {

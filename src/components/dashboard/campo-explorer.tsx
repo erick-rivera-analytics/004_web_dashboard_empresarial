@@ -135,14 +135,12 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
       if (bedId) {
         // Bed flow: open beds panel for the selected cycle
         blockModal.openBeds(cycleKey);
+      } else if (valveId) {
+        // Valve flow with specific valve: skip the list and jump directly to the valve detail
+        blockModal.openValve(cycleKey, valveId);
       } else {
-        // Valve flow: open valve list for the selected cycle
+        // Valve flow without specific valve: open valve list for the selected cycle
         blockModal.openValves(cycleKey);
-        if (valveId) {
-          window.setTimeout(() => {
-            blockModal.openValve(cycleKey, valveId);
-          }, 400);
-        }
       }
       setPendingValveNav(null);
     }, 120);

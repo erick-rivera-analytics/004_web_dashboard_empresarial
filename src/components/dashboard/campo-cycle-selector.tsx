@@ -28,13 +28,13 @@ type Props = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getStatusLabel(cycle: CycleOption): { label: string; cls: string } {
-  if (cycle.isCurrent) {
+  if (cycle.isCurrent && cycle.isValid) {
     return { label: "Activo",      cls: "bg-emerald-100 text-emerald-700" };
   }
-  if (cycle.isValid) {
-    return { label: "Planificado", cls: "bg-blue-100 text-blue-700" };
+  if (!cycle.isCurrent && cycle.isValid) {
+    return { label: "Cerrado",     cls: "bg-slate-100 text-slate-500" };
   }
-  return { label: "Cerrado",       cls: "bg-slate-100 text-slate-500" };
+  return { label: "Planificado",   cls: "bg-blue-100 text-blue-700" };
 }
 
 /** Extract a readable short label from the cycleKey */
@@ -145,7 +145,7 @@ export function CampoCycleSelectorModal({
 
           {!loading && !error && cycles.map((cycle, idx) => {
             const status = getStatusLabel(cycle);
-            const isFirst = idx === 0 && cycle.isCurrent;
+            const isFirst = idx === 0 && cycle.isCurrent && cycle.isValid;
             return (
               <button
                 key={cycle.cycleKey}
@@ -159,20 +159,20 @@ export function CampoCycleSelectorModal({
                 <span
                   className={cn(
                     "mt-px size-2 shrink-0 rounded-full",
-                    cycle.isCurrent
+                    cycle.isCurrent && cycle.isValid
                       ? "bg-emerald-500"
-                      : cycle.isValid
-                        ? "bg-blue-400"
-                        : "bg-slate-300",
+                      : !cycle.isCurrent && cycle.isValid
+                        ? "bg-slate-300"
+                        : "bg-blue-400",
                   )}
                 />
 
                 {/* Cycle key — full, monospace style */}
                 <span className={cn(
                   "flex-1 truncate font-mono text-[12.5px] leading-snug",
-                  cycle.isCurrent
+                  cycle.isCurrent && cycle.isValid
                     ? "text-slate-900 dark:text-slate-100"
-                    : cycle.isValid
+                    : !cycle.isCurrent && cycle.isValid
                       ? "text-slate-700 dark:text-slate-300"
                       : "text-slate-400 dark:text-slate-500",
                 )}>
@@ -190,7 +190,7 @@ export function CampoCycleSelectorModal({
                 {/* Hover arrow */}
                 <Check className={cn(
                   "size-3.5 shrink-0 text-emerald-500 transition-opacity",
-                  cycle.isCurrent ? "opacity-100" : "opacity-0 group-hover:opacity-40",
+                  cycle.isCurrent && cycle.isValid ? "opacity-100" : "opacity-0 group-hover:opacity-40",
                 )} aria-hidden="true" />
               </button>
             );
