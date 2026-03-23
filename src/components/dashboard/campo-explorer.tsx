@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MapPinned, Move, Sprout } from "lucide-react";
 
 import { BlockProfileModal } from "@/components/dashboard/fenograma-block-modal";
@@ -12,11 +12,16 @@ import { useBlockProfileModal } from "@/hooks/use-block-profile-modal";
 import type { ActiveLayer } from "@/components/dashboard/campo-map";
 import type { CampoDashboardData, CampoMapFeature } from "@/lib/campo";
 
-// ── Dynamic imports (Leaflet cannot SSR) ──────────────────────────────────────
+// ── Dynamic imports (Leaflet cannot SSR) ─────────────────────────────────────
 
 const CampoLeafletMap = dynamic(
   () => import("@/components/dashboard/campo-map").then((m) => ({ default: m.CampoLeafletMap })),
-  { ssr: false, loading: () => <div className="h-[82vh] min-h-[640px] w-full animate-pulse rounded-[26px] bg-muted/40" /> },
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[82vh] min-h-[640px] w-full animate-pulse rounded-[26px] bg-muted/40" />
+    ),
+  },
 );
 
 const CampoLayerSwitcher = dynamic(
@@ -25,7 +30,18 @@ const CampoLayerSwitcher = dynamic(
 );
 
 const CampoSubMapModal = dynamic(
-  () => import("@/components/dashboard/campo-sub-map-modal").then((m) => ({ default: m.CampoSubMapModal })),
+  () =>
+    import("@/components/dashboard/campo-sub-map-modal").then((m) => ({
+      default: m.CampoSubMapModal,
+    })),
+  { ssr: false },
+);
+
+const CampoCycleSelectorModal = dynamic(
+  () =>
+    import("@/components/dashboard/campo-cycle-selector").then((m) => ({
+      default: m.CampoCycleSelectorModal,
+    })),
   { ssr: false },
 );
 
@@ -35,11 +51,11 @@ type SubMapState =
   | { mode: "valves"; bloquePad: string }
   | { mode: "beds"; bloquePad: string; valveId: string };
 
-function formatNumber(value: number) {
-  return value.toLocaleString("en-US", {
-    maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
-  });
-}
+/** After user picks a cycle in the selector, open valves for that cycle */
+type PendingValveNav = {
+  cycleKey: string;
+  valveId?: string; // if known, will auto-open valve detail
+};
 
 type AreaLabel = {
   name: string;
@@ -47,9 +63,14 @@ type AreaLabel = {
   totalStems: number;
 };
 
+function formatNumber(value: number) {
+  return value.toLocaleString("en-US", {
+    maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
+  });
+}
+
 function buildAreaLabels(features: CampoMapFeature[]): AreaLabel[] {
   const grouped = new Map<string, { blockCount: number; totalStems: number }>();
-
   for (const feature of features) {
     const areaName = feature.row.area?.trim();
     if (!areaName) continue;
@@ -58,7 +79,6 @@ function buildAreaLabels(features: CampoMapFeature[]): AreaLabel[] {
     current.totalStems += feature.row.totalStems;
     grouped.set(areaName, current);
   }
-
   return Array.from(grouped.entries())
     .map(([name, value]) => ({ name, ...value }))
     .sort((a, b) => b.totalStems - a.totalStems);
@@ -67,15 +87,23 @@ function buildAreaLabels(features: CampoMapFeature[]): AreaLabel[] {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function CampoExplorer({ initialData }: { initialData: CampoDashboardData }) {
-  const [activeLayer, setActiveLayer] = useState<ActiveLayer>("none");
-  const [selectedFeature, setSelectedFeature] = useState<CampoMapFeature | null>(null);
-  const [subMap, setSubMap] = useState<SubMapState | null>(null);
+  const [activeLayer,      setActiveLayer]      = useState<ActiveLayer>("none");
+  const [selectedFeature,  setSelectedFeature]  = useState<CampoMapFeature | null>(null);
+  const [subMap,           setSubMap]           = useState<SubMapState | null>(null);
 
-  const blockModal = useBlockProfileModal(selectedFeature?.row ?? null);
+  // Cycle selector: shown after "Ver detalle válvula" from sub-map
+  const [cycleSelector,    setCycleSelector]    = useState<{
+    bloquePad: string;
+    contextLabel: string;
+    valveId?: string;
+  } | null>(null);
 
-  const areaLabels = useMemo(() => buildAreaLabels(initialData.features), [initialData.features]);
+  // Pending navigation: after user picks a cycle, auto-open valves in modal
+  const [pendingValveNav,  setPendingValveNav]  = useState<PendingValveNav | null>(null);
 
-  // Block data map for Leaflet styling
+  const blockModal  = useBlockProfileModal(selectedFeature?.row ?? null);
+  const areaLabels  = useMemo(() => buildAreaLabels(initialData.features), [initialData.features]);
+
   const blockDataMap = useMemo(
     () =>
       Object.fromEntries(
@@ -87,6 +115,27 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
     [initialData.features],
   );
 
+  // ── Effect: execute pending valve navigation once feature is set ────────────
+  useEffect(() => {
+    if (!pendingValveNav || !selectedFeature) return;
+    const { cycleKey, valveId } = pendingValveNav;
+    // Small delay so the modal renders first
+    const timer = window.setTimeout(() => {
+      blockModal.openValves(cycleKey);
+      if (valveId) {
+        // second delay to let valve list load then auto-select
+        window.setTimeout(() => {
+          blockModal.openValve(cycleKey, valveId);
+        }, 400);
+      }
+      setPendingValveNav(null);
+    }, 120);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingValveNav, selectedFeature]);
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
   function handleFicha(bloquePad: string) {
     const feature = initialData.features.find((f) => f.block === bloquePad) ?? null;
     setSelectedFeature(feature);
@@ -96,16 +145,28 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
     setSubMap({ mode: "valves", bloquePad });
   }
 
+  /** Called from valve sub-map when user clicks "Ver detalle válvula" */
   function handleValveDetail(valveId: string, bloquePad: string) {
-    // Open the valve detail inside the existing BlockProfileModal
     const feature = initialData.features.find((f) => f.block === bloquePad) ?? null;
     setSelectedFeature(feature);
     setSubMap(null);
-    // Give blockModal a moment to open, then it can navigate to the valve
+    setCycleSelector({
+      bloquePad,
+      contextLabel: `Válvula ${valveId.split("-").pop()} — Bloque ${bloquePad}`,
+      valveId,
+    });
   }
 
   function handleBedMap(valveId: string, bloquePad: string) {
     setSubMap({ mode: "beds", bloquePad, valveId });
+  }
+
+  /** Called when user picks a cycle from the cycle selector */
+  function handleCycleSelected(cycleKey: string) {
+    const valveId = cycleSelector?.valveId;
+    setCycleSelector(null);
+    // Schedule navigation into the BlockProfileModal
+    setPendingValveNav({ cycleKey, valveId });
   }
 
   return (
@@ -157,7 +218,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1">
               <CampoLayerSwitcher active={activeLayer} onChange={setActiveLayer} />
               <p className="text-xs text-muted-foreground">
-                Click en bloque → ficha o mapa válvulas
+                Click en un bloque → ficha o mapa de válvulas
               </p>
             </div>
 
@@ -170,7 +231,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
             />
           </div>
 
-          {/* Bottom cards */}
+          {/* Bottom info cards */}
           <div className="grid gap-4 xl:grid-cols-3">
             <Card className="border-border/70 bg-background/72">
               <CardHeader>
@@ -218,20 +279,20 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
                     <Sprout className="size-5" aria-hidden="true" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">Capas disponibles</CardTitle>
+                    <CardTitle className="text-lg">Capas del dron</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      Índices de vegetación del dron.
+                      Índices de vegetación — ejecuta{" "}
+                      <code className="text-xs">node scripts/convert-rasters.mjs</code> para activar.
                     </p>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
+              <CardContent className="flex flex-wrap gap-2">
                 {(["ndvi", "ndre", "lci"] as const).map((layer) => (
                   <Button
                     key={layer}
                     variant={activeLayer === layer ? "default" : "outline"}
                     size="sm"
-                    className="mr-2"
                     onClick={() => setActiveLayer(activeLayer === layer ? "none" : layer)}
                   >
                     {layer.toUpperCase()}
@@ -243,7 +304,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
         </CardContent>
       </Card>
 
-      {/* Block ficha modal (existing) */}
+      {/* ── Block ficha modal (existing, unchanged) ─────────────────────────── */}
       <BlockProfileModal
         row={selectedFeature?.row ?? null}
         data={blockModal.blockData}
@@ -283,7 +344,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
         onClose={() => setSelectedFeature(null)}
       />
 
-      {/* Sub-map modal (valves / beds) */}
+      {/* ── Valve / bed sub-map modal ────────────────────────────────────────── */}
       {subMap && (
         <CampoSubMapModal
           bloquePad={subMap.bloquePad}
@@ -292,6 +353,16 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
           onValveDetail={handleValveDetail}
           onBedMap={handleBedMap}
           onClose={() => setSubMap(null)}
+        />
+      )}
+
+      {/* ── Cycle selector (from valve map drill-down) ───────────────────────── */}
+      {cycleSelector && (
+        <CampoCycleSelectorModal
+          bloquePad={cycleSelector.bloquePad}
+          contextLabel={cycleSelector.contextLabel}
+          onSelect={handleCycleSelected}
+          onClose={() => setCycleSelector(null)}
         />
       )}
     </div>
