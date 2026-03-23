@@ -55,6 +55,7 @@ type SubMapState =
 type PendingValveNav = {
   cycleKey: string;
   valveId?: string; // if known, will auto-open valve detail
+  bedId?:   string; // if set, open beds for this cycle instead
 };
 
 type AreaLabel = {
@@ -115,18 +116,33 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
     [initialData.features],
   );
 
-  // ── Effect: execute pending valve navigation once feature is set ────────────
+  // Area name per block for map labels (e.g. { "317": "MH1" })
+  const areaByBlock = useMemo(
+    () =>
+      Object.fromEntries(
+        initialData.features
+          .filter((f) => f.row.area)
+          .map((f) => [f.block, f.row.area as string]),
+      ),
+    [initialData.features],
+  );
+
+  // ── Effect: execute pending valve/bed navigation once feature is set ─────────
   useEffect(() => {
     if (!pendingValveNav || !selectedFeature) return;
-    const { cycleKey, valveId } = pendingValveNav;
-    // Small delay so the modal renders first
+    const { cycleKey, valveId, bedId } = pendingValveNav;
     const timer = window.setTimeout(() => {
-      blockModal.openValves(cycleKey);
-      if (valveId) {
-        // second delay to let valve list load then auto-select
-        window.setTimeout(() => {
-          blockModal.openValve(cycleKey, valveId);
-        }, 400);
+      if (bedId) {
+        // Bed flow: open beds panel for the selected cycle
+        blockModal.openBeds(cycleKey);
+      } else {
+        // Valve flow: open valve list for the selected cycle
+        blockModal.openValves(cycleKey);
+        if (valveId) {
+          window.setTimeout(() => {
+            blockModal.openValve(cycleKey, valveId);
+          }, 400);
+        }
       }
       setPendingValveNav(null);
     }, 120);
@@ -161,11 +177,18 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
     setSubMap({ mode: "beds", bloquePad, valveId });
   }
 
-  /** Called when user picks a cycle from the cycle selector */
+  /** Called from bed sub-map when user picks "Ver info de cama" */
+  function handleBedDetail(bedId: string, bloquePad: string, cycleKey: string) {
+    const feature = initialData.features.find((f) => f.block === bloquePad) ?? null;
+    setSelectedFeature(feature);
+    setSubMap(null);
+    setPendingValveNav({ cycleKey, bedId });
+  }
+
+  /** Called when user picks a cycle from the cycle selector (valve flow) */
   function handleCycleSelected(cycleKey: string) {
     const valveId = cycleSelector?.valveId;
     setCycleSelector(null);
-    // Schedule navigation into the BlockProfileModal
     setPendingValveNav({ cycleKey, valveId });
   }
 
@@ -224,6 +247,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
 
             <CampoLeafletMap
               blockDataMap={blockDataMap}
+              areaByBlock={areaByBlock}
               activeLayer={activeLayer}
               onFicha={handleFicha}
               onValves={handleValves}
@@ -352,6 +376,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
           valveId={subMap.mode === "beds" ? subMap.valveId : undefined}
           onValveDetail={handleValveDetail}
           onBedMap={handleBedMap}
+          onBedDetail={handleBedDetail}
           onClose={() => setSubMap(null)}
         />
       )}
