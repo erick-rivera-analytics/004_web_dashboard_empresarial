@@ -46,3 +46,11 @@ react-doctor-report.txt
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# GIS raw files (large drone rasters – not for VCS)
+/Capas/*.tif
+/Capas/*.ovr
+/Capas/*.tfw
+/Capas/*.sbn
+/Capas/*.sbx
+/public/rasters/*.png
