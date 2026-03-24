@@ -28,7 +28,7 @@ export type SidebarNode = {
   items?: SidebarNode[];
 };
 
-export const starterName = "Atlas Empresarial";
+export const starterName = "Centro de Inteligencia Empresarial";
 
 export const dashboardViews: DashboardView[] = [
   {
@@ -82,40 +82,22 @@ const campoViews = dashboardViews.filter((view) => view.category === "campo");
 const poscosechaViews = dashboardViews.filter((view) => view.category === "poscosecha");
 
 export const sidebarTree: SidebarNode[] = [
+  { label: "Inicio", href: "/dashboard", icon: LayoutDashboard },
   {
-    label: "Inicio",
-    href: "/dashboard",
-    icon: LayoutDashboard,
+    label: "Campo",
+    items: campoViews.map((view) => ({
+      label: view.title,
+      href: view.href,
+      icon: view.icon,
+    })),
   },
   {
-    label: "Indicadores",
-    icon: Gauge,
-    items: [
-      {
-        label: "Produccion",
-        icon: Factory,
-        items: [
-          {
-            label: "Campo",
-            icon: Sprout,
-            items: campoViews.map((view) => ({
-              label: view.title,
-              href: view.href,
-              icon: view.icon,
-            })),
-          },
-          {
-            label: "Poscosecha",
-            icon: Scale,
-            items: poscosechaViews.map((view) => ({
-              label: view.title,
-              href: view.href,
-              icon: view.icon,
-            })),
-          },
-        ],
-      },
-    ],
+    label: "Poscosecha",
+    items: poscosechaViews.map((view) => ({
+      label: view.title,
+      href: view.href,
+      icon: view.icon,
+    })),
   },
 ];
 

@@ -1,16 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ChevronDown,
-  ChevronRight,
-  DatabaseZap,
-  LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
-} from "lucide-react";
+import { DatabaseZap, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import {
@@ -27,284 +19,76 @@ type AppSidebarProps = {
   onCollapsedChange: (collapsed: boolean) => void;
 };
 
-type SidebarBranchProps = {
-  node: SidebarNode;
-  pathname: string;
-  lineage?: string[];
-  depth?: number;
-  collapsed: boolean;
-  openBranches: Record<string, boolean>;
-  onBranchToggle: (key: string) => void;
-};
-
-const EMPTY_LINEAGE: string[] = [];
-
-function getNodeKey(lineage: string[], label: string) {
-  return [...lineage, label].join("/");
-}
-
-function treeIsActive(node: SidebarNode, pathname: string): boolean {
-  if (node.href && isPathActive(pathname, node.href)) {
-    return true;
-  }
-
-  return node.items?.some((item) => treeIsActive(item, pathname)) ?? false;
-}
-
-function buildOpenState(
-  nodes: SidebarNode[],
-  lineage: string[] = EMPTY_LINEAGE,
-  initialState: Record<string, boolean> = {},
-) {
-  for (const node of nodes) {
-    const nodeKey = getNodeKey(lineage, node.label);
-
-    if (node.items?.length) {
-      initialState[nodeKey] = true;
-      buildOpenState(node.items, [...lineage, node.label], initialState);
-    }
-  }
-
-  return initialState;
-}
-
-function SidebarItem({
+function NavItem({
   node,
   pathname,
-  depth = 0,
+  collapsed,
 }: {
   node: SidebarNode;
   pathname: string;
-  depth?: number;
+  collapsed: boolean;
 }) {
   const Icon = node.icon;
   const active = node.href ? isPathActive(pathname, node.href) : false;
 
-  if (!node.href) {
-    return null;
-  }
+  if (!node.href) return null;
 
   return (
     <Link
       href={node.href}
+      title={collapsed ? node.label : undefined}
       className={cn(
-        "group flex items-center gap-3 rounded-3xl px-2 py-1.5 text-sm transition-colors",
+        "flex h-9 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+        collapsed && "justify-center px-2",
         active
-          ? "bg-primary/10 text-foreground"
-          : "text-muted-foreground hover:text-foreground",
-        depth > 0 && "ml-2",
+          ? "bg-foreground text-background shadow-sm"
+          : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
       )}
     >
-      {Icon ? (
-        <span
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-full transition-colors",
-            active
-              ? "bg-primary/14 text-primary"
-              : "bg-background/52 text-muted-foreground group-hover:bg-muted group-hover:text-foreground",
-          )}
-        >
-          <Icon className="size-4" aria-hidden="true" />
-        </span>
-      ) : null}
-      <span className="truncate">{node.label}</span>
+      {Icon ? <Icon className="size-4 shrink-0" aria-hidden="true" /> : null}
+      {!collapsed ? <span className="truncate">{node.label}</span> : null}
     </Link>
   );
 }
 
-function SidebarBranch({
-  node,
-  pathname,
-  lineage = EMPTY_LINEAGE,
-  depth = 0,
-  collapsed,
-  openBranches,
-  onBranchToggle,
-}: SidebarBranchProps) {
-  const Icon = node.icon;
-  const nodeKey = getNodeKey(lineage, node.label);
-  const active = treeIsActive(node, pathname);
-  const open = openBranches[nodeKey] ?? true;
-
-  if (node.href && !node.items?.length) {
-    return <SidebarItem node={node} pathname={pathname} depth={depth} />;
-  }
-
-  return (
-    <div className={cn("space-y-1", depth > 0 && "pl-4")}>
-      <button
-        type="button"
-        onClick={() => onBranchToggle(nodeKey)}
-        className={cn(
-          "group flex w-full items-center gap-3 rounded-3xl px-2 py-1.5 text-left transition-colors",
-          active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
-        )}
-        aria-expanded={open}
-      >
-        {Icon ? (
-          <span
-            className={cn(
-              "flex size-9 shrink-0 items-center justify-center rounded-full transition-colors",
-              active
-                ? "bg-primary/14 text-primary"
-                : "bg-background/52 text-muted-foreground group-hover:bg-muted group-hover:text-foreground",
-            )}
-          >
-            <Icon className="size-4" aria-hidden="true" />
-          </span>
-        ) : null}
-
-        {!collapsed ? (
-          <>
-            <span
-              className={cn(
-                "min-w-0 flex-1 truncate",
-                depth === 0
-                  ? "text-[11px] font-semibold uppercase tracking-[0.28em]"
-                  : "text-sm font-medium",
-              )}
-            >
-              {node.label}
-            </span>
-            {open ? (
-              <ChevronDown className="size-4 shrink-0" aria-hidden="true" />
-            ) : (
-              <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
-            )}
-          </>
-        ) : null}
-      </button>
-
-      {!collapsed && open ? (
-        <div className="space-y-1">
-          {node.items?.map((item) => (
-            <SidebarBranch
-              key={`${nodeKey}-${item.label}`}
-              node={item}
-              pathname={pathname}
-              lineage={[...lineage, node.label]}
-              depth={depth + 1}
-              collapsed={collapsed}
-              openBranches={openBranches}
-              onBranchToggle={onBranchToggle}
-            />
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function CollapsedNodeButton({
-  node,
-  pathname,
-  onOpenSidebar,
-}: {
-  node: SidebarNode;
-  pathname: string;
-  onOpenSidebar: () => void;
-}) {
-  const Icon = node.icon;
-  const active = treeIsActive(node, pathname);
-
-  if (!Icon) {
-    return null;
-  }
-
-  if (node.href) {
-    return (
-      <Link
-        href={node.href}
-        title={node.label}
-        className={cn(
-          "flex size-11 items-center justify-center rounded-full transition-colors",
-          active
-            ? "bg-primary/12 text-primary"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground",
-        )}
-      >
-        <Icon className="size-4" />
-      </Link>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      title={node.label}
-      onClick={onOpenSidebar}
-      className={cn(
-        "flex size-11 items-center justify-center rounded-full transition-colors",
-        active
-          ? "bg-primary/12 text-primary"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground",
-      )}
-    >
-      <Icon className="size-4" />
-    </button>
-  );
-}
-
-export function AppSidebar({
-  collapsed,
-  onCollapsedChange,
-}: AppSidebarProps) {
+export function AppSidebar({ collapsed, onCollapsedChange }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [openBranches, setOpenBranches] = useState(() =>
-    buildOpenState(sidebarTree),
-  );
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   }
 
-  function toggleBranch(key: string) {
-    setOpenBranches((current) => ({
-      ...current,
-      [key]: !(current[key] ?? true),
-    }));
-  }
-
-  function openSidebarWithBranch(key: string) {
-    setOpenBranches((current) => ({
-      ...current,
-      [key]: true,
-    }));
-    onCollapsedChange(false);
-  }
-
   return (
     <div
       className={cn(
-        "flex h-full flex-col gap-8 transition-all",
-        collapsed ? "items-center px-3 py-5" : "px-5 py-6",
+        "flex h-full flex-col overflow-y-auto transition-all",
+        collapsed ? "px-3 py-5" : "px-4 py-5",
       )}
     >
+      {/* ── Brand ──────────────────────────────────────────────────────────── */}
       <div
         className={cn(
-          "flex w-full",
-          collapsed
-            ? "flex-col items-center gap-3"
-            : "items-center justify-between gap-3",
+          "mb-4 flex items-center",
+          collapsed ? "justify-center" : "justify-between gap-2",
         )}
       >
         <Link
           href="/dashboard"
           className={cn(
-            "flex items-center gap-3 overflow-hidden",
+            "flex min-w-0 items-center gap-2.5 overflow-hidden",
             collapsed && "justify-center",
           )}
           title={starterName}
         >
-          <div className="rounded-full bg-primary/12 p-3 text-primary">
-            <Logo size={20} />
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
+            <Logo size={16} />
           </div>
           {!collapsed ? (
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{starterName}</p>
-              <p className="text-xs text-muted-foreground">Indicadores</p>
+              <p className="truncate text-sm font-semibold leading-tight">{starterName}</p>
+              <p className="text-[11px] text-muted-foreground">Indicadores</p>
             </div>
           ) : null}
         </Link>
@@ -312,7 +96,7 @@ export function AppSidebar({
         <button
           type="button"
           onClick={() => onCollapsedChange(!collapsed)}
-          className="flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label={collapsed ? "Expandir sidebar" : "Contraer sidebar"}
           title={collapsed ? "Expandir sidebar" : "Contraer sidebar"}
         >
@@ -324,55 +108,61 @@ export function AppSidebar({
         </button>
       </div>
 
-      {collapsed ? (
-        <nav className="flex flex-col items-center gap-3 pt-1">
-          {sidebarTree.map((node) => {
-            const nodeKey = getNodeKey([], node.label);
-
+      {/* ── Navigation ─────────────────────────────────────────────────────── */}
+      <nav className="flex flex-1 flex-col gap-0.5">
+        {sidebarTree.map((node) => {
+          // Direct link (e.g., Inicio)
+          if (node.href) {
             return (
-              <CollapsedNodeButton
-                key={nodeKey}
+              <NavItem
+                key={node.label}
                 node={node}
                 pathname={pathname}
-                onOpenSidebar={() => openSidebarWithBranch(nodeKey)}
+                collapsed={collapsed}
               />
             );
-          })}
-        </nav>
-      ) : (
-        <nav className="w-full space-y-4">
-          {sidebarTree.map((node) => (
-            <SidebarBranch
-              key={node.label}
-              node={node}
-              pathname={pathname}
-              collapsed={collapsed}
-              openBranches={openBranches}
-              onBranchToggle={toggleBranch}
-            />
-          ))}
-        </nav>
-      )}
+          }
 
-      <div
-        className={cn(
-          "mt-auto flex w-full gap-2",
-          collapsed ? "flex-col items-center" : "flex-col",
-        )}
-      >
+          // Section group
+          if (node.items?.length) {
+            return (
+              <div key={node.label} className="pt-4">
+                {!collapsed ? (
+                  <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/55">
+                    {node.label}
+                  </p>
+                ) : (
+                  <div className="mb-2 border-t border-border/50" />
+                )}
+                <div className="space-y-0.5">
+                  {node.items.map((item) => (
+                    <NavItem
+                      key={item.label}
+                      node={item}
+                      pathname={pathname}
+                      collapsed={collapsed}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          }
+
+          return null;
+        })}
+      </nav>
+
+      {/* ── Footer ─────────────────────────────────────────────────────────── */}
+      <div className="mt-auto space-y-0.5 border-t border-border/50 pt-3">
         <Link
           href="/api/health/db"
           title="Estado DB"
           className={cn(
-            "flex items-center transition-colors",
-            collapsed
-              ? "size-11 justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-              : "gap-3 rounded-3xl px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground",
+            "flex h-9 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground",
+            collapsed && "justify-center px-2",
           )}
         >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-background/52">
-            <DatabaseZap className="size-4" />
-          </span>
+          <DatabaseZap className="size-4 shrink-0" aria-hidden="true" />
           {!collapsed ? <span>Estado DB</span> : null}
         </Link>
 
@@ -381,15 +171,11 @@ export function AppSidebar({
           onClick={handleLogout}
           title="Salir"
           className={cn(
-            "flex items-center transition-colors",
-            collapsed
-              ? "size-11 justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-              : "gap-3 rounded-3xl px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground",
+            "flex h-9 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground",
+            collapsed && "justify-center px-2",
           )}
         >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-background/52">
-            <LogOut className="size-4" />
-          </span>
+          <LogOut className="size-4 shrink-0" aria-hidden="true" />
           {!collapsed ? <span>Salir</span> : null}
         </button>
       </div>

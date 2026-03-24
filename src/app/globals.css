@@ -85,19 +85,13 @@
 
   body {
     @apply min-h-screen bg-background text-foreground;
-    background-image:
-      radial-gradient(circle at top left, color-mix(in oklab, var(--color-primary) 16%, transparent), transparent 34rem),
-      radial-gradient(circle at 85% 0%, color-mix(in oklab, var(--color-accent) 22%, transparent), transparent 24rem),
-      linear-gradient(180deg, color-mix(in oklab, var(--color-background) 96%, white 4%) 0%, var(--color-background) 100%);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 }
 
 .starter-shell {
-  background:
-    radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--color-primary) 12%, transparent), transparent 24rem),
-    radial-gradient(circle at 88% 0%, color-mix(in oklab, var(--color-accent) 10%, transparent), transparent 22rem);
+  /* clean - no gradient */
 }
 
 .starter-panel {
@@ -111,10 +105,7 @@
 }
 
 .starter-glow {
-  background:
-    radial-gradient(circle at 15% 10%, color-mix(in oklab, var(--color-primary) 18%, transparent), transparent 26rem),
-    radial-gradient(circle at 82% 0%, color-mix(in oklab, var(--color-accent) 18%, transparent), transparent 20rem),
-    radial-gradient(circle at 60% 40%, color-mix(in oklab, var(--color-secondary) 40%, transparent), transparent 24rem);
+  /* clean - no gradient */
 }
 
 .balanzas-process .djs-container,

@@ -19,7 +19,7 @@ export default function DashboardLayout({
       <div className="dashboard-scale-shell flex min-h-screen w-full">
         <aside
           className={cn(
-            "hidden shrink-0 border-r border-border/50 bg-card/62 backdrop-blur-xl transition-[width] duration-300 lg:block",
+            "hidden shrink-0 border-r border-border/60 bg-card transition-[width] duration-300 lg:block",
             sidebarCollapsed ? "w-[5.75rem]" : "w-[18.5rem]",
           )}
         >

@@ -916,20 +916,25 @@ function ModalContent({
   );
 
   const blockAggregates = useMemo(() => {
-    let totalStems = 0;
-    let totalCurrentPlants = 0;
+    let totalStemsForRatio = 0;
+    let totalCurrentPlantsForRatio = 0;
     let totalGreenKg = 0;
     let totalBedArea = 0;
     for (const c of data.cycles) {
-      totalStems += c.totalStems ?? 0;
-      totalCurrentPlants += c.currentPlants ?? 0;
+      // Only count cycles with programmed plants data for the tallos/planta ratio
+      if ((c.programmedPlants ?? 0) > 0 && (c.currentPlants ?? 0) > 0) {
+        totalStemsForRatio += c.totalStems ?? 0;
+        totalCurrentPlantsForRatio += c.currentPlants!;
+      }
       totalGreenKg += c.greenWeightKg ?? 0;
       totalBedArea += c.bedArea ?? 0;
     }
     const camas30 = totalBedArea > 0 ? totalBedArea / 30 : null;
     const cajasVerde = totalGreenKg > 0 ? totalGreenKg / 10 : null;
     return {
-      tallosPlanta: totalStems > 0 && totalCurrentPlants > 0 ? Math.round((totalStems / totalCurrentPlants) * 100) / 100 : null,
+      tallosPlanta: totalStemsForRatio > 0 && totalCurrentPlantsForRatio > 0
+        ? Math.round((totalStemsForRatio / totalCurrentPlantsForRatio) * 100) / 100
+        : null,
       cajasCama: cajasVerde && camas30 ? Math.round((cajasVerde / camas30) * 100) / 100 : null,
     };
   }, [data.cycles]);
