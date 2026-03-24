@@ -102,6 +102,9 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
   // Pending navigation: after user picks a cycle, auto-open valves in modal
   const [pendingValveNav,  setPendingValveNav]  = useState<PendingValveNav | null>(null);
 
+  // When true: the block modal skips the main panel and shows only the valve/bed overlay directly
+  const [directPanelMode,  setDirectPanelMode]  = useState(false);
+
   const blockModal  = useBlockProfileModal(selectedFeature?.row ?? null);
   const areaLabels  = useMemo(() => buildAreaLabels(initialData.features), [initialData.features]);
 
@@ -133,17 +136,18 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
     const { cycleKey, valveId, bedId } = pendingValveNav;
     const timer = window.setTimeout(() => {
       if (bedId) {
-        // Bed flow: open beds panel for the selected cycle
+        // Bed flow: open beds overlay directly
         blockModal.openBeds(cycleKey);
       } else if (valveId) {
-        // Valve flow with specific valve: skip the list and jump directly to the valve detail
+        // Valve flow: open valve list AND pre-select the specific valve
+        blockModal.openValves(cycleKey);
         blockModal.openValve(cycleKey, valveId);
       } else {
-        // Valve flow without specific valve: open valve list for the selected cycle
+        // Generic valve list for the selected cycle
         blockModal.openValves(cycleKey);
       }
       setPendingValveNav(null);
-    }, 120);
+    }, 80);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingValveNav, selectedFeature]);
@@ -161,8 +165,6 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
 
   /** Called from valve sub-map when user clicks "Ver detalle válvula" */
   function handleValveDetail(valveId: string, bloquePad: string) {
-    const feature = initialData.features.find((f) => f.block === bloquePad) ?? null;
-    setSelectedFeature(feature);
     setSubMap(null);
     setCycleSelector({
       bloquePad,
@@ -180,13 +182,17 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
     const feature = initialData.features.find((f) => f.block === bloquePad) ?? null;
     setSelectedFeature(feature);
     setSubMap(null);
+    setDirectPanelMode(true);
     setPendingValveNav({ cycleKey, bedId });
   }
 
   /** Called when user picks a cycle from the cycle selector (valve flow) */
   function handleCycleSelected(cycleKey: string) {
-    const valveId = cycleSelector?.valveId;
+    const { valveId, bloquePad } = cycleSelector!;
+    const feature = initialData.features.find((f) => f.block === bloquePad) ?? null;
+    setSelectedFeature(feature);
     setCycleSelector(null);
+    setDirectPanelMode(true);
     setPendingValveNav({ cycleKey, valveId });
   }
 
@@ -363,7 +369,8 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
         onOpenValveMortalityCurve={blockModal.openValveMortalityCurve}
         onOpenBedMortalityCurve={blockModal.openBedMortalityCurve}
         onCloseMortalityCurve={blockModal.closeMortalityCurve}
-        onClose={() => setSelectedFeature(null)}
+        directMode={directPanelMode}
+        onClose={() => { setSelectedFeature(null); setDirectPanelMode(false); }}
       />
 
       {/* ── Valve / bed sub-map modal ────────────────────────────────────────── */}

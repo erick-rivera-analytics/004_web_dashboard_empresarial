@@ -223,15 +223,15 @@ function MetricPill({
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-left",
-        onClick && "transition-colors hover:border-primary/30 hover:bg-primary/6",
+        "rounded-xl border border-border/60 bg-card px-4 py-3.5 text-left",
+        onClick && "cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm active:scale-[0.985]",
       )}
     >
-      <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+      <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/80">
         {label}
       </p>
-      <p className="mt-2 break-words text-lg font-semibold">{value}</p>
-      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+      <p className="mt-1.5 break-words text-base font-semibold tabular-nums">{value}</p>
+      {hint ? <p className="mt-0.5 text-[11px] text-muted-foreground/70">{hint}</p> : null}
     </Comp>
   );
 }
@@ -1021,12 +1021,11 @@ function ModalContent({
             <MetricPill
               label="Cajas en verde"
               value={cycle.greenWeightKg ? formatNumber(Math.round((cycle.greenWeightKg / 10) * 100) / 100) : "-"}
-              hint="green_weight_kg / 10"
             />
             <MetricPill
               label="Cajas en blanco"
               value={cycle.postWeightKg ? formatNumber(Math.round((cycle.postWeightKg / 10) * 100) / 100) : "-"}
-              hint="post_weight_kg / 10"
+              hint="Estimado proporcional"
             />
             <MetricPill
               label="Cajas cama"
@@ -1034,9 +1033,8 @@ function ModalContent({
               hint="Cajas verde / camas 30m²"
             />
             <MetricPill
-              label="Peso tallo"
-              value={cycle.greenWeightKg && cycle.totalStems ? formatNumber(Math.round((cycle.greenWeightKg / cycle.totalStems) * 100) / 100) : "-"}
-              hint="green_weight_kg / tallos"
+              label="PESO / TALLO"
+              value={cycle.greenWeightKg && cycle.totalStems ? `${formatNumber(Math.round((cycle.greenWeightKg / cycle.totalStems) * 1000 * 100) / 100)} g` : "-"}
             />
             <MetricPill
               label="Mortandad"
@@ -1401,6 +1399,7 @@ export function BlockProfileModal({
   onOpenBedMortalityCurve,
   onCloseMortalityCurve,
   onClose,
+  directMode = false,
 }: {
   row: BlockModalRow | null;
   data: CycleProfileBlockPayload | null;
@@ -1438,6 +1437,8 @@ export function BlockProfileModal({
   onOpenBedMortalityCurve: (cycleKey: string, bedId: string) => void;
   onCloseMortalityCurve: () => void;
   onClose: () => void;
+  /** When true the main block summary panel is hidden; navigation goes directly to the overlay panel */
+  directMode?: boolean;
 }) {
   const [selectedValveBeds, setSelectedValveBeds] = useState<{ cycleKey: string; valveId: string } | null>(null);
 
@@ -1509,7 +1510,7 @@ export function BlockProfileModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/38 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-block">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar ficha del bloque" />
-      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1320px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/96 shadow-2xl shadow-slate-950/20 sm:w-[min(1320px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
+      <div className={cn("starter-panel relative z-10 flex max-h-[88vh] w-[min(1320px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/96 shadow-2xl shadow-slate-950/20 sm:w-[min(1320px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200", directMode && "pointer-events-none opacity-0 invisible")}>
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
@@ -1576,7 +1577,7 @@ export function BlockProfileModal({
           onOpenValveBedsOverlay={openValveBedsOverlay}
           onOpenBedMortalityCurve={onOpenBedMortalityCurve}
           onOpenValveMortalityCurve={onOpenValveMortalityCurve}
-          onClose={onCloseBeds}
+          onClose={() => { onCloseBeds(); if (directMode) onClose(); }}
         />
       ) : null}
 
@@ -1613,7 +1614,7 @@ export function BlockProfileModal({
           onOpenValve={onOpenValve}
           onOpenValveBedsOverlay={openValveBedsOverlay}
           onOpenValveMortalityCurve={onOpenValveMortalityCurve}
-          onClose={onCloseValves}
+          onClose={() => { onCloseValves(); if (directMode) onClose(); }}
         />
       ) : null}
 

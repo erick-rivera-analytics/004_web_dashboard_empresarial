@@ -407,6 +407,11 @@ export type HarvestCurvePoint = {
   observedCumulativeStems: number | null;
   projectedCumulativeStems: number | null;
   isProjected: boolean;
+  /** Proportional daily green weight (kg) based on stem share */
+  dailyGreenKg: number;
+  cumulativeGreenKg: number;
+  dailyWeightPerStemG: number | null;
+  cumulativeWeightPerStemG: number | null;
 };
 
 export type HarvestCurvePayload = {
@@ -1693,14 +1698,24 @@ export async function getHarvestCurveByCycleKey(
     });
 
     const projectionStartIndex = rawPoints.findIndex((point) => !isMultipleOfTwenty(point.dailyStems));
+    const totalRawStems = rawPoints.reduce((acc, p) => acc + p.dailyStems, 0);
+    let cumulativeGreenKg = 0;
     const points = rawPoints.map((point, index) => {
       const isProjected = projectionStartIndex !== -1 && index >= projectionStartIndex;
+      const dailyGreenKg = totalRawStems > 0
+        ? roundValue((point.dailyStems / totalRawStems) * totalGreenWeightKg)
+        : 0;
+      cumulativeGreenKg = roundValue(cumulativeGreenKg + dailyGreenKg);
 
       return {
         ...point,
         observedCumulativeStems: !isProjected ? point.cumulativeStems : null,
         projectedCumulativeStems: isProjected ? point.cumulativeStems : null,
         isProjected,
+        dailyGreenKg,
+        cumulativeGreenKg,
+        dailyWeightPerStemG: point.dailyStems > 0 ? roundValue((dailyGreenKg / point.dailyStems) * 1000) : null,
+        cumulativeWeightPerStemG: point.cumulativeStems > 0 ? roundValue((cumulativeGreenKg / point.cumulativeStems) * 1000) : null,
       } satisfies HarvestCurvePoint;
     });
 

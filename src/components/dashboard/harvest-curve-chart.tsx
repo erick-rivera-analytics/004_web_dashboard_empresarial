@@ -38,40 +38,50 @@ function HarvestTooltip({ active, payload, label }: { active?: boolean; payload?
 
   const accumulated = point.observedCumulativeStems ?? point.projectedCumulativeStems ?? null;
 
-  const rows: { label: string; value: string }[] = [];
+  const stemRows: { label: string; value: string }[] = [
+    { label: "Tallos acumulados", value: accumulated !== null ? formatNumber(accumulated) : "—" },
+    { label: "Tallos día", value: formatNumber(point.dailyStems) },
+  ];
 
-  rows.push({
-    label: "Tallos acumulados",
-    value: accumulated !== null ? formatNumber(accumulated) : "—",
-  });
-  rows.push({
-    label: "Tallos día",
-    value: formatNumber(point.dailyStems),
-  });
+  const hasWeight = point.dailyGreenKg > 0;
+  const weightRows: { label: string; value: string }[] = hasWeight ? [
+    { label: "Kg acumulado", value: formatNumber(point.cumulativeGreenKg) },
+    { label: "Kg día", value: formatNumber(point.dailyGreenKg) },
+    { label: "Peso / tallo acum.", value: point.cumulativeWeightPerStemG !== null ? `${formatNumber(point.cumulativeWeightPerStemG)} g` : "—" },
+    { label: "Peso / tallo día", value: point.dailyWeightPerStemG !== null ? `${formatNumber(point.dailyWeightPerStemG)} g` : "—" },
+  ] : [];
+
+  const renderRow = (row: { label: string; value: string }) => (
+    <div
+      key={row.label}
+      style={{ display: "flex", justifyContent: "space-between", gap: 16, fontSize: 12, lineHeight: "1.65" }}
+    >
+      <span style={{ color: "var(--color-muted-foreground)" }}>{row.label}</span>
+      <span style={{ fontWeight: 500, color: "var(--color-foreground)" }}>{row.value}</span>
+    </div>
+  );
 
   return (
     <div
       style={{
-        borderRadius: "16px",
+        borderRadius: "14px",
         border: "1px solid var(--color-border)",
         background: "var(--color-card)",
-        boxShadow: "0 22px 60px -28px rgba(15,23,42,0.35)",
+        boxShadow: "0 8px 32px -8px rgba(15,23,42,0.28), 0 2px 8px -2px rgba(15,23,42,0.12)",
         padding: "10px 14px",
-        minWidth: "180px",
+        minWidth: "210px",
       }}
     >
-      <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--color-foreground)" }}>
-        Día {label}{point.eventDate ? ` / ${point.eventDate}` : ""}
+      <p style={{ fontSize: 11, fontWeight: 600, marginBottom: 7, color: "var(--color-muted-foreground)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        Día {label}{point.eventDate ? ` · ${point.eventDate}` : ""}
       </p>
-      {rows.map((row) => (
-        <div
-          key={row.label}
-          style={{ display: "flex", justifyContent: "space-between", gap: 16, fontSize: 12, lineHeight: "1.6" }}
-        >
-          <span style={{ color: "var(--color-muted-foreground)" }}>{row.label}</span>
-          <span style={{ fontWeight: 500, color: "var(--color-foreground)" }}>{row.value}</span>
-        </div>
-      ))}
+      {stemRows.map(renderRow)}
+      {hasWeight ? (
+        <>
+          <div style={{ borderTop: "1px solid var(--color-border)", margin: "6px 0" }} />
+          {weightRows.map(renderRow)}
+        </>
+      ) : null}
     </div>
   );
 }
