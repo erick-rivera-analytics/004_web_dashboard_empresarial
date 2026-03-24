@@ -18,14 +18,14 @@ export default function DashboardPage() {
 
   return (
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-      <Card className="starter-panel border-border/70 bg-card/80">
+      <Card className="border-border/60 bg-card">
         <CardContent className="flex h-full flex-col justify-between p-8">
           <div className="space-y-4">
-            <Badge variant="outline" className="rounded-full px-3 py-1">
+            <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
               Indicadores / Produccion
             </Badge>
             <div className="space-y-2">
-              <h1 className="text-4xl font-semibold tracking-tight">
+              <h1 className="text-3xl font-semibold tracking-tight">
                 Indicadores operativos
               </h1>
               <p className="text-sm text-muted-foreground">
@@ -35,10 +35,10 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex flex-wrap gap-2 pt-8">
-            <Badge variant="secondary" className="rounded-full px-3 py-1">
+            <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
               {dashboardViews.length} vistas
             </Badge>
-            <Badge variant="secondary" className="rounded-full px-3 py-1">
+            <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
               DB {db.configured ? "lista" : "pendiente"}
             </Badge>
           </div>
@@ -50,18 +50,18 @@ export default function DashboardPage() {
           const Icon = view.icon;
 
           return (
-            <Card key={view.slug} className="starter-panel border-border/70 bg-card/80">
-              <CardHeader className="space-y-4">
-                <div className="rounded-2xl border border-border/70 bg-background/85 p-3 text-primary">
-                  <Icon className="size-5" />
+            <Card key={view.slug} className="border-border/60 bg-card">
+              <CardHeader className="space-y-3">
+                <div className="flex size-9 items-center justify-center rounded-lg border border-border/60 bg-muted text-foreground">
+                  <Icon className="size-4" />
                 </div>
                 <div className="space-y-1">
-                  <CardTitle>{view.title}</CardTitle>
-                  <CardDescription>{view.summary}</CardDescription>
+                  <CardTitle className="text-base">{view.title}</CardTitle>
+                  <CardDescription className="text-xs leading-relaxed">{view.summary}</CardDescription>
                 </div>
               </CardHeader>
               <CardContent>
-                <Button asChild className="w-full justify-between rounded-xl">
+                <Button asChild variant="outline" className="w-full justify-between rounded-lg text-sm font-medium hover:bg-foreground hover:text-background">
                   <Link href={view.href}>
                     Abrir
                     <ArrowRight className="size-4" />

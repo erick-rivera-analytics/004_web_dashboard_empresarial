@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { manrope } from "@/lib/fonts";
 
 export const metadata: Metadata = {
-  title: "Centro de Inteligencia Empresarial",
+  title: "CoreX — Centro de Inteligencia Empresarial",
   description:
     "Dashboard empresarial conectado a PostgreSQL para indicadores operativos de campo.",
   icons: {

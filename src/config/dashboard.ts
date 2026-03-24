@@ -28,7 +28,8 @@ export type SidebarNode = {
   items?: SidebarNode[];
 };
 
-export const starterName = "Centro de Inteligencia Empresarial";
+export const starterName = "CoreX";
+export const starterSubtitle = "Centro de Inteligencia Empresarial";
 
 export const dashboardViews: DashboardView[] = [
   {

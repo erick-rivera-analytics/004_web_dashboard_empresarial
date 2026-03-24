@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2 } from "lucide-react";
 
-import { starterName } from "@/config/dashboard";
+import { starterName, starterSubtitle } from "@/config/dashboard";
 import { Logo } from "@/components/logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,23 +51,23 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="starter-shell flex min-h-screen items-center justify-center px-6 py-10">
-      <Card className="starter-panel w-full max-w-md border-border/70 bg-card/88 shadow-2xl shadow-slate-950/10">
+    <main className="flex min-h-screen items-center justify-center bg-background px-6 py-10">
+      <Card className="w-full max-w-md border-border/60 bg-card shadow-xl shadow-slate-950/8">
         <CardHeader className="space-y-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-primary/12 p-3 text-primary">
-              <Logo size={20} />
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
+              <Logo size={18} />
             </div>
-            <div>
-              <p className="text-sm font-semibold">{starterName}</p>
-              <p className="text-xs text-muted-foreground">Indicadores</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold leading-tight">{starterName}</p>
+              <p className="truncate text-[11px] text-muted-foreground">{starterSubtitle}</p>
             </div>
           </div>
           <div className="space-y-2">
-            <Badge variant="outline" className="rounded-full px-3 py-1">
+            <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
               Acceso
             </Badge>
-            <CardTitle className="text-3xl">Entrar</CardTitle>
+            <CardTitle className="text-2xl font-semibold tracking-tight">Entrar</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
