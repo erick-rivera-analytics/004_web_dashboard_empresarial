@@ -910,10 +910,11 @@ function ModalContent({
     [data.cycles],
   );
 
-  const programmedPlantsTotal = useMemo(
-    () => computeProgrammedPlantsAcrossCycles(data.cycles),
-    [data.cycles],
-  );
+  const programmedPlantsTotal = useMemo(() => {
+    // Use blockProgrammedPlants from the most current cycle (sum by block_id)
+    const currentCycle = data.cycles.find((c) => c.isCurrent) ?? data.cycles[0] ?? null;
+    return currentCycle?.blockProgrammedPlants ?? computeProgrammedPlantsAcrossCycles(data.cycles);
+  }, [data.cycles]);
 
   const blockAggregates = useMemo(() => {
     let totalStemsForRatio = 0;
@@ -1007,8 +1008,8 @@ function ModalContent({
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricPill label="Invernadero" value={cycle.greenhouse ? "Si" : "No"} />
               <MetricPill label="Luz" value={cycle.lightType && cycle.lightType.toLowerCase() !== "unknown" ? cycle.lightType : "-"} />
-              <MetricPill label="Suelo" value="-" />
-              <MetricPill label="Fecha SP" value={formatDate(cycle.validFrom)} />
+              <MetricPill label="Suelo" value={cycle.soilType || "-"} />
+              <MetricPill label="Fecha SP" value={formatDate(cycle.pruningDate)} />
             </div>
             {/* Fila 3: Infraestructura */}
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1066,8 +1067,7 @@ function ModalContent({
                 hint="Estimado proporcional"
               />
               <MetricPill label="Inicio cosecha" value={formatDate(cycle.harvestStartDate)} />
-              <MetricPill label="Fin cosecha" value="-" />
-              <MetricPill label="Hasta ciclo" value={formatDate(cycle.validTo)} />
+              <MetricPill label="Fin cosecha" value={formatDate(cycle.harvestEndDate)} />
             </div>
           </CardContent>
 

@@ -41,6 +41,8 @@ type CycleProfileQueryRow = {
   parent_block: string | null;
   block_id: string | null;
   area_id: string | null;
+  soil_type: string | null;
+  pruning_date: string | null;
   status: string | null;
   is_valid: boolean | null;
   change_reason: string | null;
@@ -53,9 +55,11 @@ type CycleProfileQueryRow = {
   availability_vs_initial_pct: string | number | null;
   mortality_pct: string | number | null;
   harvest_start_date: string | null;
+  harvest_end_date: string | null;
   total_stems: string | number | null;
   green_weight_kg: string | number | null;
   post_weight_kg: string | number | null;
+  block_programmed_plants: string | number | null;
 };
 
 type BedProfileQueryRow = {
@@ -273,6 +277,8 @@ export type CycleProfileCard = {
   parentBlock: string;
   blockId: string;
   areaId: string;
+  soilType: string;
+  pruningDate: string | null;
   status: string;
   changeReason: string;
   programmedPlants: number | null;
@@ -284,9 +290,11 @@ export type CycleProfileCard = {
   availabilityVsInitialPct: number | null;
   mortalityPct: number | null;
   harvestStartDate: string | null;
+  harvestEndDate: string | null;
   totalStems: number | null;
   greenWeightKg: number | null;
   postWeightKg: number | null;
+  blockProgrammedPlants: number | null;
 };
 
 export type CycleProfileBlockPayload = {
@@ -1324,6 +1332,8 @@ export async function getCycleProfilesByBlock(
           cp.parent_block,
           cp.block_id,
           area_info.area_id,
+          cp.soil_type,
+          to_char(cp.pruning_date, 'YYYY-MM-DD') as pruning_date,
           valves.status,
           cp.is_valid,
           cp.change_reason,
@@ -1336,9 +1346,11 @@ export async function getCycleProfilesByBlock(
           plants.availability_vs_initial_pct,
           plants.mortality_pct,
           feno.harvest_start_date,
+          feno.harvest_end_date,
           feno.total_stems,
           green.green_weight_kg,
-          post.post_weight_kg
+          post.post_weight_kg,
+          block_plants.block_programmed_plants
         from slv.camp_dim_cycle_profile_scd2 cp
         left join lateral (
           select nullif(bp.area_id, '') as area_id
@@ -1373,6 +1385,7 @@ export async function getCycleProfilesByBlock(
         left join lateral (
           select
             to_char(min(harvest_start_date), 'YYYY-MM-DD') as harvest_start_date,
+            to_char(max(harvest_end_date), 'YYYY-MM-DD') as harvest_end_date,
             coalesce(sum(stems_count), 0) as total_stems
           from ${FENOGRAMA_SOURCE}
           where cycle_key = cp.cycle_key
@@ -1387,6 +1400,11 @@ export async function getCycleProfilesByBlock(
           from gld.mv_prod_productivity_post_cur
           where cycle_key = cp.cycle_key
         ) post on true
+        left join lateral (
+          select coalesce(sum(initial_plants), 0) as block_programmed_plants
+          from ${BED_PLANTS_SOURCE}
+          where block_id = cp.block_id
+        ) block_plants on true
         where cp.parent_block = $1
           and ($2::text is null or cp.cycle_key = $2)
         order by
@@ -1415,6 +1433,8 @@ export async function getCycleProfilesByBlock(
       parentBlock: cleanText(row.parent_block),
       blockId: cleanText(row.block_id),
       areaId: cleanText(row.area_id),
+      soilType: cleanText(row.soil_type),
+      pruningDate: row.pruning_date ?? null,
       status: cleanText(row.status),
       changeReason: cleanText(row.change_reason),
       programmedPlants: toNumber(row.programmed_plants),
@@ -1426,9 +1446,11 @@ export async function getCycleProfilesByBlock(
       availabilityVsInitialPct: toPercent(row.availability_vs_initial_pct),
       mortalityPct: toPercent(row.mortality_pct),
       harvestStartDate: row.harvest_start_date ?? null,
+      harvestEndDate: row.harvest_end_date ?? null,
       totalStems: toNumber(row.total_stems),
       greenWeightKg: toNumber(row.green_weight_kg),
       postWeightKg: toNumber(row.post_weight_kg),
+      blockProgrammedPlants: toNumber(row.block_programmed_plants),
     }));
 
     return {
