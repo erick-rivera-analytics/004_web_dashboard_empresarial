@@ -1401,9 +1401,11 @@ export async function getCycleProfilesByBlock(
           where cycle_key = cp.cycle_key
         ) post on true
         left join lateral (
-          select coalesce(sum(initial_plants), 0) as block_programmed_plants
-          from ${BED_PLANTS_SOURCE}
-          where block_id = cp.block_id
+          select coalesce(cp2.sum_initial_plantas, 0) as block_programmed_plants
+          from slv.camp_dim_cycle_profile_scd2 cp2
+          where cp2.block_id = cp.block_id
+          order by cp2.valid_from desc nulls last
+          limit 1
         ) block_plants on true
         where cp.parent_block = $1
           and ($2::text is null or cp.cycle_key = $2)
