@@ -223,15 +223,15 @@ function MetricPill({
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "rounded-xl border border-border/60 bg-card px-4 py-3.5 text-left",
-        onClick && "cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm active:scale-[0.985]",
+        "rounded-lg border border-border/50 bg-card px-3.5 py-3 text-left shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
+        onClick && "cursor-pointer transition-all hover:border-primary/30 hover:shadow-md active:scale-[0.987]",
       )}
     >
-      <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/80">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/65">
         {label}
       </p>
-      <p className="mt-1.5 break-words text-base font-semibold tabular-nums">{value}</p>
-      {hint ? <p className="mt-0.5 text-[11px] text-muted-foreground/70">{hint}</p> : null}
+      <p className="mt-1 break-words text-[15px] font-semibold tabular-nums leading-tight">{value}</p>
+      {hint ? <p className="mt-0.5 text-[10px] text-muted-foreground/55">{hint}</p> : null}
     </Comp>
   );
 }
@@ -277,7 +277,7 @@ function BedsTable({
   return (
     <div className="overflow-auto rounded-2xl border border-border/70">
       <table className="min-w-full border-separate border-spacing-0 text-sm">
-        <thead className="bg-card/95">
+        <thead>
           <tr>
             {[
               "Cama",
@@ -298,7 +298,7 @@ function BedsTable({
             ].map((label) => (
               <th
                 key={label}
-                className="border-b border-r border-border/70 px-3 py-2.5 text-left font-semibold text-foreground last:border-r-0"
+                className="border-b border-r border-border/20 bg-foreground px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-background last:border-r-0"
               >
                 {label}
               </th>
@@ -401,8 +401,8 @@ function BedsOverlay({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/46 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-beds">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar detalle de camas" />
-      <div className="starter-panel relative z-10 flex max-h-[90vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/22 sm:w-[min(1480px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
+      <div className="relative z-10 flex max-h-[90vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1480px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="rounded-full px-3 py-1">
@@ -526,8 +526,8 @@ function ValveBedsOverlay({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-valve-beds">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar camas de la valvula" />
-      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
+      <div className="relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="rounded-full px-3 py-1">
@@ -609,8 +609,8 @@ function HarvestCurveOverlay({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-harvest-curve">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar curva de cosecha" />
-      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
+      <div className="relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="rounded-full px-3 py-1">
@@ -745,8 +745,8 @@ function MortalityCurveOverlay({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-mortality">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar curva de mortandad" />
-      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
+      <div className="relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="rounded-full px-3 py-1">
@@ -979,8 +979,8 @@ function ModalContent({
 
       {/* B3: Selected cycle detail */}
       {cycle ? (
-        <Card className="rounded-[24px] border-border/70 bg-background/80">
-          <CardHeader className="space-y-3">
+        <Card className="rounded-xl border-border/50 bg-card shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <CardHeader className="space-y-3 border-b border-border/40 pb-4">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="rounded-full px-3 py-1">{cycle.cycleKey}</Badge>
               <Badge
@@ -995,60 +995,80 @@ function ModalContent({
             </CardTitle>
           </CardHeader>
 
-          <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricPill label="Variedad" value={cycle.variety || "-"} />
-            <MetricPill label="Tipo SP" value={cycle.spType || "-"} />
-            <MetricPill label="Fase" value={deriveCyclePhase(cycle)} />
-            <MetricPill label="Invernadero" value={cycle.greenhouse ? "Si" : "No"} />
-            <MetricPill label="Luz" value={cycle.lightType && cycle.lightType.toLowerCase() !== "unknown" ? cycle.lightType : "-"} />
-            <MetricPill
-              label="Camas fisicas"
-              value={formatNumber(cycle.bedCount)}
-              hint="Abrir tabla flotante de camas"
-              onClick={() => onOpenBeds(cycle.cycleKey)}
-            />
-            <MetricPill
-              label="Valvulas"
-              value={formatNumber(cycle.valveCount)}
-              hint="Abrir ventana flotante de valvulas"
-              onClick={() => onOpenValves(cycle.cycleKey)}
-            />
-            <MetricPill label="Pambiles" value={formatNumber(cycle.pambilesCount)} />
-            <MetricPill label="Camas 30 m²" value={formatNumber(computeCamas30(cycle.bedArea))} />
-            <MetricPill label="Plantas programadas" value={formatNumber(cycle.programmedPlants)} />
-            <MetricPill label="Plantas vigentes" value={formatNumber(cycle.currentPlants)} />
-            <MetricPill label="Disp. vs programadas" value={formatPercent(cycle.availabilityVsScheduledPct)} />
-            <MetricPill label="Fecha inicio cosecha" value={formatDate(cycle.harvestStartDate)} />
-            <MetricPill
-              label="Tallos planta"
-              value={cycle.totalStems && cycle.currentPlants ? formatNumber(Math.round((cycle.totalStems / cycle.currentPlants) * 100) / 100) : "-"}
-            />
-            <MetricPill
-              label="Cajas en verde"
-              value={cycle.greenWeightKg ? formatNumber(Math.round((cycle.greenWeightKg / 10) * 100) / 100) : "-"}
-            />
-            <MetricPill
-              label="Cajas en blanco"
-              value={cycle.postWeightKg ? formatNumber(Math.round((cycle.postWeightKg / 10) * 100) / 100) : "-"}
-              hint="Estimado proporcional"
-            />
-            <MetricPill
-              label="Cajas cama"
-              value={cycle.greenWeightKg && cycle.bedArea ? formatNumber(Math.round(((cycle.greenWeightKg / 10) / computeCamas30(cycle.bedArea)!) * 100) / 100) : "-"}
-              hint="Cajas verde / camas 30m²"
-            />
-            <MetricPill
-              label="PESO / TALLO"
-              value={cycle.greenWeightKg && cycle.totalStems ? `${formatNumber(Math.round((cycle.greenWeightKg / cycle.totalStems) * 1000 * 100) / 100)} g` : "-"}
-            />
-            <MetricPill
-              label="Mortandad"
-              value={formatPercent(cycle.mortalityPct)}
-              hint="Click para ver curva de mortandad"
-              onClick={() => onOpenCycleMortalityCurve(cycle.cycleKey)}
-            />
-            <MetricPill label="Desde" value={formatDate(cycle.validFrom)} />
-            <MetricPill label="Hasta" value={formatDate(cycle.validTo)} />
+          <CardContent className="space-y-1">
+            {/* Fila 1: Identificación */}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricPill label="Área" value={cycle.areaId || "-"} />
+              <MetricPill label="Variedad" value={cycle.variety || "-"} />
+              <MetricPill label="Tipo SP" value={cycle.spType || "-"} />
+              <MetricPill label="Fase" value={deriveCyclePhase(cycle)} />
+            </div>
+            {/* Fila 2: Condiciones */}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricPill label="Invernadero" value={cycle.greenhouse ? "Si" : "No"} />
+              <MetricPill label="Luz" value={cycle.lightType && cycle.lightType.toLowerCase() !== "unknown" ? cycle.lightType : "-"} />
+              <MetricPill label="Suelo" value="-" />
+              <MetricPill label="Fecha SP" value={formatDate(cycle.validFrom)} />
+            </div>
+            {/* Fila 3: Infraestructura */}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricPill label="Camas 30 m²" value={formatNumber(computeCamas30(cycle.bedArea))} />
+              <MetricPill
+                label="Camas físicas"
+                value={formatNumber(cycle.bedCount)}
+                hint="Ver tabla de camas"
+                onClick={() => onOpenBeds(cycle.cycleKey)}
+              />
+              <MetricPill
+                label="Válvulas"
+                value={formatNumber(cycle.valveCount)}
+                hint="Ver detalle de válvulas"
+                onClick={() => onOpenValves(cycle.cycleKey)}
+              />
+              <MetricPill label="Pambiles" value={formatNumber(cycle.pambilesCount)} />
+            </div>
+            {/* Fila 4: Plantas */}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricPill label="Plantas programadas" value={formatNumber(cycle.programmedPlants)} />
+              <MetricPill label="Plantas vigentes" value={formatNumber(cycle.currentPlants)} />
+              <MetricPill label="Disp. vs programadas" value={formatPercent(cycle.availabilityVsScheduledPct)} />
+              <MetricPill
+                label="Mortandad"
+                value={formatPercent(cycle.mortalityPct)}
+                hint="Ver curva de mortandad"
+                onClick={() => onOpenCycleMortalityCurve(cycle.cycleKey)}
+              />
+            </div>
+            {/* Fila 5: Producción */}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricPill
+                label="Tallos / planta"
+                value={cycle.totalStems && cycle.currentPlants ? formatNumber(Math.round((cycle.totalStems / cycle.currentPlants) * 100) / 100) : "-"}
+              />
+              <MetricPill
+                label="Peso / tallo"
+                value={cycle.greenWeightKg && cycle.totalStems ? `${formatNumber(Math.round((cycle.greenWeightKg / cycle.totalStems) * 1000 * 100) / 100)} g` : "-"}
+              />
+              <MetricPill
+                label="Cajas / cama"
+                value={cycle.greenWeightKg && cycle.bedArea ? formatNumber(Math.round(((cycle.greenWeightKg / 10) / computeCamas30(cycle.bedArea)!) * 100) / 100) : "-"}
+              />
+              <MetricPill
+                label="Cajas verde"
+                value={cycle.greenWeightKg ? formatNumber(Math.round((cycle.greenWeightKg / 10) * 100) / 100) : "-"}
+              />
+            </div>
+            {/* Fila 6: Fechas y post */}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricPill
+                label="Cajas blanco"
+                value={cycle.postWeightKg ? formatNumber(Math.round((cycle.postWeightKg / 10) * 100) / 100) : "-"}
+                hint="Estimado proporcional"
+              />
+              <MetricPill label="Inicio cosecha" value={formatDate(cycle.harvestStartDate)} />
+              <MetricPill label="Fin cosecha" value="-" />
+              <MetricPill label="Hasta ciclo" value={formatDate(cycle.validTo)} />
+            </div>
           </CardContent>
 
           <CardContent className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
@@ -1324,8 +1344,8 @@ function ValvesOverlay({
   return (
     <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/50 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-valves">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar valvulas del ciclo" />
-      <div className="starter-panel relative z-10 flex max-h-[88vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1480px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
+      <div className="relative z-10 flex max-h-[88vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1480px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="rounded-full px-3 py-1">
@@ -1515,8 +1535,8 @@ export function BlockProfileModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/38 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-block">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar ficha del bloque" />
-      <div className={cn("starter-panel relative z-10 flex max-h-[88vh] w-[min(1320px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/96 shadow-2xl shadow-slate-950/20 sm:w-[min(1320px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200", directMode && "pointer-events-none opacity-0 invisible")}>
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
+      <div className={cn("relative z-10 flex max-h-[88vh] w-[min(1320px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1320px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200", directMode && "pointer-events-none opacity-0 invisible")}>
+        <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="rounded-full px-3 py-1">

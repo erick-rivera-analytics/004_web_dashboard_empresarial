@@ -44,9 +44,11 @@ function HarvestTooltip({ active, payload, label }: { active?: boolean; payload?
   ];
 
   const hasWeight = point.dailyGreenKg > 0;
-  const weightRows: { label: string; value: string }[] = hasWeight ? [
+  const kgRows: { label: string; value: string }[] = hasWeight ? [
     { label: "Kg acumulado", value: formatNumber(point.cumulativeGreenKg) },
     { label: "Kg día", value: formatNumber(point.dailyGreenKg) },
+  ] : [];
+  const weightPerStemRows: { label: string; value: string }[] = hasWeight ? [
     { label: "Peso / tallo acum.", value: point.cumulativeWeightPerStemG !== null ? `${formatNumber(point.cumulativeWeightPerStemG)} g` : "—" },
     { label: "Peso / tallo día", value: point.dailyWeightPerStemG !== null ? `${formatNumber(point.dailyWeightPerStemG)} g` : "—" },
   ] : [];
@@ -79,7 +81,9 @@ function HarvestTooltip({ active, payload, label }: { active?: boolean; payload?
       {hasWeight ? (
         <>
           <div style={{ borderTop: "1px solid var(--color-border)", margin: "6px 0" }} />
-          {weightRows.map(renderRow)}
+          {kgRows.map(renderRow)}
+          <div style={{ borderTop: "1px solid var(--color-border)", margin: "6px 0" }} />
+          {weightPerStemRows.map(renderRow)}
         </>
       ) : null}
     </div>

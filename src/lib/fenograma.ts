@@ -40,6 +40,7 @@ type CycleProfileQueryRow = {
   greenhouse: boolean | null;
   parent_block: string | null;
   block_id: string | null;
+  area_id: string | null;
   status: string | null;
   is_valid: boolean | null;
   change_reason: string | null;
@@ -271,6 +272,7 @@ export type CycleProfileCard = {
   greenhouse: boolean;
   parentBlock: string;
   blockId: string;
+  areaId: string;
   status: string;
   changeReason: string;
   programmedPlants: number | null;
@@ -602,10 +604,7 @@ function getCurrentIsoWeekId() {
 
 function shouldUseCurrentWeekWindow(filters: FenogramaFilters) {
   return (
-    filters.includeActive
-    && filters.includePlanned
-    && !filters.includeHistory
-    && !hasMultiSelectValue(filters.area)
+    !hasMultiSelectValue(filters.area)
     && !hasMultiSelectValue(filters.variety)
     && !hasMultiSelectValue(filters.spType)
   );
@@ -1324,6 +1323,7 @@ export async function getCycleProfilesByBlock(
           cp.greenhouse,
           cp.parent_block,
           cp.block_id,
+          area_info.area_id,
           valves.status,
           cp.is_valid,
           cp.change_reason,
@@ -1340,6 +1340,14 @@ export async function getCycleProfilesByBlock(
           green.green_weight_kg,
           post.post_weight_kg
         from slv.camp_dim_cycle_profile_scd2 cp
+        left join lateral (
+          select nullif(bp.area_id, '') as area_id
+          from slv.camp_dim_block_profile_scd2 bp
+          where bp.parent_block = cp.parent_block
+            and bp.is_current = true
+          order by bp.valid_from desc nulls last
+          limit 1
+        ) area_info on true
         left join lateral (
           select
             count(distinct valve_id) as valve_count,
@@ -1406,6 +1414,7 @@ export async function getCycleProfilesByBlock(
       greenhouse: Boolean(row.greenhouse),
       parentBlock: cleanText(row.parent_block),
       blockId: cleanText(row.block_id),
+      areaId: cleanText(row.area_id),
       status: cleanText(row.status),
       changeReason: cleanText(row.change_reason),
       programmedPlants: toNumber(row.programmed_plants),
