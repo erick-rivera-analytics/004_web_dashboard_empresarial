@@ -173,6 +173,11 @@ type HarvestCurveQueryRow = {
   stems_count: number | string | null;
 };
 
+type GreenDailyQueryRow = {
+  event_date: string | null;
+  green_weight_kg: number | string | null;
+};
+
 type BlockModalRowQueryRow = {
   parent_block: string | null;
   area: string | null;
@@ -1692,7 +1697,7 @@ export async function getHarvestCurveByCycleKey(
   const normalizedCycleKey = cycleKey.trim();
 
   return cachedAsync(`fenograma:curve:${normalizedCycleKey}`, FENOGRAMA_CURVE_TTL_MS, async () => {
-    const [result, greenResult, postResult] = await Promise.all([
+    const [result, greenDailyResult, greenResult, postResult] = await Promise.all([
       query<HarvestCurveQueryRow>(
         `
           select
@@ -1701,6 +1706,16 @@ export async function getHarvestCurveByCycleKey(
           from ${FENOGRAMA_DAY_SOURCE}
           where cycle_key = $1
           order by event_date asc
+        `,
+        [normalizedCycleKey],
+      ),
+      query<GreenDailyQueryRow>(
+        `
+          select
+            to_char(event_date::date, 'YYYY-MM-DD') as event_date,
+            coalesce(green_weight_kg, 0) as green_weight_kg
+          from gld.mv_prod_productivity_green_day_cur
+          where cycle_key = $1
         `,
         [normalizedCycleKey],
       ),
@@ -1717,6 +1732,14 @@ export async function getHarvestCurveByCycleKey(
     const totalGreenWeightKg = roundValue(Number(greenResult.rows[0]?.total ?? 0));
     const totalPostWeightKg = roundValue(Number(postResult.rows[0]?.total ?? 0));
 
+    // Build a map date → daily green kg (same approach as stems from fenograma_day)
+    const greenKgByDate = new Map<string, number>();
+    for (const row of greenDailyResult.rows) {
+      if (row.event_date) {
+        greenKgByDate.set(row.event_date, roundValue(Number(row.green_weight_kg ?? 0)));
+      }
+    }
+
     let cumulativeStems = 0;
     const rawPoints = result.rows.map((row, index) => {
       const dailyStems = roundValue(Number(row.stems_count ?? 0));
@@ -1731,13 +1754,10 @@ export async function getHarvestCurveByCycleKey(
     });
 
     const projectionStartIndex = rawPoints.findIndex((point) => !isMultipleOfTwenty(point.dailyStems));
-    const totalRawStems = rawPoints.reduce((acc, p) => acc + p.dailyStems, 0);
     let cumulativeGreenKg = 0;
     const points = rawPoints.map((point, index) => {
       const isProjected = projectionStartIndex !== -1 && index >= projectionStartIndex;
-      const dailyGreenKg = totalRawStems > 0
-        ? roundValue((point.dailyStems / totalRawStems) * totalGreenWeightKg)
-        : 0;
+      const dailyGreenKg = greenKgByDate.get(point.eventDate) ?? 0;
       cumulativeGreenKg = roundValue(cumulativeGreenKg + dailyGreenKg);
 
       return {
