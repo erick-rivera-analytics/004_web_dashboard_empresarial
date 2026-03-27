@@ -155,12 +155,14 @@ export function BalanzasProcessViewer({
   const viewerRef = useRef<ViewerApi | null>(null);
   const elementIdsRef = useRef<Record<string, string[]>>({});
   const onNodeSelectRef = useRef(onNodeSelect);
+  const nodesRef = useRef(nodes);
   const [viewerError, setViewerError] = useState<string | null>(null);
   const [viewerReady, setViewerReady] = useState(false);
 
-  // Keep the ref current on every render so event handlers always call the
-  // latest version without needing to be part of any effect dependency array.
+  // Keep refs current on every render so event handlers and the init effect
+  // always use the latest values without needing them as effect dependencies.
   onNodeSelectRef.current = onNodeSelect;
+  nodesRef.current = nodes;
 
   const { data: xmlData, error: fetchError, isLoading } = useSWR(assetPath, textFetcher);
 
@@ -198,7 +200,7 @@ export function BalanzasProcessViewer({
         const nextElementIds: Record<string, string[]> = {};
 
         elementRegistry.forEach((element) => {
-          for (const node of nodes) {
+          for (const node of nodesRef.current) {
             for (const binding of node.processBindings) {
               if (!matchesSingleBinding(binding, element)) {
                 continue;
@@ -211,7 +213,7 @@ export function BalanzasProcessViewer({
         });
 
         eventBus.on("element.click", (event) => {
-          const matchedSelection = resolveNodeSelection(nodes, event.element);
+          const matchedSelection = resolveNodeSelection(nodesRef.current, event.element);
 
           if (matchedSelection) {
             onNodeSelectRef.current(matchedSelection.nodeKey, matchedSelection.destination);
@@ -245,7 +247,8 @@ export function BalanzasProcessViewer({
       viewerRef.current = null;
       setViewerReady(false);
     };
-  }, [xmlData, nodes]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [xmlData]);
 
   useEffect(() => {
     if (!viewerReady || !viewerRef.current) {

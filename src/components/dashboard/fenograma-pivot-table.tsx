@@ -284,6 +284,7 @@ function aggregateRows(
 
 function compareSortValues(left: SortValue, right: SortValue) {
   if (typeof left === "number" && typeof right === "number") {
+    if (left === right) return 0; // guards Infinity - Infinity = NaN
     return left - right;
   }
 
