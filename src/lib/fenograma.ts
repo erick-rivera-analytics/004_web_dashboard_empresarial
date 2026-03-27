@@ -1034,22 +1034,32 @@ export async function getFenogramaDashboardData(
         `
           with filtered as (
             select
-              nullif(cycle_key, '') as cycle_key,
+              nullif(mv.cycle_key, '') as cycle_key,
               ${AREA_SQL} as area,
-              nullif(parent_block, '') as block,
-              nullif(variety, '') as variety,
-              nullif(sp_type, '') as sp_type,
-              to_char(sp_date, 'YYYY-MM-DD') as sp_date,
-              to_char(harvest_start_date, 'YYYY-MM-DD') as harvest_start_date,
-              to_char(harvest_end_date, 'YYYY-MM-DD') as harvest_end_date,
+              nullif(mv.parent_block, '') as block,
+              nullif(mv.variety, '') as variety,
+              nullif(mv.sp_type, '') as sp_type,
+              to_char(coalesce(cp_dates.cp_sp_date, mv.sp_date), 'YYYY-MM-DD') as sp_date,
+              to_char(coalesce(cp_dates.cp_harvest_start_date, mv.harvest_start_date), 'YYYY-MM-DD') as harvest_start_date,
+              to_char(coalesce(cp_dates.cp_harvest_end_date, mv.harvest_end_date), 'YYYY-MM-DD') as harvest_end_date,
               case
-                when sp_date >= current_date then 'planned'
-                when coalesce(harvest_end_date, harvest_start_date, sp_date) >= current_date then 'active'
+                when mv.sp_date >= current_date then 'planned'
+                when coalesce(mv.harvest_end_date, mv.harvest_start_date, mv.sp_date) >= current_date then 'active'
                 else 'history'
               end as lifecycle_status,
-              iso_week_id,
-              coalesce(stems_count, 0) as stems_count
-            from ${FENOGRAMA_SOURCE}
+              mv.iso_week_id,
+              coalesce(mv.stems_count, 0) as stems_count
+            from ${FENOGRAMA_SOURCE} mv
+            left join lateral (
+              select
+                pruning_date      as cp_sp_date,
+                harvest_start_date as cp_harvest_start_date,
+                harvest_end_date   as cp_harvest_end_date
+              from slv.camp_dim_cycle_profile_scd2 cp2
+              where cp2.cycle_key = mv.cycle_key
+              order by cp2.valid_from desc nulls last
+              limit 1
+            ) cp_dates on true
             ${whereClause}
           )
           select
@@ -1188,17 +1198,27 @@ export async function getBlockModalRowsByParentBlocks(parentBlocks: string[]) {
     `
       with cycles as (
         select
-          nullif(parent_block, '') as parent_block,
-          nullif(cycle_key, '') as cycle_key,
+          nullif(mv.parent_block, '') as parent_block,
+          nullif(mv.cycle_key, '') as cycle_key,
           ${AREA_SQL} as area,
-          nullif(variety, '') as variety,
-          nullif(sp_type, '') as sp_type,
-          sp_date,
-          harvest_start_date,
-          harvest_end_date,
-          sum(coalesce(stems_count, 0)) as total_stems
-        from ${FENOGRAMA_SOURCE}
-        where nullif(parent_block, '') = any($1::text[])
+          nullif(mv.variety, '') as variety,
+          nullif(mv.sp_type, '') as sp_type,
+          coalesce(cp_dates.cp_sp_date, mv.sp_date) as sp_date,
+          coalesce(cp_dates.cp_harvest_start_date, mv.harvest_start_date) as harvest_start_date,
+          coalesce(cp_dates.cp_harvest_end_date, mv.harvest_end_date) as harvest_end_date,
+          sum(coalesce(mv.stems_count, 0)) as total_stems
+        from ${FENOGRAMA_SOURCE} mv
+        left join lateral (
+          select
+            pruning_date      as cp_sp_date,
+            harvest_start_date as cp_harvest_start_date,
+            harvest_end_date   as cp_harvest_end_date
+          from slv.camp_dim_cycle_profile_scd2 cp2
+          where cp2.cycle_key = mv.cycle_key
+          order by cp2.valid_from desc nulls last
+          limit 1
+        ) cp_dates on true
+        where nullif(mv.parent_block, '') = any($1::text[])
         group by 1, 2, 3, 4, 5, 6, 7, 8
       ),
       ranked as (
@@ -1350,8 +1370,8 @@ export async function getCycleProfilesByBlock(
           plants.availability_vs_scheduled_pct,
           plants.availability_vs_initial_pct,
           plants.mortality_pct,
-          feno.harvest_start_date,
-          feno.harvest_end_date,
+          to_char(cp.harvest_start_date, 'YYYY-MM-DD') as harvest_start_date,
+          to_char(cp.harvest_end_date, 'YYYY-MM-DD') as harvest_end_date,
           feno.total_stems,
           green.green_weight_kg,
           post.post_weight_kg,
@@ -1389,8 +1409,6 @@ export async function getCycleProfilesByBlock(
         ) plants on true
         left join lateral (
           select
-            to_char(min(harvest_start_date), 'YYYY-MM-DD') as harvest_start_date,
-            to_char(max(harvest_end_date), 'YYYY-MM-DD') as harvest_end_date,
             coalesce(sum(stems_count), 0) as total_stems
           from ${FENOGRAMA_SOURCE}
           where cycle_key = cp.cycle_key
