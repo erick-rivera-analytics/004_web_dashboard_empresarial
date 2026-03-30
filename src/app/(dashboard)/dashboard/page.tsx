@@ -18,7 +18,7 @@ export default function DashboardPage() {
 
   return (
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-      <Card className="border-border/60 bg-card">
+      <Card className="rounded-2xl border-border/60 bg-card">
         <CardContent className="flex h-full flex-col justify-between p-8">
           <div className="space-y-4">
             <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
@@ -50,7 +50,7 @@ export default function DashboardPage() {
           const Icon = view.icon;
 
           return (
-            <Card key={view.slug} className="border-border/60 bg-card">
+            <Card key={view.slug} className="rounded-2xl border-border/60 bg-card">
               <CardHeader className="space-y-3">
                 <div className="flex size-9 items-center justify-center rounded-lg border border-border/60 bg-muted text-foreground">
                   <Icon className="size-4" />

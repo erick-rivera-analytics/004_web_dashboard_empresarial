@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  CalendarClock,
   CalendarRange,
   Factory,
   Gauge,
@@ -66,6 +67,15 @@ export const dashboardViews: DashboardView[] = [
     summary: "Cruce uno a uno entre ciclos activos.",
     href: "/dashboard/comparacion",
     icon: GitCompareArrows,
+    category: "campo",
+  },
+  {
+    slug: "programaciones",
+    title: "Programaciones",
+    eyebrow: "Indicadores / Produccion / Campo",
+    summary: "Calendario de programaciones de campo: plantas muertas, iluminación y riego.",
+    href: "/dashboard/programaciones",
+    icon: CalendarClock,
     category: "campo",
   },
   {

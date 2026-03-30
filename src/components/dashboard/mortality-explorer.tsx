@@ -57,10 +57,29 @@ function formatPercent(value: number | null) {
   return value === null ? "-" : `${value.toFixed(2)}%`;
 }
 
-function MetricPill({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function MetricPill({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  accent?: "bad" | "warn" | "good" | "neutral";
+}) {
+  const accentClass =
+    accent === "bad"
+      ? "border-l-4 border-l-destructive/60 pl-3"
+      : accent === "warn"
+        ? "border-l-4 border-l-amber-500/60 pl-3"
+        : accent === "good"
+          ? "border-l-4 border-l-emerald-500/60 pl-3"
+          : "";
+
   return (
-    <div className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-left">
-      <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
+    <div className={`rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-left ${accentClass}`}>
+      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground/80">{label}</p>
       <p className="mt-2 text-lg font-semibold">{value}</p>
       {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
     </div>
@@ -167,10 +186,10 @@ export function MortalityExplorer({ initialData }: { initialData: MortalityDashb
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MetricPill label="Mortandad ponderada" value={formatPercent(data.summary.weightedMortalityPct)} />
-            <MetricPill label="Bajas" value={formatNumber(data.summary.totalDeadPlants)} />
-            <MetricPill label="Resiembras" value={formatNumber(data.summary.totalReseededPlants)} />
-            <MetricPill label="Plantas finales" value={formatNumber(data.summary.totalFinalPlants)} />
+            <MetricPill label="Mortandad ponderada" value={formatPercent(data.summary.weightedMortalityPct)} accent="bad" />
+            <MetricPill label="Bajas" value={formatNumber(data.summary.totalDeadPlants)} accent="bad" />
+            <MetricPill label="Resiembras" value={formatNumber(data.summary.totalReseededPlants)} accent="warn" />
+            <MetricPill label="Plantas finales" value={formatNumber(data.summary.totalFinalPlants)} accent="good" />
           </div>
 
           {isValidating ? (

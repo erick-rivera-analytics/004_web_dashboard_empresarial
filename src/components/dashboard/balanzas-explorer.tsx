@@ -477,6 +477,7 @@ export function BalanzasExplorer({
 }: BalanzasExplorerProps) {
   const [filters, setFilters] = useState<BalanzasFilters>(initialData.filters);
   const [selectedNodeKey, setSelectedNodeKey] = useState<BalanzasNodeKey | null>(null);
+  const [stableSelectedNode, setStableSelectedNode] = useState<BalanzasNodeData | null>(null);
   const [detailSearch, setDetailSearch] = useState("");
   const [detailFilters, setDetailFilters] = useState<NodeLocalFilters>(DEFAULT_NODE_LOCAL_FILTERS);
   const deferredFilters = useDeferredValue(filters);
@@ -507,12 +508,25 @@ export function BalanzasExplorer({
 
   useEffect(() => { if (dashboardError) toast.error(dashboardError.message || "Error al cargar datos"); }, [dashboardError]);
 
+  // Keep stableSelectedNode in sync with the live data so that the modal
+  // never closes when SWR briefly returns data that doesn't contain the
+  // selected node key (e.g. during a re-fetch or filter change).
+  useEffect(() => {
+    if (!selectedNodeKey) {
+      return;
+    }
+
+    const liveNode = data.nodes.find((node) => node.key === selectedNodeKey);
+
+    if (liveNode) {
+      setStableSelectedNode(liveNode);
+    }
+  }, [selectedNodeKey, data.nodes]);
+
   const activeMessage = dashboardError?.message ?? data.summary.statusMessage ?? initialError ?? null;
   const weekOptions = data.options.isoWeeks;
   const effectiveWeekValue = data.filters.weekValue;
-  const selectedNode = selectedNodeKey
-    ? data.nodes.find((node) => node.key === selectedNodeKey) ?? null
-    : null;
+  const selectedNode = stableSelectedNode;
 
   const filteredDetailRows = useMemo(() => {
     if (!selectedNode) {
@@ -573,11 +587,15 @@ export function BalanzasExplorer({
   }
 
   function openNode(nodeKey: BalanzasNodeKey, destination: string | null = null) {
+    const liveNode = data.nodes.find((node) => node.key === nodeKey);
     setDetailSearch("");
     setDetailFilters({
       ...DEFAULT_NODE_LOCAL_FILTERS,
       destination: nodeKey === "b2a" && destination ? destination : "all",
     });
+    if (liveNode) {
+      setStableSelectedNode(liveNode);
+    }
     setSelectedNodeKey(nodeKey);
   }
 
@@ -740,7 +758,7 @@ export function BalanzasExplorer({
           filters={detailFilters}
           onSearchChange={setDetailSearch}
           onFilterChange={updateDetailFilter}
-          onClose={() => setSelectedNodeKey(null)}
+          onClose={() => { setSelectedNodeKey(null); setStableSelectedNode(null); }}
         />
       ) : null}
     </div>
