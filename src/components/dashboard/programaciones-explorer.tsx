@@ -585,58 +585,47 @@ export function ProgramacionesExplorer({
                         )}
                       </dl>
 
-                      {/* Visual cycle bar connecting start and end */}
+                      {/* Simple timeline connecting start and end */}
                       {ilumCycleDateRange && (
-                        <div className="mt-3 px-2 py-3 rounded-lg bg-amber-50/40 dark:bg-amber-900/20">
-                          <div className="flex items-center gap-3">
-                            {/* Start dot */}
-                            <div className="flex flex-col items-center">
-                              <div className="size-3 rounded-full bg-amber-400 border-2 border-amber-500 shadow-sm" />
-                              <span className="text-xs text-muted-foreground mt-1 whitespace-nowrap">{formatDate(ilumCycleDateRange.min)}</span>
+                        <div className="mt-4 px-4 py-4">
+                          <div className="relative flex items-start gap-4">
+                            {/* Start date */}
+                            <div className="flex flex-col items-center flex-shrink-0">
+                              <div className="size-2.5 rounded-full bg-amber-400" />
                             </div>
-                            {/* Connecting bar */}
-                            <div className="flex-1 h-1.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-300 to-orange-400 shadow-sm" />
-                            {/* End dot */}
-                            <div className="flex flex-col items-center">
-                              <div className="size-3 rounded-full bg-orange-400 border-2 border-orange-500 shadow-sm" />
-                              <span className="text-xs text-muted-foreground mt-1 whitespace-nowrap">{formatDate(ilumCycleDateRange.max)}</span>
+                            {/* Connecting line */}
+                            <div className="absolute left-[0.3125rem] top-2.5 bottom-0 w-px bg-gradient-to-b from-amber-400 via-amber-300 to-orange-400" style={{ height: "100%" }} />
+                            {/* Date range text */}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs text-muted-foreground mb-1">{formatDate(ilumCycleDateRange.min)}</div>
+                              <div className="text-xs text-muted-foreground mt-2">{formatDate(ilumCycleDateRange.max)}</div>
+                              {ilumDays !== null && (
+                                <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-2">{ilumDays} días</div>
+                              )}
                             </div>
                           </div>
-                          {ilumDays !== null && (
-                            <div className="text-center mt-2">
-                              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{ilumDays} días</span>
-                            </div>
-                          )}
                         </div>
                       )}
 
                       <div className="mt-3 rounded-xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/30 dark:bg-amber-900/10 divide-y divide-amber-200/40 dark:divide-amber-800/30 text-[12px]">
-                        {ilumStartRec ? (
+                        {ilumCycleDateRange ? (
                           <div className="flex items-center justify-between gap-2 px-4 py-2.5">
                             <span className="flex items-center gap-1.5 text-muted-foreground">
                               <span className="inline-block size-2 rounded-full bg-amber-400" />
                               Inicio
                             </span>
-                            <span className="font-semibold">{formatDate(ilumStartRec.eventDate)}</span>
+                            <span className="font-semibold">{formatDate(ilumCycleDateRange.min)}</span>
                           </div>
-                        ) : (
-                          <div className="flex items-center justify-between gap-2 px-4 py-2.5 text-muted-foreground/50">
-                            <span>Inicio</span><span>fuera del rango</span>
-                          </div>
-                        )}
-                        {ilumEndRec ? (
+                        ) : null}
+                        {ilumCycleDateRange ? (
                           <div className="flex items-center justify-between gap-2 px-4 py-2.5">
                             <span className="flex items-center gap-1.5 text-muted-foreground">
                               <span className="inline-block size-2 rounded-full bg-orange-400" />
                               Fin
                             </span>
-                            <span className="font-semibold">{formatDate(ilumEndRec.eventDate)}</span>
+                            <span className="font-semibold">{formatDate(ilumCycleDateRange.max)}</span>
                           </div>
-                        ) : (
-                          <div className="flex items-center justify-between gap-2 px-4 py-2.5 text-muted-foreground/50">
-                            <span>Fin</span><span>fuera del rango</span>
-                          </div>
-                        )}
+                        ) : null}
                         {ilumDays !== null && (
                           <div className="flex items-center justify-between gap-2 px-4 py-2.5">
                             <span className="text-muted-foreground">Duración</span>
