@@ -44,12 +44,12 @@ export async function getProgramaciones(
     const result = await query<ProgramacionQueryRow>(
       `
         select
-          nullif(trim(v.block_id), '')  as block_id,
-          nullif(trim(v.cycle_key), '') as cycle_key,
+          nullif(trim(cp.block_id), '')  as block_id,
+          nullif(trim(v.cycle_key), '')  as cycle_key,
           to_char(v.event_date, 'YYYY-MM-DD') as event_date,
           v.activity_code,
-          nullif(trim(cp.variety), '')  as variety,
-          nullif(trim(cp.sp_type), '')  as sp_type,
+          nullif(trim(cp.variety), '')   as variety,
+          nullif(trim(cp.sp_type), '')   as sp_type,
           case
             when cp.pruning_date >= current_date then 'Planificado'
             when coalesce(cp.harvest_end_date, cp.harvest_start_date, cp.pruning_date) >= current_date
@@ -60,6 +60,7 @@ export async function getProgramaciones(
         from mdl.prod_ref_vegetativo_subset_scd2 v
         left join lateral (
           select
+            cp2.block_id,
             cp2.variety,
             cp2.sp_type,
             cp2.parent_block,
@@ -82,8 +83,7 @@ export async function getProgramaciones(
         where v.activity_code = any($1::text[])
           and v.event_date >= $2::date
           and v.event_date <= $3::date
-          and nullif(trim(v.block_id), '') is not null
-        order by v.event_date asc, v.block_id asc
+        order by v.event_date asc, cp.block_id asc
       `,
       [ACTIVITY_CODES as unknown as string[], dateFrom, dateTo],
     );
@@ -97,7 +97,7 @@ export async function getProgramaciones(
         blockId: row.block_id,
         cycleKey: row.cycle_key,
         eventDate: row.event_date,
-        activityCode: (row.activity_code ?? "SMPC") as ActivityCode,
+        activityCode: (row.activity_code ?? "SPMC") as ActivityCode,
         variety: row.variety ?? null,
         spType: row.sp_type ?? null,
         fase: row.fase ?? null,

@@ -57,11 +57,11 @@ export async function GET() {
   // 4. Prueba del JOIN con camp_dim_cycle_profile_scd2
   try {
     const join_test = await query<Record<string, unknown>>(
-      `select v.block_id, v.cycle_key, v.activity_code, v.event_date,
-              cp.variety, cp.sp_type
+      `select v.cycle_key, v.activity_code, v.event_date,
+              cp.block_id, cp.variety, cp.sp_type
        from mdl.prod_ref_vegetativo_subset_scd2 v
        left join lateral (
-         select cp2.variety, cp2.sp_type
+         select cp2.block_id, cp2.variety, cp2.sp_type
          from slv.camp_dim_cycle_profile_scd2 cp2
          where cp2.cycle_key = v.cycle_key
          order by cp2.valid_from desc nulls last
