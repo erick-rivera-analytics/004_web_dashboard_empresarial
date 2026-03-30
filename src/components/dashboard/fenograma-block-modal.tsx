@@ -1210,8 +1210,9 @@ function ModalContent({
     let totalCurrentPlantsForRatio = 0;
     let totalGreenKg = 0;
     let totalBedArea = 0;
-    let totalEffectiveHours = 0;
-    let totalCamas30ForHours = 0;
+    let totalEffectiveHoursClosedCycles = 0;
+    let totalCamas30ClosedCycles = 0;
+    let closedCyclesCount = 0;
     for (const c of data.cycles) {
       // Only count cycles with programmed plants data for the tallos/planta ratio
       if ((c.programmedPlants ?? 0) > 0 && (c.currentPlants ?? 0) > 0) {
@@ -1221,10 +1222,14 @@ function ModalContent({
       totalGreenKg += c.greenWeightKg ?? 0;
       totalBedArea += c.bedArea ?? 0;
 
-      const camas30Cycle = computeCamas30(c.bedArea);
-      if (c.effectiveHours !== null && camas30Cycle !== null && camas30Cycle > 0) {
-        totalEffectiveHours += c.effectiveHours;
-        totalCamas30ForHours += camas30Cycle;
+      // Horas cama ponderado: only closed cycles
+      if (c.status === "CLOSED" && c.effectiveHours !== null && c.effectiveHours > 0) {
+        totalEffectiveHoursClosedCycles += c.effectiveHours;
+        const camas30Cycle = computeCamas30(c.bedArea);
+        if (camas30Cycle !== null && camas30Cycle > 0) {
+          totalCamas30ClosedCycles += camas30Cycle;
+          closedCyclesCount++;
+        }
       }
     }
     const camas30 = totalBedArea > 0 ? totalBedArea / 30 : null;
@@ -1234,8 +1239,8 @@ function ModalContent({
         ? Math.round((totalStemsForRatio / totalCurrentPlantsForRatio) * 100) / 100
         : null,
       cajasCama: cajasVerde && camas30 ? Math.round((cajasVerde / camas30) * 100) / 100 : null,
-      horasCama: totalEffectiveHours > 0 && totalCamas30ForHours > 0
-        ? Math.round((totalEffectiveHours / totalCamas30ForHours) * 100) / 100
+      horasCama: totalEffectiveHoursClosedCycles > 0 && totalCamas30ClosedCycles > 0 && closedCyclesCount > 0
+        ? Math.round((totalEffectiveHoursClosedCycles / (totalCamas30ClosedCycles * closedCyclesCount)) * 100) / 100
         : null,
     };
   }, [data.cycles]);
