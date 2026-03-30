@@ -5,7 +5,27 @@
       "Bash(npm run:*)",
       "Bash(cmd.exe /c \"where node\")",
       "Bash(cmd.exe /c \"where npm\")",
-      "Bash(cmd.exe /c \"node --version && npm --version\")"
+      "Bash(cmd.exe /c \"node --version && npm --version\")",
+      "Bash(find C:Userserick.riveraDesktopworkhub004_web_dashboard_empresarial -name *shapefile* -o -name *shp* -o -name *geojson* -o -name *processo* -o -name *capa*)",
+      "Bash(xargs grep:*)",
+      "Bash(git -C \"C:\\\\Users\\\\erick.rivera\\\\Desktop\\\\workhub\\\\004_web_dashboard_empresarial\" diff src/components/dashboard/campo-map.tsx)",
+      "Bash(grep -rn \"BlockProfileModal\\\\|useBlockProfileModal\" \"C:\\\\Users\\\\erick.rivera\\\\Desktop\\\\workhub\\\\004_web_dashboard_empresarial\\\\src\\\\components\\\\dashboard\"\" --include=\"*.tsx\" | grep -v \"fenograma-block-modal \")",
+      "Bash(git -C \"C:\\\\Users\\\\erick.rivera\\\\Desktop\\\\workhub\\\\004_web_dashboard_empresarial\" status --short)",
+      "Bash(git -C \"C:\\\\Users\\\\erick.rivera\\\\Desktop\\\\workhub\\\\004_web_dashboard_empresarial\" diff --stat HEAD -- src/components/dashboard/campo-explorer.tsx src/components/dashboard/campo-map.tsx src/lib/campo.ts src/lib/fenograma.ts src/components/dashboard/campo-sub-map-modal.tsx)",
+      "Bash(git -C \"C:\\\\Users\\\\erick.rivera\\\\Desktop\\\\workhub\\\\004_web_dashboard_empresarial\" log --oneline -5)",
+      "Bash(git -C \"C:\\\\Users\\\\erick.rivera\\\\Desktop\\\\workhub\\\\004_web_dashboard_empresarial\" add src/components/dashboard/campo-explorer.tsx src/components/dashboard/campo-map.tsx src/components/dashboard/campo-sub-map-modal.tsx src/components/dashboard/fenograma-block-modal.tsx src/lib/campo.ts src/lib/fenograma.ts public/data/campo-geo.json scripts/convert-shapefile.mjs src/app/api/fenograma/cycle/ Capas/Capas_Bloque.dbf Capas/Capas_Bloque.shp.xml)",
+      "Bash(git -C:*)",
+      "mcp__obsidian-mcp-tools__search_vault_simple",
+      "mcp__obsidian-mcp-tools__patch_vault_file",
+      "mcp__obsidian-mcp-tools__get_vault_file",
+      "mcp__obsidian-mcp-tools__create_vault_file",
+      "Bash(cmd /c \"npx tsc --noEmit 2>&1 | head -30\")",
+      "Bash(cmd.exe /c \"set PATH=C:\\\\Users\\\\erick.rivera\\\\nodejs\\\\node;%PATH% && npm run typecheck 2>&1\")",
+      "Bash(cmd.exe /c \"C:\\\\Users\\\\erick.rivera\\\\nodejs\\\\node\\\\npm.cmd run typecheck 2>&1\")",
+      "Bash(cmd.exe /c \"C:\\\\Users\\\\erick.rivera\\\\nodejs\\\\node\\\\npm.cmd run typecheck\")",
+      "Bash(cmd.exe /c \"C:\\\\Users\\\\erick.rivera\\\\nodejs\\\\node\\\\npx.cmd tsc --noEmit 2>&1\")",
+      "Bash(cmd.exe /c \"git diff --stat && git add src/components/dashboard/fenograma-block-modal.tsx\")",
+      "Bash(cmd.exe /c \"git diff --stat\")"
     ]
   }
 }
