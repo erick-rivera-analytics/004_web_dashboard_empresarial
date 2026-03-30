@@ -279,8 +279,13 @@ export function ProgramacionesExplorer({
     () => new Set(ilumCycleRecords.map((r) => r.eventDate)),
     [ilumCycleRecords],
   );
-  const ilumStartRec = ilumCycleRecords.find((r) => r.ilumLabel === "Inicio") ?? null;
-  const ilumEndRec   = ilumCycleRecords.find((r) => r.ilumLabel === "Fin") ?? null;
+  // Get complete start/end records from ALL data, not just current month
+  const ilumStartRec = selectedIlumCycleKey && swrData
+    ? swrData.find((r) => r.cycleKey === selectedIlumCycleKey && r.ilumLabel === "Inicio") ?? null
+    : null;
+  const ilumEndRec = selectedIlumCycleKey && swrData
+    ? swrData.find((r) => r.cycleKey === selectedIlumCycleKey && r.ilumLabel === "Fin") ?? null
+    : null;
   const ilumDays = ilumStartRec && ilumEndRec
     ? Math.round(
         (new Date(ilumEndRec.eventDate).getTime() - new Date(ilumStartRec.eventDate).getTime())
