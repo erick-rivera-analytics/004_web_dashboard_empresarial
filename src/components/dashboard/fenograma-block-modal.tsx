@@ -318,7 +318,7 @@ function HoursCamaOverlay({
   const totalActualHours = data?.summary.totalActualHours ?? cycle.actualHours;
   const totalUnitsProduced = data?.summary.totalUnitsProduced ?? cycle.unitsProduced;
   const horasCama = computeHorasCama(totalEffectiveHours, cycle.bedArea);
-  const camas30 = computeCamas30(cycle.bedArea);
+  const camas30 = computeCamas30(cycle.bedArea) ?? 1;
 
   function toggleType(activityType: string) {
     setExpandedTypes((current) => (
