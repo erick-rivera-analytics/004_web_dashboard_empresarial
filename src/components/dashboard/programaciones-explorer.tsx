@@ -279,16 +279,21 @@ export function ProgramacionesExplorer({
     () => new Set(ilumCycleRecords.map((r) => r.eventDate)),
     [ilumCycleRecords],
   );
-  // Get complete start/end records from ALL data, not just current month
-  const ilumStartRec = selectedIlumCycleKey && swrData
-    ? swrData.find((r) => r.cycleKey === selectedIlumCycleKey && r.ilumLabel === "Inicio") ?? null
+  // Get start/end from cycle records (month-specific) for detail display
+  const ilumStartRec = ilumCycleRecords.find((r) => r.ilumLabel === "Inicio") ?? null;
+  const ilumEndRec   = ilumCycleRecords.find((r) => r.ilumLabel === "Fin") ?? null;
+
+  // Get cycle date range from highlighted dates (includes all cycle dates)
+  const ilumCycleDateRange = ilumHighlightedDates.size > 0
+    ? {
+        min: Array.from(ilumHighlightedDates).sort()[0],
+        max: Array.from(ilumHighlightedDates).sort()[ilumHighlightedDates.size - 1],
+      }
     : null;
-  const ilumEndRec = selectedIlumCycleKey && swrData
-    ? swrData.find((r) => r.cycleKey === selectedIlumCycleKey && r.ilumLabel === "Fin") ?? null
-    : null;
-  const ilumDays = ilumStartRec && ilumEndRec
+
+  const ilumDays = ilumCycleDateRange
     ? Math.round(
-        (new Date(ilumEndRec.eventDate).getTime() - new Date(ilumStartRec.eventDate).getTime())
+        (new Date(ilumCycleDateRange.max).getTime() - new Date(ilumCycleDateRange.min).getTime())
         / 86_400_000,
       )
     : null;
@@ -573,20 +578,20 @@ export function ProgramacionesExplorer({
                       </dl>
 
                       {/* Visual cycle bar connecting start and end */}
-                      {(ilumStartRec || ilumEndRec) && (
+                      {ilumCycleDateRange && (
                         <div className="mt-3 px-2 py-3 rounded-lg bg-amber-50/40 dark:bg-amber-900/20">
                           <div className="flex items-center gap-3">
                             {/* Start dot */}
                             <div className="flex flex-col items-center">
                               <div className="size-3 rounded-full bg-amber-400 border-2 border-amber-500 shadow-sm" />
-                              {ilumStartRec && <span className="text-xs text-muted-foreground mt-1 whitespace-nowrap">{formatDate(ilumStartRec.eventDate)}</span>}
+                              <span className="text-xs text-muted-foreground mt-1 whitespace-nowrap">{formatDate(ilumCycleDateRange.min)}</span>
                             </div>
                             {/* Connecting bar */}
                             <div className="flex-1 h-1.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-300 to-orange-400 shadow-sm" />
                             {/* End dot */}
                             <div className="flex flex-col items-center">
                               <div className="size-3 rounded-full bg-orange-400 border-2 border-orange-500 shadow-sm" />
-                              {ilumEndRec && <span className="text-xs text-muted-foreground mt-1 whitespace-nowrap">{formatDate(ilumEndRec.eventDate)}</span>}
+                              <span className="text-xs text-muted-foreground mt-1 whitespace-nowrap">{formatDate(ilumCycleDateRange.max)}</span>
                             </div>
                           </div>
                           {ilumDays !== null && (
