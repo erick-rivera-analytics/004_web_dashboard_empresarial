@@ -473,7 +473,23 @@ export function ProgramacionesExplorer({
                         key={`${ev.cycleKey}-${ei}`}
                         record={ev}
                         highlighted={activeTab === "iluminacion" && selectedIlumCycleKey === ev.cycleKey}
-                        onClick={activeTab === "iluminacion" ? (e) => { e.stopPropagation(); setSelectedIlumCycleKey(ev.cycleKey === selectedIlumCycleKey ? null : ev.cycleKey); } : undefined}
+                        onClick={activeTab === "iluminacion" ? (e) => {
+                          e.stopPropagation();
+                          const newKey = ev.cycleKey === selectedIlumCycleKey ? null : ev.cycleKey;
+                          if (newKey) {
+                            // Find start/end dates for this cycle
+                            const cycleRecs = filtered.filter((r) => r.cycleKey === newKey);
+                            const startRec = cycleRecs.find((r) => r.ilumLabel === "Inicio");
+                            const endRec = cycleRecs.find((r) => r.ilumLabel === "Fin");
+                            const firstDate = startRec || endRec;
+                            // Auto-navigate to the month of the first available date
+                            if (firstDate) {
+                              const eventDate = new Date(firstDate.eventDate);
+                              setViewDate(new Date(eventDate.getFullYear(), eventDate.getMonth(), 1));
+                            }
+                          }
+                          setSelectedIlumCycleKey(newKey);
+                        } : undefined}
                       />
                     ))}
                     {events.length > 4 && (
@@ -551,7 +567,32 @@ export function ProgramacionesExplorer({
                         )}
                       </dl>
 
-                      <div className="mt-1 rounded-xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/30 dark:bg-amber-900/10 divide-y divide-amber-200/40 dark:divide-amber-800/30 text-[12px]">
+                      {/* Visual cycle bar connecting start and end */}
+                      {(ilumStartRec || ilumEndRec) && (
+                        <div className="mt-3 px-2 py-3 rounded-lg bg-amber-50/40 dark:bg-amber-900/20">
+                          <div className="flex items-center gap-3">
+                            {/* Start dot */}
+                            <div className="flex flex-col items-center">
+                              <div className="size-3 rounded-full bg-amber-400 border-2 border-amber-500 shadow-sm" />
+                              {ilumStartRec && <span className="text-xs text-muted-foreground mt-1 whitespace-nowrap">{formatDate(ilumStartRec.eventDate)}</span>}
+                            </div>
+                            {/* Connecting bar */}
+                            <div className="flex-1 h-1.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-300 to-orange-400 shadow-sm" />
+                            {/* End dot */}
+                            <div className="flex flex-col items-center">
+                              <div className="size-3 rounded-full bg-orange-400 border-2 border-orange-500 shadow-sm" />
+                              {ilumEndRec && <span className="text-xs text-muted-foreground mt-1 whitespace-nowrap">{formatDate(ilumEndRec.eventDate)}</span>}
+                            </div>
+                          </div>
+                          {ilumDays !== null && (
+                            <div className="text-center mt-2">
+                              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{ilumDays} días</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="mt-3 rounded-xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/30 dark:bg-amber-900/10 divide-y divide-amber-200/40 dark:divide-amber-800/30 text-[12px]">
                         {ilumStartRec ? (
                           <div className="flex items-center justify-between gap-2 px-4 py-2.5">
                             <span className="flex items-center gap-1.5 text-muted-foreground">
