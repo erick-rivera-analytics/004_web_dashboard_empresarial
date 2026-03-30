@@ -35,10 +35,12 @@ npx vitest run src/lib/__tests__/server-cache.test.ts  # Run single test file
 | `src/proxy.ts` | Middleware — protects `/dashboard/*`, redirects unauthenticated to `/login` |
 | `src/lib/fetch-json.ts` | Client-side `fetchJson<T>()` used by SWR fetchers |
 | `src/hooks/use-block-profile-modal.ts` | Complex drill-down state: block → cycle → valve/bed → curves |
+| `src/lib/programaciones.ts` | Query SPMC (mortality) + ILUMINACION from `mdl.prod_ref_vegetativo_subset_scd2` + cycle/area details; ilum only returns first & last dates per cycle |
 
 ### Dashboard Views
 
 - **Campo** (`/dashboard/campo`) — SVG spatial map of blocks by area, pure client-side state
+- **Programaciones** (`/dashboard/programaciones`) — Monthly calendar with activity schedules (SPMC, Iluminación, Riego); shows plant mortality events, lighting cycles, and irrigation. Interactive iluminación mode selects cycle and shows detail panel with start/end dates & duration.
 - **Fenograma** (`/dashboard/fenograma`) — Weekly pivot table + harvest curves + block drill-down modals
 - **Mortandades** (`/dashboard/mortality`) — Mortality metrics with cycle/valve/bed curve drill-downs
 - **Comparacion** (`/dashboard/comparacion`) — Side-by-side cycle comparison with radar charts
