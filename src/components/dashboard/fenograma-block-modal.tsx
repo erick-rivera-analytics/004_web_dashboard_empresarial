@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight, LineChart, LoaderCircle, Rows3, Sprout, X } from "lucide-react";
 import useSWRImmutable from "swr/immutable";
 
@@ -336,7 +337,7 @@ function HoursCamaOverlay({
   }
 
   const overlayContent = (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-hours-cama">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-hours-cama">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar detalle de horas cama" />
       <div className="relative z-10 flex max-h-[88vh] w-[min(1500px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1500px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
@@ -516,7 +517,11 @@ function HoursCamaOverlay({
     </div>
   );
 
-  return overlayContent;
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(overlayContent, document.body);
 }
 
 function HoursCamaPersonRow({
