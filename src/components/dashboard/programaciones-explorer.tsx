@@ -275,9 +275,17 @@ export function ProgramacionesExplorer({
       : [],
     [filtered, selectedIlumCycleKey],
   );
+  // Get ALL cycle dates from swrData (not just current month)
   const ilumHighlightedDates = useMemo(
-    () => new Set(ilumCycleRecords.map((r) => r.eventDate)),
-    [ilumCycleRecords],
+    () => {
+      if (!selectedIlumCycleKey || !swrData) return new Set<string>();
+      return new Set(
+        swrData
+          .filter((r) => r.cycleKey === selectedIlumCycleKey)
+          .map((r) => r.eventDate)
+      );
+    },
+    [selectedIlumCycleKey, swrData],
   );
   // Get start/end from cycle records (month-specific) for detail display
   const ilumStartRec = ilumCycleRecords.find((r) => r.ilumLabel === "Inicio") ?? null;
