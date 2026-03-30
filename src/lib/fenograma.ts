@@ -60,6 +60,9 @@ type CycleProfileQueryRow = {
   green_weight_kg: string | number | null;
   post_weight_kg: string | number | null;
   block_programmed_plants: string | number | null;
+  actual_hours: string | number | null;
+  effective_hours: string | number | null;
+  units_produced: string | number | null;
 };
 
 type BedProfileQueryRow = {
@@ -171,6 +174,18 @@ type ValveProfileQueryRow = {
 type HarvestCurveQueryRow = {
   event_date: string | null;
   stems_count: number | string | null;
+};
+
+type CycleLaborHoursQueryRow = {
+  cycle_key: string;
+  person_id: string | number | null;
+  activity_id: string | number | null;
+  activity_name: string | null;
+  activity_type: string | null;
+  unit_of_measure: string | null;
+  actual_hours: string | number | null;
+  effective_hours: string | number | null;
+  units_produced: string | number | null;
 };
 
 type GreenDailyQueryRow = {
@@ -300,6 +315,9 @@ export type CycleProfileCard = {
   greenWeightKg: number | null;
   postWeightKg: number | null;
   blockProgrammedPlants: number | null;
+  actualHours: number | null;
+  effectiveHours: number | null;
+  unitsProduced: number | null;
 };
 
 export type CycleProfileBlockPayload = {
@@ -448,6 +466,53 @@ export type HarvestCurvePayload = {
   points: HarvestCurvePoint[];
 };
 
+export type CycleLaborPersonSummary = {
+  personId: string;
+  unitOfMeasure: string;
+  actualHours: number;
+  effectiveHours: number;
+  unitsProduced: number;
+  productivity: number | null;
+  rendimientoPct: number | null;
+};
+
+export type CycleLaborActivitySummary = {
+  activityId: string;
+  activityName: string;
+  activityType: string;
+  unitOfMeasure: string;
+  actualHours: number;
+  effectiveHours: number;
+  unitsProduced: number;
+  productivity: number | null;
+  rendimientoPct: number | null;
+  people: CycleLaborPersonSummary[];
+};
+
+export type CycleLaborActivityTypeSummary = {
+  activityType: string;
+  actualHours: number;
+  effectiveHours: number;
+  unitsProduced: number;
+  productivity: number | null;
+  rendimientoPct: number | null;
+  activities: CycleLaborActivitySummary[];
+};
+
+export type CycleLaborHoursPayload = {
+  cycleKey: string;
+  generatedAt: string;
+  summary: {
+    totalActualHours: number;
+    totalEffectiveHours: number;
+    totalUnitsProduced: number;
+    activityTypeCount: number;
+    activityCount: number;
+    personCount: number;
+  };
+  activityTypes: CycleLaborActivityTypeSummary[];
+};
+
 export const defaultFenogramaFilters: FenogramaFilters = {
   includeActive: true,
   includePlanned: true,
@@ -473,6 +538,7 @@ const FENOGRAMA_DAY_SOURCE = "gld.mv_prod_fenograma_day_cur";
 const BED_PLANTS_SOURCE = "gld.mv_camp_kardex_bed_plants_cur";
 const CYCLE_PLANTS_SOURCE = "gld.mv_camp_kardex_cycle_plants_cur";
 const VALVE_PLANTS_SOURCE = "gld.mv_camp_kardex_valve_plants_cur";
+const PROD_HOURS_SOURCE = "gld.mv_prod_hours_cycle_person_cur";
 
 const FENOGRAMA_OPTIONS_QUERY = `
   select
@@ -511,6 +577,7 @@ const FENOGRAMA_BLOCK_TTL_MS = 60 * 1000;
 const FENOGRAMA_BEDS_TTL_MS = 60 * 1000;
 const FENOGRAMA_VALVE_TTL_MS = 60 * 1000;
 const FENOGRAMA_CURVE_TTL_MS = 60 * 1000;
+const FENOGRAMA_HOURS_TTL_MS = 60 * 1000;
 
 function cleanText(value: string | null) {
   return value?.trim() ?? "";
@@ -584,6 +651,19 @@ function toPercent(value: string | number | null) {
   }
 
   return roundValue(numericValue * 100);
+}
+
+function toRatio(numerator: number | null, denominator: number | null) {
+  if (numerator === null || denominator === null || denominator <= 0) {
+    return null;
+  }
+
+  return roundValue(numerator / denominator);
+}
+
+function toPercentFromNumbers(numerator: number | null, denominator: number | null) {
+  const ratio = toRatio(numerator, denominator);
+  return ratio === null ? null : roundValue(ratio * 100);
 }
 
 function isMultipleOfTwenty(value: number) {
@@ -1375,7 +1455,10 @@ export async function getCycleProfilesByBlock(
           feno.total_stems,
           green.green_weight_kg,
           post.post_weight_kg,
-          block_plants.block_programmed_plants
+          block_plants.block_programmed_plants,
+          labor.actual_hours,
+          labor.effective_hours,
+          labor.units_produced
         from slv.camp_dim_cycle_profile_scd2 cp
         left join lateral (
           select nullif(bp.area_id, '') as area_id
@@ -1430,6 +1513,14 @@ export async function getCycleProfilesByBlock(
           order by cp2.valid_from desc nulls last
           limit 1
         ) block_plants on true
+        left join lateral (
+          select
+            sum(actual_hours) as actual_hours,
+            sum(effective_hours) as effective_hours,
+            sum(units_produced) as units_produced
+          from ${PROD_HOURS_SOURCE}
+          where cycle_key = cp.cycle_key
+        ) labor on true
         where cp.parent_block = $1
           and ($2::text is null or cp.cycle_key = $2)
         order by
@@ -1476,6 +1567,9 @@ export async function getCycleProfilesByBlock(
       greenWeightKg: toNumber(row.green_weight_kg),
       postWeightKg: toNumber(row.post_weight_kg),
       blockProgrammedPlants: toNumber(row.block_programmed_plants),
+      actualHours: toNumber(row.actual_hours),
+      effectiveHours: toNumber(row.effective_hours),
+      unitsProduced: toNumber(row.units_produced),
     }));
 
     return {
@@ -1490,6 +1584,190 @@ export async function getCycleProfilesByBlock(
         spTypes: Array.from(new Set(cycles.map((cycle) => cycle.spType).filter(Boolean))).sort(),
       },
       cycles,
+    };
+  });
+}
+
+export async function getCycleLaborHoursByCycleKey(
+  cycleKey: string,
+): Promise<CycleLaborHoursPayload> {
+  const normalizedCycleKey = cycleKey.trim();
+
+  return cachedAsync(`fenograma:hours:${normalizedCycleKey}`, FENOGRAMA_HOURS_TTL_MS, async () => {
+    const result = await query<CycleLaborHoursQueryRow>(
+      `
+        select
+          cycle_key,
+          person_id,
+          activity_id,
+          activity_name,
+          activity_type,
+          unit_of_measure,
+          actual_hours,
+          effective_hours,
+          units_produced
+        from ${PROD_HOURS_SOURCE}
+        where cycle_key = $1
+        order by
+          coalesce(activity_type, '') asc,
+          coalesce(activity_name, '') asc,
+          coalesce(activity_id::text, '') asc,
+          coalesce(person_id::text, '') asc
+      `,
+      [normalizedCycleKey],
+    );
+
+    const activityTypeMap = new Map<string, {
+      activityType: string;
+      actualHours: number;
+      effectiveHours: number;
+      unitsProduced: number;
+      activities: Map<string, {
+        activityId: string;
+        activityName: string;
+        activityType: string;
+        unitOfMeasure: string;
+        actualHours: number;
+        effectiveHours: number;
+        unitsProduced: number;
+        people: Map<string, CycleLaborPersonSummary>;
+      }>;
+    }>();
+    const personIds = new Set<string>();
+    let totalActualHours = 0;
+    let totalEffectiveHours = 0;
+    let totalUnitsProduced = 0;
+
+    for (const row of result.rows) {
+      const activityType = cleanText(row.activity_type) || "Sin tipo";
+      const activityId = cleanText(row.activity_id === null ? null : String(row.activity_id)) || "Sin actividad";
+      const activityName = cleanText(row.activity_name) || activityId;
+      const unitOfMeasure = cleanText(row.unit_of_measure);
+      const personId = cleanText(row.person_id === null ? null : String(row.person_id)) || "Sin ID";
+      const actualHours = toNumber(row.actual_hours) ?? 0;
+      const effectiveHours = toNumber(row.effective_hours) ?? 0;
+      const unitsProduced = toNumber(row.units_produced) ?? 0;
+
+      totalActualHours += actualHours;
+      totalEffectiveHours += effectiveHours;
+      totalUnitsProduced += unitsProduced;
+      personIds.add(personId);
+
+      const activityTypeEntry = activityTypeMap.get(activityType) ?? {
+        activityType,
+        actualHours: 0,
+        effectiveHours: 0,
+        unitsProduced: 0,
+        activities: new Map(),
+      };
+      activityTypeEntry.actualHours += actualHours;
+      activityTypeEntry.effectiveHours += effectiveHours;
+      activityTypeEntry.unitsProduced += unitsProduced;
+      activityTypeMap.set(activityType, activityTypeEntry);
+
+      const activityKey = `${activityType}|${activityId}|${activityName}|${unitOfMeasure}`;
+      const activityEntry = activityTypeEntry.activities.get(activityKey) ?? {
+        activityId,
+        activityName,
+        activityType,
+        unitOfMeasure,
+        actualHours: 0,
+        effectiveHours: 0,
+        unitsProduced: 0,
+        people: new Map<string, CycleLaborPersonSummary>(),
+      };
+      activityEntry.actualHours += actualHours;
+      activityEntry.effectiveHours += effectiveHours;
+      activityEntry.unitsProduced += unitsProduced;
+      activityTypeEntry.activities.set(activityKey, activityEntry);
+
+      const personEntry = activityEntry.people.get(personId) ?? {
+        personId,
+        unitOfMeasure,
+        actualHours: 0,
+        effectiveHours: 0,
+        unitsProduced: 0,
+        productivity: null,
+        rendimientoPct: null,
+      };
+      personEntry.actualHours += actualHours;
+      personEntry.effectiveHours += effectiveHours;
+      personEntry.unitsProduced += unitsProduced;
+      activityEntry.people.set(personId, personEntry);
+    }
+
+    const activityTypes = Array.from(activityTypeMap.values())
+      .sort((left, right) => left.activityType.localeCompare(right.activityType, "en-US", {
+        numeric: true,
+        sensitivity: "base",
+      }))
+      .map((activityTypeEntry) => {
+        const activities = Array.from(activityTypeEntry.activities.values())
+          .sort((left, right) => {
+            const nameCompare = left.activityName.localeCompare(right.activityName, "en-US", {
+              numeric: true,
+              sensitivity: "base",
+            });
+
+            return nameCompare !== 0
+              ? nameCompare
+              : left.activityId.localeCompare(right.activityId, "en-US", {
+                numeric: true,
+                sensitivity: "base",
+              });
+          })
+          .map((activityEntry) => {
+            const people = Array.from(activityEntry.people.values())
+              .sort((left, right) => left.personId.localeCompare(right.personId, "en-US", {
+                numeric: true,
+                sensitivity: "base",
+              }))
+              .map((personEntry) => ({
+                ...personEntry,
+                actualHours: roundValue(personEntry.actualHours),
+                effectiveHours: roundValue(personEntry.effectiveHours),
+                unitsProduced: roundValue(personEntry.unitsProduced),
+                productivity: toRatio(personEntry.unitsProduced, personEntry.actualHours),
+                rendimientoPct: toPercentFromNumbers(personEntry.effectiveHours, personEntry.actualHours),
+              }));
+
+            return {
+              activityId: activityEntry.activityId,
+              activityName: activityEntry.activityName,
+              activityType: activityEntry.activityType,
+              unitOfMeasure: activityEntry.unitOfMeasure,
+              actualHours: roundValue(activityEntry.actualHours),
+              effectiveHours: roundValue(activityEntry.effectiveHours),
+              unitsProduced: roundValue(activityEntry.unitsProduced),
+              productivity: toRatio(activityEntry.unitsProduced, activityEntry.actualHours),
+              rendimientoPct: toPercentFromNumbers(activityEntry.effectiveHours, activityEntry.actualHours),
+              people,
+            } satisfies CycleLaborActivitySummary;
+          });
+
+        return {
+          activityType: activityTypeEntry.activityType,
+          actualHours: roundValue(activityTypeEntry.actualHours),
+          effectiveHours: roundValue(activityTypeEntry.effectiveHours),
+          unitsProduced: roundValue(activityTypeEntry.unitsProduced),
+          productivity: toRatio(activityTypeEntry.unitsProduced, activityTypeEntry.actualHours),
+          rendimientoPct: toPercentFromNumbers(activityTypeEntry.effectiveHours, activityTypeEntry.actualHours),
+          activities,
+        } satisfies CycleLaborActivityTypeSummary;
+      });
+
+    return {
+      cycleKey: normalizedCycleKey,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalActualHours: roundValue(totalActualHours),
+        totalEffectiveHours: roundValue(totalEffectiveHours),
+        totalUnitsProduced: roundValue(totalUnitsProduced),
+        activityTypeCount: activityTypes.length,
+        activityCount: activityTypes.reduce((sum, activityType) => sum + activityType.activities.length, 0),
+        personCount: personIds.size,
+      },
+      activityTypes,
     };
   });
 }

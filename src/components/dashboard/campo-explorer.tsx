@@ -1,21 +1,23 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { FeatureCollection } from "geojson";
 import { useEffect, useMemo, useState } from "react";
 import { MapPinned, Move, Sprout } from "lucide-react";
+import useSWRImmutable from "swr/immutable";
 
 import { BlockProfileModal } from "@/components/dashboard/fenograma-block-modal";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBlockProfileModal } from "@/hooks/use-block-profile-modal";
-import type { ActiveLayer } from "@/components/dashboard/campo-map";
+import { fetchJson } from "@/lib/fetch-json";
+import type { ActiveLayer, RasterBounds } from "@/components/dashboard/campo-map";
 import type { CampoDashboardData, CampoMapFeature } from "@/lib/campo";
 
-// ── Dynamic imports (Leaflet cannot SSR) ─────────────────────────────────────
+const DEFAULT_RASTER_OPACITY = 0.9;
 
 const CampoLeafletMap = dynamic(
-  () => import("@/components/dashboard/campo-map").then((m) => ({ default: m.CampoLeafletMap })),
+  () => import("@/components/dashboard/campo-map").then((module) => ({ default: module.CampoLeafletMap })),
   {
     ssr: false,
     loading: () => (
@@ -24,38 +26,40 @@ const CampoLeafletMap = dynamic(
   },
 );
 
-const CampoLayerSwitcher = dynamic(
-  () => import("@/components/dashboard/campo-map").then((m) => ({ default: m.CampoLayerSwitcher })),
+const CampoRasterControls = dynamic(
+  () => import("@/components/dashboard/campo-map").then((module) => ({ default: module.CampoRasterControls })),
   { ssr: false },
 );
 
 const CampoSubMapModal = dynamic(
   () =>
-    import("@/components/dashboard/campo-sub-map-modal").then((m) => ({
-      default: m.CampoSubMapModal,
+    import("@/components/dashboard/campo-sub-map-modal").then((module) => ({
+      default: module.CampoSubMapModal,
     })),
   { ssr: false },
 );
 
 const CampoCycleSelectorModal = dynamic(
   () =>
-    import("@/components/dashboard/campo-cycle-selector").then((m) => ({
-      default: m.CampoCycleSelectorModal,
+    import("@/components/dashboard/campo-cycle-selector").then((module) => ({
+      default: module.CampoCycleSelectorModal,
     })),
   { ssr: false },
 );
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+type CampoMapAssets = {
+  geoData: FeatureCollection;
+  rasterBounds: RasterBounds;
+};
 
 type SubMapState =
   | { mode: "valves"; bloquePad: string }
   | { mode: "beds"; bloquePad: string; valveId: string };
 
-/** After user picks a cycle in the selector, open valves for that cycle */
 type PendingValveNav = {
   cycleKey: string;
-  valveId?: string; // if known, will auto-open valve detail
-  bedId?:   string; // if set, open beds for this cycle instead
+  valveId?: string;
+  bedId?: string;
 };
 
 type AreaLabel = {
@@ -63,6 +67,83 @@ type AreaLabel = {
   blockCount: number;
   totalStems: number;
 };
+
+function normalizeBlockKey(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (!/^\d+$/.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+
+  return String(Number(trimmed));
+}
+
+function buildFeatureLookup(features: CampoMapFeature[]) {
+  const lookup = new Map<string, CampoMapFeature>();
+
+  for (const feature of features) {
+    const rawKey = feature.block.trim();
+    const normalizedKey = normalizeBlockKey(rawKey);
+
+    if (rawKey && !lookup.has(rawKey)) {
+      lookup.set(rawKey, feature);
+    }
+
+    if (normalizedKey && !lookup.has(normalizedKey)) {
+      lookup.set(normalizedKey, feature);
+    }
+  }
+
+  return lookup;
+}
+
+function buildBlockLookupRecord<T>(
+  features: CampoMapFeature[],
+  getValue: (feature: CampoMapFeature) => T | null,
+) {
+  const lookup = new Map<string, T>();
+
+  for (const feature of features) {
+    const value = getValue(feature);
+
+    if (value === null) {
+      continue;
+    }
+
+    const rawKey = feature.block.trim();
+    const normalizedKey = normalizeBlockKey(rawKey);
+
+    if (rawKey && !lookup.has(rawKey)) {
+      lookup.set(rawKey, value);
+    }
+
+    if (normalizedKey && !lookup.has(normalizedKey)) {
+      lookup.set(normalizedKey, value);
+    }
+  }
+
+  return Object.fromEntries(lookup);
+}
+
+async function loadCampoMapAssets(
+  [geoUrl, boundsUrl]: readonly [string, string],
+): Promise<CampoMapAssets> {
+  const [geoData, rasterBounds] = await Promise.all([
+    fetchJson<FeatureCollection>(geoUrl, "No se pudo cargar la geometría del mapa."),
+    fetchJson<RasterBounds>(boundsUrl, "No se pudieron cargar los límites raster.").catch(
+      () => ({} as RasterBounds),
+    ),
+  ]);
+
+  return {
+    geoData,
+    rasterBounds,
+  };
+}
 
 function formatNumber(value: number) {
   return value.toLocaleString("en-US", {
@@ -72,103 +153,118 @@ function formatNumber(value: number) {
 
 function buildAreaLabels(features: CampoMapFeature[]): AreaLabel[] {
   const grouped = new Map<string, { blockCount: number; totalStems: number }>();
+
   for (const feature of features) {
     const areaName = feature.row.area?.trim();
-    if (!areaName) continue;
+
+    if (!areaName) {
+      continue;
+    }
+
     const current = grouped.get(areaName) ?? { blockCount: 0, totalStems: 0 };
     current.blockCount += 1;
     current.totalStems += feature.row.totalStems;
     grouped.set(areaName, current);
   }
+
   return Array.from(grouped.entries())
     .map(([name, value]) => ({ name, ...value }))
-    .sort((a, b) => b.totalStems - a.totalStems);
+    .sort((first, second) => second.totalStems - first.totalStems);
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export function CampoExplorer({ initialData }: { initialData: CampoDashboardData }) {
-  const [activeLayer,      setActiveLayer]      = useState<ActiveLayer>("none");
-  const [selectedFeature,  setSelectedFeature]  = useState<CampoMapFeature | null>(null);
-  const [subMap,           setSubMap]           = useState<SubMapState | null>(null);
-
-  // Cycle selector: shown after "Ver detalle válvula" from sub-map
-  const [cycleSelector,    setCycleSelector]    = useState<{
+  const [activeLayer, setActiveLayer] = useState<ActiveLayer>("none");
+  const [rasterOpacity, setRasterOpacity] = useState(DEFAULT_RASTER_OPACITY);
+  const [selectedFeature, setSelectedFeature] = useState<CampoMapFeature | null>(null);
+  const [subMap, setSubMap] = useState<SubMapState | null>(null);
+  const [cycleSelector, setCycleSelector] = useState<{
     bloquePad: string;
     contextLabel: string;
     valveId?: string;
   } | null>(null);
+  const [pendingValveNav, setPendingValveNav] = useState<PendingValveNav | null>(null);
+  const [directPanelMode, setDirectPanelMode] = useState(false);
 
-  // Pending navigation: after user picks a cycle, auto-open valves in modal
-  const [pendingValveNav,  setPendingValveNav]  = useState<PendingValveNav | null>(null);
-
-  // When true: the block modal skips the main panel and shows only the valve/bed overlay directly
-  const [directPanelMode,  setDirectPanelMode]  = useState(false);
-
-  const blockModal  = useBlockProfileModal(selectedFeature?.row ?? null);
-  const areaLabels  = useMemo(() => buildAreaLabels(initialData.features), [initialData.features]);
-
-  const blockDataMap = useMemo(
-    () =>
-      Object.fromEntries(
-        initialData.features.map((f) => [
-          f.block,
-          { stemsIntensity: f.stemsIntensity, hasData: f.hasData },
-        ]),
-      ),
+  const {
+    data: mapAssets,
+    error: mapAssetsError,
+    isLoading: mapAssetsLoading,
+  } = useSWRImmutable(
+    ["/data/campo-geo.json", "/rasters/bounds.json"] as const,
+    loadCampoMapAssets,
+    {
+      revalidateOnFocus: false,
+    },
+  );
+  const blockModal = useBlockProfileModal(selectedFeature?.row ?? null);
+  const areaLabels = useMemo(() => buildAreaLabels(initialData.features), [initialData.features]);
+  const featureByBlock = useMemo(
+    () => buildFeatureLookup(initialData.features),
     [initialData.features],
   );
-
-  // Area name per block for map labels (e.g. { "317": "MH1" })
+  const blockDataMap = useMemo(
+    () => buildBlockLookupRecord(initialData.features, (feature) => ({
+      stemsIntensity: feature.stemsIntensity,
+      hasData: feature.hasData,
+    })),
+    [initialData.features],
+  );
   const areaByBlock = useMemo(
     () =>
-      Object.fromEntries(
-        initialData.features
-          .filter((f) => f.row.area)
-          .map((f) => [f.block, f.row.area as string]),
+      buildBlockLookupRecord(
+        initialData.features,
+        (feature) => feature.row.area?.trim() || null,
       ),
     [initialData.features],
   );
+  const mapAssetsErrorMessage = mapAssetsError instanceof Error
+    ? mapAssetsError.message
+    : mapAssetsError
+      ? "No se pudieron cargar los assets del mapa."
+      : null;
 
-  // ── Effect: execute pending valve/bed navigation once feature is set ─────────
   useEffect(() => {
-    if (!pendingValveNav || !selectedFeature) return;
+    if (!pendingValveNav || !selectedFeature) {
+      return;
+    }
+
     const { cycleKey, valveId, bedId } = pendingValveNav;
     const timer = window.setTimeout(() => {
       if (bedId) {
-        // Bed flow: open beds overlay directly
         blockModal.openBeds(cycleKey);
       } else if (valveId) {
-        // Valve flow: open valve list AND pre-select the specific valve
         blockModal.openValves(cycleKey);
         blockModal.openValve(cycleKey, valveId);
       } else {
-        // Generic valve list for the selected cycle
         blockModal.openValves(cycleKey);
       }
+
       setPendingValveNav(null);
     }, 80);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingValveNav, selectedFeature]);
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
+    return () => window.clearTimeout(timer);
+  }, [blockModal, pendingValveNav, selectedFeature]);
+
+  function getFeatureByBlock(bloquePad: string) {
+    return featureByBlock.get(bloquePad)
+      ?? featureByBlock.get(normalizeBlockKey(bloquePad))
+      ?? null;
+  }
 
   function handleFicha(bloquePad: string) {
-    const feature = initialData.features.find((f) => f.block === bloquePad) ?? null;
-    setSelectedFeature(feature);
+    setDirectPanelMode(false);
+    setSelectedFeature(getFeatureByBlock(bloquePad));
   }
 
   function handleValves(bloquePad: string) {
     setSubMap({ mode: "valves", bloquePad });
   }
 
-  /** Called from valve sub-map when user clicks "Ver detalle válvula" */
   function handleValveDetail(valveId: string, bloquePad: string) {
     setSubMap(null);
     setCycleSelector({
       bloquePad,
-      contextLabel: `Válvula ${valveId.split("-").pop()} — Bloque ${bloquePad}`,
+      contextLabel: `Válvula ${valveId.split("-").pop()} · Bloque ${bloquePad}`,
       valveId,
     });
   }
@@ -177,20 +273,16 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
     setSubMap({ mode: "beds", bloquePad, valveId });
   }
 
-  /** Called from bed sub-map when user picks "Ver info de cama" */
   function handleBedDetail(bedId: string, bloquePad: string, cycleKey: string) {
-    const feature = initialData.features.find((f) => f.block === bloquePad) ?? null;
-    setSelectedFeature(feature);
+    setSelectedFeature(getFeatureByBlock(bloquePad));
     setSubMap(null);
     setDirectPanelMode(true);
     setPendingValveNav({ cycleKey, bedId });
   }
 
-  /** Called when user picks a cycle from the cycle selector (valve flow) */
   function handleCycleSelected(cycleKey: string) {
     const { valveId, bloquePad } = cycleSelector!;
-    const feature = initialData.features.find((f) => f.block === bloquePad) ?? null;
-    setSelectedFeature(feature);
+    setSelectedFeature(getFeatureByBlock(bloquePad));
     setCycleSelector(null);
     setDirectPanelMode(true);
     setPendingValveNav({ cycleKey, valveId });
@@ -222,7 +314,6 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Area labels */}
           <div className="rounded-[28px] border border-border/70 bg-background/72 p-4">
             <div className="flex flex-wrap items-start gap-3">
               {areaLabels.map((label) => (
@@ -239,27 +330,42 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
             </div>
           </div>
 
-          {/* Map container */}
           <div className="rounded-[30px] border border-border/70 bg-background/72 p-3">
-            {/* Layer switcher bar */}
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1">
-              <CampoLayerSwitcher active={activeLayer} onChange={setActiveLayer} />
-              <p className="text-xs text-muted-foreground">
-                Click en un bloque → ficha o mapa de válvulas
-              </p>
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3 px-1">
+              <CampoRasterControls
+                active={activeLayer}
+                opacity={rasterOpacity}
+                onChange={setActiveLayer}
+                onOpacityChange={setRasterOpacity}
+              />
+              <div className="space-y-1 text-right">
+                <p className="text-xs font-medium text-foreground">
+                  {activeLayer === "none"
+                    ? "Modo operativo activo"
+                    : `Modo agronómico · ${activeLayer.toUpperCase()}`}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Click en un bloque {"->"} ficha o mapa de valvulas. En submapa:
+                  {" "}valvula {"->"} ficha o mapa de camas.
+                </p>
+              </div>
             </div>
 
             <CampoLeafletMap
+              geoData={mapAssets?.geoData ?? null}
+              rasterBounds={mapAssets?.rasterBounds ?? {}}
+              assetsLoading={mapAssetsLoading}
+              assetsError={mapAssetsErrorMessage}
               blockDataMap={blockDataMap}
               areaByBlock={areaByBlock}
               activeLayer={activeLayer}
+              rasterOpacity={rasterOpacity}
               onFicha={handleFicha}
               onValves={handleValves}
               className="h-[82vh] min-h-[640px] border border-border/70"
             />
           </div>
 
-          {/* Bottom info cards */}
           <div className="grid gap-4 xl:grid-cols-3">
             <Card className="border-border/70 bg-background/72">
               <CardHeader>
@@ -286,7 +392,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
                   <div>
                     <CardTitle className="text-lg">Áreas identificadas</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      Resumen agregado del último ciclo por bloque.
+                      Resumen agregado de bloques renderizables del mapa actual.
                     </p>
                   </div>
                 </div>
@@ -309,30 +415,34 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
                   <div>
                     <CardTitle className="text-lg">Capas del dron</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      Índices de vegetación — ejecuta{" "}
-                      <code className="text-xs">node scripts/convert-rasters.mjs</code> para activar.
+                      PNG clasificado + bounds listos para Leaflet. Ajusta capa y opacidad desde
+                      la barra superior.
                     </p>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                {(["ndvi", "ndre", "lci"] as const).map((layer) => (
-                  <Button
-                    key={layer}
-                    variant={activeLayer === layer ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setActiveLayer(activeLayer === layer ? "none" : layer)}
-                  >
-                    {layer.toUpperCase()}
-                  </Button>
-                ))}
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {(["ndvi", "ndre", "lci"] as const).map((layer) => (
+                    <Badge
+                      key={layer}
+                      variant={activeLayer === layer ? "default" : "outline"}
+                      className="rounded-full px-3 py-1"
+                    >
+                      {layer.toUpperCase()}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Regenera assets con <code className="text-[11px]">node scripts/convert-rasters.mjs</code>{" "}
+                  y <code className="text-[11px]">node scripts/convert-shapefile.mjs</code>.
+                </p>
               </CardContent>
             </Card>
           </div>
         </CardContent>
       </Card>
 
-      {/* ── Block ficha modal (existing, unchanged) ─────────────────────────── */}
       <BlockProfileModal
         row={selectedFeature?.row ?? null}
         data={blockModal.blockData}
@@ -370,15 +480,25 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
         onOpenBedMortalityCurve={blockModal.openBedMortalityCurve}
         onCloseMortalityCurve={blockModal.closeMortalityCurve}
         directMode={directPanelMode}
-        onClose={() => { setSelectedFeature(null); setDirectPanelMode(false); }}
+        onClose={() => {
+          setSelectedFeature(null);
+          setDirectPanelMode(false);
+        }}
       />
 
-      {/* ── Valve / bed sub-map modal ────────────────────────────────────────── */}
       {subMap && (
         <CampoSubMapModal
+          geoData={mapAssets?.geoData ?? null}
+          rasterBounds={mapAssets?.rasterBounds ?? {}}
+          assetsLoading={mapAssetsLoading}
+          assetsError={mapAssetsErrorMessage}
           bloquePad={subMap.bloquePad}
           mode={subMap.mode}
           valveId={subMap.mode === "beds" ? subMap.valveId : undefined}
+          activeLayer={activeLayer}
+          rasterOpacity={rasterOpacity}
+          onLayerChange={setActiveLayer}
+          onRasterOpacityChange={setRasterOpacity}
           onValveDetail={handleValveDetail}
           onBedMap={handleBedMap}
           onBedDetail={handleBedDetail}
@@ -386,7 +506,6 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
         />
       )}
 
-      {/* ── Cycle selector (from valve map drill-down) ───────────────────────── */}
       {cycleSelector && (
         <CampoCycleSelectorModal
           bloquePad={cycleSelector.bloquePad}

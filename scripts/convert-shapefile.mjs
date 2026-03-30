@@ -1,11 +1,10 @@
 /**
- * Converts Capas/Capas_Bloque.shp (UTM Zone 17S) to src/data/campo-geo.json (WGS84)
+ * Converts Capas/Capas_Bloque.shp (UTM Zone 17S) to public/data/campo-geo.json (WGS84)
  * Each feature = one bed polygon with properties: bloque, bloquePad, cama, valvula
  *
  * Run: node scripts/convert-shapefile.mjs
  */
 
-import { createReadStream } from "fs";
 import { writeFileSync, mkdirSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -44,7 +43,7 @@ function reprojectGeometry(geom) {
 
 const shpPath = join(rootDir, "Capas", "Capas_Bloque.shp");
 const dbfPath = join(rootDir, "Capas", "Capas_Bloque.dbf");
-const outPath = join(rootDir, "src", "data", "campo-geo.json");
+const outPath = join(rootDir, "public", "data", "campo-geo.json");
 
 console.log("Reading shapefile…");
 const source = await open(shpPath, dbfPath, { encoding: "UTF-8" });
@@ -87,9 +86,9 @@ while (true) {
 
 const geojson = { type: "FeatureCollection", features };
 
-mkdirSync(join(rootDir, "src", "data"), { recursive: true });
+mkdirSync(join(rootDir, "public", "data"), { recursive: true });
 writeFileSync(outPath, JSON.stringify(geojson));
-console.log(`\nWrote ${features.length} features to src/data/campo-geo.json`);
+console.log(`\nWrote ${features.length} features to public/data/campo-geo.json`);
 
 // ── Compute bounding box of entire dataset ──────────────────────────────────
 let minLng =  Infinity, maxLng = -Infinity;

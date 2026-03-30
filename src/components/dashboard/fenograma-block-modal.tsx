@@ -1,13 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
-import { LineChart, LoaderCircle, Rows3, Sprout, X } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { ChevronDown, ChevronRight, LineChart, LoaderCircle, Rows3, Sprout, X } from "lucide-react";
+import useSWRImmutable from "swr/immutable";
 
 import { HarvestCurvePanel } from "@/components/dashboard/harvest-curve-panel";
 import { MortalityCurvePanel } from "@/components/dashboard/mortality-curve-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { fetchJson } from "@/lib/fetch-json";
 
 const ProcessViewerOverlay = dynamic(
   () =>
@@ -27,6 +30,8 @@ import type {
   BedProfileCard,
   BedProfilePayload,
   BlockModalRow,
+  CycleLaborHoursPayload,
+  CycleLaborPersonSummary,
   CycleProfileBlockPayload,
   CycleProfileCard,
   HarvestCurvePayload,
@@ -163,6 +168,31 @@ function computeCamas30(bedArea: number | null): number | null {
   return Math.round((bedArea / 30) * 100) / 100;
 }
 
+function computeHorasCama(effectiveHours: number | null, bedArea: number | null): number | null {
+  const camas30 = computeCamas30(bedArea);
+
+  if (effectiveHours === null || camas30 === null || camas30 <= 0) {
+    return null;
+  }
+
+  return Math.round((effectiveHours / camas30) * 100) / 100;
+}
+
+function buildCycleHoursRequest(cycleKey: string | null) {
+  if (!cycleKey) {
+    return null;
+  }
+
+  return [
+    `/api/fenograma/cycle/${encodeURIComponent(cycleKey)}/hours`,
+    "No se pudo cargar el detalle de horas del ciclo.",
+  ] as const;
+}
+
+async function swrHoursFetcher<T>([url, fallbackMessage]: readonly [string, string]) {
+  return fetchJson<T>(url, fallbackMessage);
+}
+
 /**
  * Plantas del programa: macro-ponderado sobre todos los ciclos visibles.
  * Suma programmedPlants de todos los ciclos.
@@ -216,23 +246,40 @@ function MetricPill({
   onClick?: () => void;
   hint?: string;
 }) {
-  const Comp = onClick ? "button" : "div";
+  const sharedClassName = cn(
+    "block h-full w-full rounded-lg border border-border/50 bg-card px-3.5 py-3 text-left shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
+    onClick && "cursor-pointer transition-all hover:border-primary/30 hover:shadow-md active:scale-[0.987]",
+  );
 
-  return (
-    <Comp
-      type={onClick ? "button" : undefined}
-      onClick={onClick}
-      className={cn(
-        "rounded-lg border border-border/50 bg-card px-3.5 py-3 text-left shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
-        onClick && "cursor-pointer transition-all hover:border-primary/30 hover:shadow-md active:scale-[0.987]",
-      )}
-    >
+  const content = (
+    <>
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/65">
         {label}
       </p>
       <p className="mt-1 break-words text-[15px] font-semibold tabular-nums leading-tight">{value}</p>
       {hint ? <p className="mt-0.5 text-[10px] text-muted-foreground/55">{hint}</p> : null}
-    </Comp>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onClick();
+        }}
+        className={sharedClassName}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className={sharedClassName}>
+      {content}
+    </div>
   );
 }
 
@@ -249,6 +296,256 @@ function DetailBadges({
         </Badge>
       ))}
     </div>
+  );
+}
+
+function HoursCamaOverlay({
+  cycle,
+  data,
+  loading,
+  error,
+  onClose,
+}: {
+  cycle: CycleProfileCard;
+  data: CycleLaborHoursPayload | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  const [expandedTypes, setExpandedTypes] = useState<string[]>([]);
+  const [expandedActivities, setExpandedActivities] = useState<string[]>([]);
+  const totalEffectiveHours = data?.summary.totalEffectiveHours ?? cycle.effectiveHours;
+  const totalActualHours = data?.summary.totalActualHours ?? cycle.actualHours;
+  const totalUnitsProduced = data?.summary.totalUnitsProduced ?? cycle.unitsProduced;
+  const horasCama = computeHorasCama(totalEffectiveHours, cycle.bedArea);
+  const camas30 = computeCamas30(cycle.bedArea);
+
+  function toggleType(activityType: string) {
+    setExpandedTypes((current) => (
+      current.includes(activityType)
+        ? current.filter((value) => value !== activityType)
+        : [...current, activityType]
+    ));
+  }
+
+  function toggleActivity(activityKey: string) {
+    setExpandedActivities((current) => (
+      current.includes(activityKey)
+        ? current.filter((value) => value !== activityKey)
+        : [...current, activityKey]
+    ));
+  }
+
+  const overlayContent = (
+    <div className="fixed inset-0 z-[72] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-hours-cama">
+      <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar detalle de horas cama" />
+      <div className="relative z-10 flex max-h-[88vh] w-[min(1500px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1500px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="rounded-full px-3 py-1">
+                Horas cama
+              </Badge>
+              <Badge variant="secondary" className="rounded-full px-3 py-1">
+                {cycle.cycleKey}
+              </Badge>
+            </div>
+            <div className="min-w-0">
+              <h3 id="modal-title-hours-cama" className="text-2xl font-semibold tracking-tight">Detalle de horas por actividad</h3>
+              <p className="break-words text-sm text-muted-foreground">
+                Resumen por tipo de actividad, con despliegue por actividad y por ID personal.
+              </p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="overflow-y-auto px-4 py-5 sm:px-6">
+          <div className="space-y-5">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricPill
+                label="Horas cama"
+                value={formatNumber(horasCama)}
+                hint="Horas trabajadas / camas 30 m2"
+              />
+              <MetricPill
+                label="Horas trabajadas"
+                value={formatNumber(totalEffectiveHours)}
+                hint="Effective hours del ciclo"
+              />
+              <MetricPill
+                label="Horas presenciales"
+                value={formatNumber(totalActualHours)}
+                hint="Actual hours del ciclo"
+              />
+              <MetricPill
+                label="Camas 30 m2"
+                value={formatNumber(camas30)}
+                hint="Area del ciclo / 30"
+              />
+            </div>
+
+            {loading ? (
+              <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
+                <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                Cargando detalle de horas.
+              </div>
+            ) : error ? (
+              <div className="py-8 text-sm text-destructive">{error}</div>
+            ) : data ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <DetailBadges
+                    items={[
+                      `${data.summary.activityTypeCount} tipos`,
+                      `${data.summary.activityCount} actividades`,
+                      `${data.summary.personCount} personas`,
+                      `${formatNumber(totalUnitsProduced)} unidades`,
+                    ]}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Productividad = unidades / horas presenciales. Rendimiento = horas trabajadas / horas presenciales.
+                  </p>
+                </div>
+
+                <div className="max-h-[56vh] overflow-auto rounded-[24px] border border-border/70">
+                  <table className="min-w-full border-separate border-spacing-0 text-sm">
+                    <thead className="sticky top-0 z-20 bg-card/95 backdrop-blur">
+                      <tr>
+                        {[
+                          "Tipo actividad",
+                          "Nombre actividad",
+                          "ID personal",
+                          "Medida",
+                          "Unidades producidas",
+                          "Horas presenciales",
+                          "Horas trabajadas",
+                          "Productividad",
+                          "Rendimiento",
+                        ].map((label) => (
+                          <th
+                            key={label}
+                            className="border-b border-r border-border/70 bg-card px-3 py-3 text-left font-semibold text-foreground last:border-r-0"
+                          >
+                            {label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.activityTypes.length ? data.activityTypes.map((activityType, typeIndex) => {
+                        const typeExpanded = expandedTypes.includes(activityType.activityType);
+
+                        return (
+                          <Fragment key={`type-${activityType.activityType}`}>
+                            <tr className={cn(typeIndex % 2 === 0 ? "bg-primary/6" : "bg-primary/10")}>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 font-semibold text-foreground">
+                                <button
+                                  type="button"
+                                  className="flex items-center gap-2 text-left"
+                                  onClick={() => toggleType(activityType.activityType)}
+                                >
+                                  {typeExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                                  <span>{activityType.activityType}</span>
+                                </button>
+                              </td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">Resumen del tipo</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.unitsProduced)}</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.actualHours)}</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.effectiveHours)}</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.productivity)}</td>
+                              <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(activityType.rendimientoPct)}</td>
+                            </tr>
+
+                            {typeExpanded ? activityType.activities.map((activity) => {
+                              const activityKey = `${activity.activityType}|${activity.activityId}|${activity.activityName}`;
+                              const activityExpanded = expandedActivities.includes(activityKey);
+
+                              return (
+                                <Fragment key={`activity-${activityKey}`}>
+                                  <tr className="bg-background/84">
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground"> </td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 font-medium text-foreground">
+                                      <button
+                                        type="button"
+                                        className="flex items-center gap-2 text-left"
+                                        onClick={() => toggleActivity(activityKey)}
+                                      >
+                                        {activityExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                                        <span>{activity.activityName}</span>
+                                      </button>
+                                    </td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5">{activity.unitOfMeasure || "-"}</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.unitsProduced)}</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.actualHours)}</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.effectiveHours)}</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.productivity)}</td>
+                                    <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(activity.rendimientoPct)}</td>
+                                  </tr>
+
+                                  {activityExpanded ? activity.people.map((person) => (
+                                    <HoursCamaPersonRow
+                                      key={`person-${activityKey}-${person.personId}`}
+                                      person={person}
+                                    />
+                                  )) : null}
+                                </Fragment>
+                              );
+                            }) : null}
+                          </Fragment>
+                        );
+                      }) : (
+                        <tr>
+                          <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                            No hay horas registradas para este ciclo.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[140]">
+      {overlayContent}
+    </div>,
+    document.body,
+  );
+}
+
+function HoursCamaPersonRow({
+  person,
+}: {
+  person: CycleLaborPersonSummary;
+}) {
+  return (
+    <tr className="bg-muted/24">
+      <td className="border-b border-r border-border/40 px-3 py-2.5 text-muted-foreground"> </td>
+      <td className="border-b border-r border-border/40 px-3 py-2.5 text-muted-foreground">@ Personal</td>
+      <td className="border-b border-r border-border/40 px-3 py-2.5 font-medium text-foreground">{person.personId}</td>
+      <td className="border-b border-r border-border/40 px-3 py-2.5">{person.unitOfMeasure || "-"}</td>
+      <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.unitsProduced)}</td>
+      <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.actualHours)}</td>
+      <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.effectiveHours)}</td>
+      <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.productivity)}</td>
+      <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(person.rendimientoPct)}</td>
+    </tr>
   );
 }
 
@@ -486,7 +783,6 @@ function BedsOverlay({
                       data={valveData}
                       loading={valveLoading}
                       error={valveError}
-                      onOpenBedsOverlay={() => onOpenValveBedsOverlay(cycleKey, selectedValveId)}
                       onOpenMortalityCurve={() => onOpenValveMortalityCurve(cycleKey, selectedValveId)}
                     />
                   </div>
@@ -878,20 +1174,18 @@ function CycleSelector({
 function ModalContent({
   data,
   filteredCycleKey,
-  selectedValveCycleKey,
   selectedCurveCycleKey,
-  selectedMortalityCurve,
   onOpenBeds,
+  onOpenHours,
   onOpenValves,
   onOpenCurve,
   onOpenCycleMortalityCurve,
 }: {
   data: CycleProfileBlockPayload;
   filteredCycleKey: string | null;
-  selectedValveCycleKey: string | null;
   selectedCurveCycleKey: string | null;
-  selectedMortalityCurve: SelectedMortalityCurveState | null;
   onOpenBeds: (cycleKey: string) => void;
+  onOpenHours: (cycle: CycleProfileCard) => void;
   onOpenValves: (cycleKey: string) => void;
   onOpenCurve: (cycleKey: string) => void;
   onOpenCycleMortalityCurve: (cycleKey: string) => void;
@@ -921,6 +1215,8 @@ function ModalContent({
     let totalCurrentPlantsForRatio = 0;
     let totalGreenKg = 0;
     let totalBedArea = 0;
+    let totalEffectiveHours = 0;
+    let totalCamas30ForHours = 0;
     for (const c of data.cycles) {
       // Only count cycles with programmed plants data for the tallos/planta ratio
       if ((c.programmedPlants ?? 0) > 0 && (c.currentPlants ?? 0) > 0) {
@@ -929,6 +1225,12 @@ function ModalContent({
       }
       totalGreenKg += c.greenWeightKg ?? 0;
       totalBedArea += c.bedArea ?? 0;
+
+      const camas30Cycle = computeCamas30(c.bedArea);
+      if (c.effectiveHours !== null && camas30Cycle !== null && camas30Cycle > 0) {
+        totalEffectiveHours += c.effectiveHours;
+        totalCamas30ForHours += camas30Cycle;
+      }
     }
     const camas30 = totalBedArea > 0 ? totalBedArea / 30 : null;
     const cajasVerde = totalGreenKg > 0 ? totalGreenKg / 10 : null;
@@ -937,13 +1239,13 @@ function ModalContent({
         ? Math.round((totalStemsForRatio / totalCurrentPlantsForRatio) * 100) / 100
         : null,
       cajasCama: cajasVerde && camas30 ? Math.round((cajasVerde / camas30) * 100) / 100 : null,
+      horasCama: totalEffectiveHours > 0 && totalCamas30ForHours > 0
+        ? Math.round((totalEffectiveHours / totalCamas30ForHours) * 100) / 100
+        : null,
     };
   }, [data.cycles]);
 
-  const showValvesActive = selectedValveCycleKey === activeCycleKey;
   const showCurveActive = selectedCurveCycleKey === activeCycleKey;
-  const showMortalityCurveActive = selectedMortalityCurve?.entityType === "cycle"
-    && selectedMortalityCurve.cycleKey === activeCycleKey;
 
   return (
     <div className="space-y-6">
@@ -957,7 +1259,12 @@ function ModalContent({
         />
         <MetricPill label="Tallos planta" value={formatNumber(blockAggregates.tallosPlanta)} hint="Tallos / plantas vigentes (todos ciclos)" />
         <MetricPill label="Cajas cama" value={formatNumber(blockAggregates.cajasCama)} hint="Cajas verde / camas 30m² (todos ciclos)" />
-        <MetricPill label="Horas cama" value="-" hint="Sin fuente conectada" />
+        <MetricPill
+          label="Horas cama"
+          value={formatNumber(blockAggregates.horasCama)}
+          hint={cycle ? "Macro-ponderado de todos los ciclos. Click para ver el detalle del ciclo seleccionado" : "Macro-ponderado de todos los ciclos"}
+          onClick={cycle ? () => onOpenHours(cycle) : undefined}
+        />
         <MetricPill label="Costo cama" value="-" hint="Sin fuente conectada" />
         <MetricPill
           label="Plantas del programa"
@@ -1068,6 +1375,12 @@ function ModalContent({
               />
               <MetricPill label="Inicio cosecha" value={formatDate(cycle.harvestStartDate)} />
               <MetricPill label="Fin cosecha" value={formatDate(cycle.harvestEndDate)} />
+              <MetricPill
+                label="Horas cama"
+                value={formatNumber(computeHorasCama(cycle.effectiveHours, cycle.bedArea))}
+                hint="Horas trabajadas / camas 30m²"
+                onClick={() => onOpenHours(cycle)}
+              />
             </div>
           </CardContent>
 
@@ -1111,13 +1424,11 @@ function ValveDetailPanel({
   data,
   loading,
   error,
-  onOpenBedsOverlay,
   onOpenMortalityCurve,
 }: {
   data: ValveProfilePayload | null;
   loading: boolean;
   error: string | null;
-  onOpenBedsOverlay?: () => void;
   onOpenMortalityCurve?: () => void;
 }) {
   if (loading) {
@@ -1193,10 +1504,6 @@ function ValvesSection({
   loading,
   error,
   selectedValve,
-  valveData,
-  valveLoading,
-  valveError,
-  onOpenValve,
   onOpenValveBedsOverlay,
   onOpenValveMortalityCurve,
 }: {
@@ -1205,10 +1512,6 @@ function ValvesSection({
   loading: boolean;
   error: string | null;
   selectedValve: { cycleKey: string; valveId: string } | null;
-  valveData: ValveProfilePayload | null;
-  valveLoading: boolean;
-  valveError: string | null;
-  onOpenValve: (cycleKey: string, valveId: string) => void;
   onOpenValveBedsOverlay: (cycleKey: string, valveId: string) => void;
   onOpenValveMortalityCurve: (cycleKey: string, valveId: string) => void;
 }) {
@@ -1320,10 +1623,6 @@ function ValvesOverlay({
   loading,
   error,
   selectedValve,
-  valveData,
-  valveLoading,
-  valveError,
-  onOpenValve,
   onOpenValveBedsOverlay,
   onOpenValveMortalityCurve,
   onClose,
@@ -1333,10 +1632,6 @@ function ValvesOverlay({
   loading: boolean;
   error: string | null;
   selectedValve: { cycleKey: string; valveId: string } | null;
-  valveData: ValveProfilePayload | null;
-  valveLoading: boolean;
-  valveError: string | null;
-  onOpenValve: (cycleKey: string, valveId: string) => void;
   onOpenValveBedsOverlay: (cycleKey: string, valveId: string) => void;
   onOpenValveMortalityCurve: (cycleKey: string, valveId: string) => void;
   onClose: () => void;
@@ -1374,10 +1669,6 @@ function ValvesOverlay({
             loading={loading}
             error={error}
             selectedValve={selectedValve}
-            valveData={valveData}
-            valveLoading={valveLoading}
-            valveError={valveError}
-            onOpenValve={onOpenValve}
             onOpenValveBedsOverlay={onOpenValveBedsOverlay}
             onOpenValveMortalityCurve={onOpenValveMortalityCurve}
           />
@@ -1466,6 +1757,17 @@ export function BlockProfileModal({
   directMode?: boolean;
 }) {
   const [selectedValveBeds, setSelectedValveBeds] = useState<{ cycleKey: string; valveId: string } | null>(null);
+  // Guardamos el ciclo completo para evitar mismatch de keys entre ModalContent y BlockProfileModal
+  const [selectedHoursCycle, setSelectedHoursCycle] = useState<CycleProfileCard | null>(null);
+  const selectedHoursCycleKey = selectedHoursCycle?.cycleKey ?? null;
+  const hoursRequest = buildCycleHoursRequest(selectedHoursCycleKey);
+  const {
+    data: hoursData,
+    error: hoursRequestError,
+    isLoading: hoursLoading,
+  } = useSWRImmutable<CycleLaborHoursPayload>(hoursRequest, swrHoursFetcher, {
+    revalidateOnFocus: false,
+  });
 
   useEffect(() => {
     if (!row) {
@@ -1479,6 +1781,11 @@ export function BlockProfileModal({
 
       if (selectedValveBeds) {
         setSelectedValveBeds(null);
+        return;
+      }
+
+      if (selectedHoursCycleKey) {
+        setSelectedHoursCycle(null);
         return;
       }
 
@@ -1515,6 +1822,7 @@ export function BlockProfileModal({
     onCloseValves,
     row,
     selectedCurveCycleKey,
+    selectedHoursCycleKey,
     selectedCycleKey,
     selectedMortalityCurve,
     selectedValveCycleKey,
@@ -1526,6 +1834,8 @@ export function BlockProfileModal({
   }
 
   const showingFilteredCycle = Boolean(data?.filteredCycleKey);
+  // hoursCycle: usamos el objeto guardado directamente (evita mismatch de keys)
+  const hoursCycle = selectedHoursCycle;
 
   function openValveBedsOverlay(cycleKey: string, valveId: string) {
     onOpenValve(cycleKey, valveId);
@@ -1576,10 +1886,9 @@ export function BlockProfileModal({
             <ModalContent
               data={data}
               filteredCycleKey={data.filteredCycleKey}
-              selectedValveCycleKey={selectedValveCycleKey}
               selectedCurveCycleKey={selectedCurveCycleKey}
-              selectedMortalityCurve={selectedMortalityCurve}
               onOpenBeds={onOpenBeds}
+              onOpenHours={setSelectedHoursCycle}
               onOpenValves={onOpenValves}
               onOpenCurve={onOpenCurve}
               onOpenCycleMortalityCurve={onOpenCycleMortalityCurve}
@@ -1616,6 +1925,17 @@ export function BlockProfileModal({
         />
       ) : null}
 
+      {hoursCycle ? (
+        <HoursCamaOverlay
+          key={hoursCycle.cycleKey}
+          cycle={hoursCycle}
+          data={hoursData ?? null}
+          loading={hoursLoading}
+          error={hoursRequestError instanceof Error ? hoursRequestError.message : null}
+          onClose={() => setSelectedHoursCycle(null)}
+        />
+      ) : null}
+
       {selectedMortalityCurve ? (
         <MortalityCurveOverlay
           selectedCurve={selectedMortalityCurve}
@@ -1633,10 +1953,6 @@ export function BlockProfileModal({
           loading={valvesLoading}
           error={valvesError}
           selectedValve={selectedValve}
-          valveData={valveData}
-          valveLoading={valveLoading}
-          valveError={valveError}
-          onOpenValve={onOpenValve}
           onOpenValveBedsOverlay={openValveBedsOverlay}
           onOpenValveMortalityCurve={onOpenValveMortalityCurve}
           onClose={() => { onCloseValves(); if (directMode) onClose(); }}
