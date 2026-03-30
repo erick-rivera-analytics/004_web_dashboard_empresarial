@@ -422,6 +422,7 @@ function HoursCamaOverlay({
                           "Unidades producidas",
                           "Horas presenciales",
                           "Horas trabajadas",
+                          "Horas cama",
                           "Productividad",
                           "Rendimiento",
                         ].map((label) => (
@@ -457,6 +458,7 @@ function HoursCamaOverlay({
                               <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.unitsProduced)}</td>
                               <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.actualHours)}</td>
                               <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.effectiveHours)}</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.effectiveHours / (cycle.camas30m2 || 1))}</td>
                               <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.productivity)}</td>
                               <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(activityType.rendimientoPct)}</td>
                             </tr>
@@ -484,6 +486,7 @@ function HoursCamaOverlay({
                                     <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.unitsProduced)}</td>
                                     <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.actualHours)}</td>
                                     <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.effectiveHours)}</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.effectiveHours / (cycle.camas30m2 || 1))}</td>
                                     <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.productivity)}</td>
                                     <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(activity.rendimientoPct)}</td>
                                   </tr>
@@ -492,6 +495,7 @@ function HoursCamaOverlay({
                                     <HoursCamaPersonRow
                                       key={`person-${activityKey}-${person.personId}`}
                                       person={person}
+                                      cycle={cycle}
                                     />
                                   )) : null}
                                 </Fragment>
@@ -526,8 +530,10 @@ function HoursCamaOverlay({
 
 function HoursCamaPersonRow({
   person,
+  cycle,
 }: {
   person: CycleLaborPersonSummary;
+  cycle: CycleProfileCard;
 }) {
   return (
     <tr className="bg-muted/24">
@@ -538,6 +544,7 @@ function HoursCamaPersonRow({
       <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.unitsProduced)}</td>
       <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.actualHours)}</td>
       <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.effectiveHours)}</td>
+      <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.effectiveHours / (cycle.camas30m2 || 1))}</td>
       <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.productivity)}</td>
       <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(person.rendimientoPct)}</td>
     </tr>
