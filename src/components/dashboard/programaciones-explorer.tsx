@@ -133,7 +133,7 @@ const progFetcher = (url: string) =>
 
 // ── Event pill ────────────────────────────────────────────────────────────────
 
-function EventPill({ record }: { record: ProgramacionRecord }) {
+function EventPill({ record, onClick, highlighted }: { record: ProgramacionRecord; onClick?: (e: React.MouseEvent) => void; highlighted?: boolean }) {
   const areaStyle    = getAreaStyle(record.areaId);
   const varietyColor = getVarietyColor(record.variety);
   const spAccent     = getSpTypeAccent(record.spType);
@@ -143,15 +143,18 @@ function EventPill({ record }: { record: ProgramacionRecord }) {
     <div
       style={{
         background:   areaStyle.bg,
-        borderTop:    `1px solid ${areaStyle.border}`,
-        borderRight:  `1px solid ${areaStyle.border}`,
-        borderBottom: `1px solid ${areaStyle.border}`,
+        borderTop:    highlighted ? `1.5px solid ${spAccent}` : `1px solid ${areaStyle.border}`,
+        borderRight:  highlighted ? `1.5px solid ${spAccent}` : `1px solid ${areaStyle.border}`,
+        borderBottom: highlighted ? `1.5px solid ${spAccent}` : `1px solid ${areaStyle.border}`,
         borderLeft:   `3px solid ${spAccent}`,
         borderRadius: "6px",
         padding:      "2px 5px 2px 5px",
+        cursor:       onClick ? "pointer" : "default",
+        opacity:      onClick && !highlighted ? 0.72 : 1,
       }}
       className="flex items-center gap-1"
       title={`${record.blockId} · ${record.variety ?? "—"} · SP: ${record.spType ?? "—"} · Área: ${record.areaId ?? "—"}`}
+      onClick={onClick}
     >
       {/* ilumLabel badge (Inicio / Fin) */}
       {record.ilumLabel && (
@@ -199,11 +202,12 @@ export function ProgramacionesExplorer({
   const today    = new Date();
   const todayStr = toDateStr(today);
 
-  const [activeTab,  setActiveTab]  = useState<ProgramacionTab>("plantas_muertas");
-  const [viewDate,   setViewDate]   = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
-  const [selected,   setSelected]   = useState<string | null>(null);
-  const [areaFilter, setAreaFilter] = useState("all");
-  const [faseFilter, setFaseFilter] = useState<FaseOption>("");
+  const [activeTab,           setActiveTab]           = useState<ProgramacionTab>("plantas_muertas");
+  const [viewDate,            setViewDate]            = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selected,            setSelected]            = useState<string | null>(null);
+  const [selectedIlumCycleKey, setSelectedIlumCycleKey] = useState<string | null>(null);
+  const [areaFilter,          setAreaFilter]          = useState("all");
+  const [faseFilter,          setFaseFilter]          = useState<FaseOption>("");
 
   const { dateFrom, dateTo } = useMemo(
     () => monthRange(viewDate.getFullYear(), viewDate.getMonth()),
@@ -264,10 +268,36 @@ export function ProgramacionesExplorer({
     [viewDate],
   );
 
-  function prevMonth() { setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1)); setSelected(null); }
-  function nextMonth() { setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1)); setSelected(null); }
+  // Iluminación: ciclo seleccionado y sus dos extremos (INICIO / FIN)
+  const ilumCycleRecords = useMemo(
+    () => selectedIlumCycleKey
+      ? filtered.filter((r) => r.cycleKey === selectedIlumCycleKey)
+      : [],
+    [filtered, selectedIlumCycleKey],
+  );
+  const ilumHighlightedDates = useMemo(
+    () => new Set(ilumCycleRecords.map((r) => r.eventDate)),
+    [ilumCycleRecords],
+  );
+  const ilumStartRec = ilumCycleRecords.find((r) => r.ilumLabel === "Inicio") ?? null;
+  const ilumEndRec   = ilumCycleRecords.find((r) => r.ilumLabel === "Fin") ?? null;
+  const ilumDays = ilumStartRec && ilumEndRec
+    ? Math.round(
+        (new Date(ilumEndRec.eventDate).getTime() - new Date(ilumStartRec.eventDate).getTime())
+        / 86_400_000,
+      )
+    : null;
+
+  function prevMonth() { setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1)); setSelected(null); setSelectedIlumCycleKey(null); }
+  function nextMonth() { setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1)); setSelected(null); setSelectedIlumCycleKey(null); }
 
   const selectedEvents = selected ? (byDate.get(selected) ?? []) : [];
+
+  function formatDate(dateStr: string) {
+    return new Date(dateStr + "T00:00:00").toLocaleDateString("es-ES", {
+      day: "numeric", month: "long", year: "numeric",
+    });
+  }
 
   return (
     <div className="space-y-5">
@@ -402,12 +432,13 @@ export function ProgramacionesExplorer({
           {/* Grid */}
           <div className="grid grid-cols-7">
             {cells.map((cell, i) => {
-              const dateStr  = toDateStr(cell.date);
-              const events   = byDate.get(dateStr) ?? [];
-              const isToday  = dateStr === todayStr;
-              const isSel    = dateStr === selected;
-              const isLastRow = i >= 35;
-              const isLastCol = (i + 1) % 7 === 0;
+              const dateStr     = toDateStr(cell.date);
+              const events      = byDate.get(dateStr) ?? [];
+              const isToday     = dateStr === todayStr;
+              const isSel       = dateStr === selected;
+              const isIlumHL    = activeTab === "iluminacion" && ilumHighlightedDates.has(dateStr);
+              const isLastRow   = i >= 35;
+              const isLastCol   = (i + 1) % 7 === 0;
 
               return (
                 <button
@@ -420,15 +451,17 @@ export function ProgramacionesExplorer({
                     isLastCol && "border-r-0",
                     !cell.isCurrentMonth && "bg-muted/20",
                     isSel && "ring-1 ring-inset ring-border bg-muted/40",
-                    cell.isCurrentMonth && !isSel && "hover:bg-muted/25",
+                    isIlumHL && !isSel && "bg-amber-50/40 dark:bg-amber-900/10",
+                    cell.isCurrentMonth && !isSel && !isIlumHL && "hover:bg-muted/25",
                   )}
                 >
                   {/* Day number */}
                   <span className={cn(
                     "flex size-7 items-center justify-center rounded-full text-sm font-medium leading-none",
-                    isToday  && "bg-foreground text-background",
-                    !isToday && cell.isCurrentMonth  && "text-foreground",
-                    !isToday && !cell.isCurrentMonth && "text-muted-foreground/40",
+                    isToday   && "bg-foreground text-background",
+                    isIlumHL  && !isToday && "ring-2 ring-amber-400/70",
+                    !isToday  && cell.isCurrentMonth  && "text-foreground",
+                    !isToday  && !cell.isCurrentMonth && "text-muted-foreground/40",
                   )}>
                     {cell.date.getDate()}
                   </span>
@@ -436,7 +469,12 @@ export function ProgramacionesExplorer({
                   {/* Event pills */}
                   <div className="mt-1 space-y-[3px]">
                     {events.slice(0, 4).map((ev, ei) => (
-                      <EventPill key={`${ev.cycleKey}-${ei}`} record={ev} />
+                      <EventPill
+                        key={`${ev.cycleKey}-${ei}`}
+                        record={ev}
+                        highlighted={activeTab === "iluminacion" && selectedIlumCycleKey === ev.cycleKey}
+                        onClick={activeTab === "iluminacion" ? (e) => { e.stopPropagation(); setSelectedIlumCycleKey(ev.cycleKey === selectedIlumCycleKey ? null : ev.cycleKey); } : undefined}
+                      />
                     ))}
                     {events.length > 4 && (
                       <p className="px-1 text-[10px] text-muted-foreground">
@@ -452,6 +490,115 @@ export function ProgramacionesExplorer({
 
         {/* Side panel */}
         <div className="space-y-4">
+
+          {/* Iluminación cycle detail */}
+          {activeTab === "iluminacion" && (
+            <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
+              <div className="border-b border-border/50 bg-amber-50/40 dark:bg-amber-900/10 px-5 py-4 flex items-center gap-2">
+                <Lightbulb className="size-4 shrink-0 text-amber-500" aria-hidden />
+                <h3 className="text-sm font-semibold">
+                  {selectedIlumCycleKey ? "Ciclo de iluminación" : "Iluminación"}
+                </h3>
+              </div>
+              <div className="px-5 py-4">
+                {!selectedIlumCycleKey ? (
+                  <p className="py-3 text-center text-sm text-muted-foreground/60">
+                    Haz clic en una etiqueta de iluminación para ver el detalle del ciclo.
+                  </p>
+                ) : (() => {
+                  const rec = ilumStartRec ?? ilumEndRec;
+                  if (!rec) return (
+                    <p className="py-3 text-center text-sm text-muted-foreground">Sin datos para este ciclo.</p>
+                  );
+                  const spAccent     = getSpTypeAccent(rec.spType);
+                  const varietyColor = getVarietyColor(rec.variety);
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-base font-semibold">{rec.blockId}</p>
+                        {rec.variety && (
+                          <span
+                            style={{ background: varietyColor, color: "#fff", borderRadius: "4px", padding: "1px 6px", fontSize: "10px", fontWeight: 700 }}
+                          >
+                            {getVarietyAbbr(rec.variety)}
+                          </span>
+                        )}
+                      </div>
+                      <dl className="space-y-1.5 text-[12px]">
+                        {rec.variety && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-muted-foreground">Variedad</dt>
+                            <dd className="font-medium text-right">{rec.variety}</dd>
+                          </div>
+                        )}
+                        {rec.areaId && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-muted-foreground">Área</dt>
+                            <dd className="font-medium text-right">{rec.areaId}</dd>
+                          </div>
+                        )}
+                        {rec.spType && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-muted-foreground">Tipo SP</dt>
+                            <dd className="font-medium text-right" style={{ color: spAccent }}>{rec.spType}</dd>
+                          </div>
+                        )}
+                        {rec.fase && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-muted-foreground">Fase</dt>
+                            <dd className="font-medium text-right">{rec.fase}</dd>
+                          </div>
+                        )}
+                      </dl>
+
+                      <div className="mt-1 rounded-xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/30 dark:bg-amber-900/10 divide-y divide-amber-200/40 dark:divide-amber-800/30 text-[12px]">
+                        {ilumStartRec ? (
+                          <div className="flex items-center justify-between gap-2 px-4 py-2.5">
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <span className="inline-block size-2 rounded-full bg-amber-400" />
+                              Inicio
+                            </span>
+                            <span className="font-semibold">{formatDate(ilumStartRec.eventDate)}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-2 px-4 py-2.5 text-muted-foreground/50">
+                            <span>Inicio</span><span>fuera del rango</span>
+                          </div>
+                        )}
+                        {ilumEndRec ? (
+                          <div className="flex items-center justify-between gap-2 px-4 py-2.5">
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <span className="inline-block size-2 rounded-full bg-orange-400" />
+                              Fin
+                            </span>
+                            <span className="font-semibold">{formatDate(ilumEndRec.eventDate)}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-2 px-4 py-2.5 text-muted-foreground/50">
+                            <span>Fin</span><span>fuera del rango</span>
+                          </div>
+                        )}
+                        {ilumDays !== null && (
+                          <div className="flex items-center justify-between gap-2 px-4 py-2.5">
+                            <span className="text-muted-foreground">Duración</span>
+                            <span className="font-bold text-amber-600 dark:text-amber-400">{ilumDays} días</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedIlumCycleKey(null)}
+                        className="w-full rounded-lg border border-border/60 py-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+                      >
+                        Limpiar selección
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
 
           {/* Day detail */}
           <div className="rounded-2xl border border-border/60 bg-card shadow-sm">

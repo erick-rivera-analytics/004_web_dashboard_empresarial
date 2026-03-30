@@ -54,3 +54,6 @@ next-env.d.ts
 /Capas/*.sbn
 /Capas/*.sbx
 # Note: public/rasters/*.png are committed (generated, ~0.5 MB each)
+
+# Project vault (local docs)
+project_vault/
