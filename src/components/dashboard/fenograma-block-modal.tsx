@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight, LineChart, LoaderCircle, Rows3, Sprout, X } from "lucide-react";
 import useSWRImmutable from "swr/immutable";
 
@@ -517,16 +516,7 @@ function HoursCamaOverlay({
     </div>
   );
 
-  if (typeof document === "undefined") {
-    return null;
-  }
-
-  return createPortal(
-    <div className="fixed inset-0 z-[140]">
-      {overlayContent}
-    </div>,
-    document.body,
-  );
+  return overlayContent;
 }
 
 function HoursCamaPersonRow({
