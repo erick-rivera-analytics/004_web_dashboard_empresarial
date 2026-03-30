@@ -5,7 +5,7 @@ import { cachedAsync } from "@/lib/server-cache";
 
 const PROG_TTL_MS = 5 * 60 * 1000; // 5 min
 
-export const ACTIVITY_CODES = ["SMPC", "ILUMINACION"] as const;
+export const ACTIVITY_CODES = ["SPMC", "ILUMINACION"] as const;
 export type ActivityCode = (typeof ACTIVITY_CODES)[number];
 
 // ── Types ─────────────────────────────────────────────────────────────────────

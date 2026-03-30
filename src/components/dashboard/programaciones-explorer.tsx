@@ -20,7 +20,7 @@ const TABS: {
   icon: React.ElementType;
   activityCode: string | null;
 }[] = [
-  { key: "plantas_muertas", label: "Plantas Muertas", icon: Leaf,       activityCode: "SMPC" },
+  { key: "plantas_muertas", label: "Plantas Muertas", icon: Leaf,       activityCode: "SPMC" },
   { key: "iluminacion",     label: "Iluminación",     icon: Lightbulb,  activityCode: "ILUMINACION" },
   { key: "riego",           label: "Riego",           icon: Droplets,   activityCode: null },
 ];
