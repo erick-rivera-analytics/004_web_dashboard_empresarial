@@ -60,24 +60,24 @@ export async function getProgramaciones(
           select cycle_key, activity_code, event_date, null::text as ilum_label
           from mdl.prod_ref_vegetativo_subset_scd2
           where activity_code = 'SPMC'
-            and event_date >= $2::date
-            and event_date <= $3::date
+            and event_date >= $1::date
+            and event_date <= $2::date
 
           union all
 
           -- ILUMINACION: primer dia del ciclo si cae en rango
           select ib.cycle_key, 'ILUMINACION', ib.start_date, 'Inicio'
           from ilum_bounds ib
-          where ib.start_date >= $2::date
-            and ib.start_date <= $3::date
+          where ib.start_date >= $1::date
+            and ib.start_date <= $2::date
 
           union all
 
           -- ILUMINACION: ultimo dia del ciclo si cae en rango (y distinto al inicio)
           select ib.cycle_key, 'ILUMINACION', ib.end_date, 'Fin'
           from ilum_bounds ib
-          where ib.end_date >= $2::date
-            and ib.end_date <= $3::date
+          where ib.end_date >= $1::date
+            and ib.end_date <= $2::date
             and ib.end_date != ib.start_date
         )
         select
@@ -120,7 +120,7 @@ export async function getProgramaciones(
         ) area_info on true
         order by ev.event_date asc, cp.block_id asc
       `,
-      [ACTIVITY_CODES as unknown as string[], dateFrom, dateTo],
+      [dateFrom, dateTo],
     );
 
     return result.rows
