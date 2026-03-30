@@ -15,6 +15,7 @@ type ProgramacionQueryRow = {
   cycle_key: string | null;
   event_date: string | null;
   activity_code: string | null;
+  ilum_label: string | null;  // "Inicio" | "Fin" | null
   variety: string | null;
   sp_type: string | null;
   fase: string | null;
@@ -26,6 +27,7 @@ export type ProgramacionRecord = {
   cycleKey: string;
   eventDate: string;         // "YYYY-MM-DD"
   activityCode: ActivityCode;
+  ilumLabel: string | null;  // "Inicio" | "Fin" para ILUMINACION, null para SPMC
   variety: string | null;
   spType: string | null;
   fase: string | null;       // "Planificado" | "Activo" | "Historia"
@@ -43,11 +45,47 @@ export async function getProgramaciones(
   return cachedAsync(cacheKey, PROG_TTL_MS, async () => {
     const result = await query<ProgramacionQueryRow>(
       `
+        with ilum_bounds as (
+          -- Para ILUMINACION: solo primer y ultimo event_date por ciclo
+          select
+            cycle_key,
+            min(event_date) as start_date,
+            max(event_date) as end_date
+          from mdl.prod_ref_vegetativo_subset_scd2
+          where activity_code = 'ILUMINACION'
+          group by cycle_key
+        ),
+        events as (
+          -- SPMC: todos los eventos en rango
+          select cycle_key, activity_code, event_date, null::text as ilum_label
+          from mdl.prod_ref_vegetativo_subset_scd2
+          where activity_code = 'SPMC'
+            and event_date >= $2::date
+            and event_date <= $3::date
+
+          union all
+
+          -- ILUMINACION: primer dia del ciclo si cae en rango
+          select ib.cycle_key, 'ILUMINACION', ib.start_date, 'Inicio'
+          from ilum_bounds ib
+          where ib.start_date >= $2::date
+            and ib.start_date <= $3::date
+
+          union all
+
+          -- ILUMINACION: ultimo dia del ciclo si cae en rango (y distinto al inicio)
+          select ib.cycle_key, 'ILUMINACION', ib.end_date, 'Fin'
+          from ilum_bounds ib
+          where ib.end_date >= $2::date
+            and ib.end_date <= $3::date
+            and ib.end_date != ib.start_date
+        )
         select
           nullif(trim(cp.block_id), '')  as block_id,
-          nullif(trim(v.cycle_key), '')  as cycle_key,
-          to_char(v.event_date, 'YYYY-MM-DD') as event_date,
-          v.activity_code,
+          nullif(trim(ev.cycle_key), '') as cycle_key,
+          to_char(ev.event_date, 'YYYY-MM-DD') as event_date,
+          ev.activity_code,
+          ev.ilum_label,
           nullif(trim(cp.variety), '')   as variety,
           nullif(trim(cp.sp_type), '')   as sp_type,
           case
@@ -57,7 +95,7 @@ export async function getProgramaciones(
             else 'Historia'
           end as fase,
           area_info.area_id
-        from mdl.prod_ref_vegetativo_subset_scd2 v
+        from events ev
         left join lateral (
           select
             cp2.block_id,
@@ -68,7 +106,7 @@ export async function getProgramaciones(
             cp2.harvest_start_date,
             cp2.harvest_end_date
           from slv.camp_dim_cycle_profile_scd2 cp2
-          where cp2.cycle_key = v.cycle_key
+          where cp2.cycle_key = ev.cycle_key
           order by cp2.valid_from desc nulls last
           limit 1
         ) cp on true
@@ -80,10 +118,7 @@ export async function getProgramaciones(
           order by bp.valid_from desc nulls last
           limit 1
         ) area_info on true
-        where v.activity_code = any($1::text[])
-          and v.event_date >= $2::date
-          and v.event_date <= $3::date
-        order by v.event_date asc, cp.block_id asc
+        order by ev.event_date asc, cp.block_id asc
       `,
       [ACTIVITY_CODES as unknown as string[], dateFrom, dateTo],
     );
@@ -98,6 +133,7 @@ export async function getProgramaciones(
         cycleKey: row.cycle_key,
         eventDate: row.event_date,
         activityCode: (row.activity_code ?? "SPMC") as ActivityCode,
+        ilumLabel: row.ilum_label ?? null,
         variety: row.variety ?? null,
         spType: row.sp_type ?? null,
         fase: row.fase ?? null,

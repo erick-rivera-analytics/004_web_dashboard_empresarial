@@ -143,14 +143,22 @@ function EventPill({ record }: { record: ProgramacionRecord }) {
     <div
       style={{
         background:   areaStyle.bg,
-        border:       `1px solid ${areaStyle.border}`,
+        borderTop:    `1px solid ${areaStyle.border}`,
+        borderRight:  `1px solid ${areaStyle.border}`,
+        borderBottom: `1px solid ${areaStyle.border}`,
         borderLeft:   `3px solid ${spAccent}`,
         borderRadius: "6px",
         padding:      "2px 5px 2px 5px",
       }}
-      className="flex items-center justify-between gap-1"
+      className="flex items-center gap-1"
       title={`${record.blockId} · ${record.variety ?? "—"} · SP: ${record.spType ?? "—"} · Área: ${record.areaId ?? "—"}`}
     >
+      {/* ilumLabel badge (Inicio / Fin) */}
+      {record.ilumLabel && (
+        <span style={{ color: spAccent, fontSize: "9px", fontWeight: 700, flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          {record.ilumLabel}
+        </span>
+      )}
       {/* block_id */}
       <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-tight text-foreground">
         {record.blockId}
@@ -158,15 +166,15 @@ function EventPill({ record }: { record: ProgramacionRecord }) {
       {/* variety badge */}
       <span
         style={{
-          background:   varietyColor,
-          borderRadius: "4px",
-          padding:      "0 4px",
-          fontSize:     "9px",
-          fontWeight:   700,
-          color:        "#fff",
+          background:    varietyColor,
+          borderRadius:  "4px",
+          padding:       "0 4px",
+          fontSize:      "9px",
+          fontWeight:    700,
+          color:         "#fff",
           letterSpacing: "0.02em",
-          lineHeight:   "16px",
-          flexShrink:   0,
+          lineHeight:    "16px",
+          flexShrink:    0,
         }}
       >
         {abbr}
@@ -229,10 +237,11 @@ export function ProgramacionesExplorer({
   // Active tab → activity code filter
   const activeCode = TABS.find((t) => t.key === activeTab)?.activityCode ?? null;
 
-  // Filtered records
+  // Filtered records — Riego sin activityCode → vacío
   const filtered = useMemo(() => {
+    if (!activeCode) return [];
     return allRecords.filter((r) => {
-      if (activeCode && r.activityCode !== activeCode) return false;
+      if (r.activityCode !== activeCode) return false;
       if (selectedAreas.length && !selectedAreas.includes(r.areaId ?? "")) return false;
       if (faseFilter && r.fase !== faseFilter) return false;
       return true;
@@ -483,7 +492,7 @@ export function ProgramacionesExplorer({
                     return (
                       <div
                         key={i}
-                        style={{ background: areaStyle.bg, border: `1px solid ${areaStyle.border}`, borderLeft: `4px solid ${spAccent}` }}
+                        style={{ background: areaStyle.bg, borderTop: `1px solid ${areaStyle.border}`, borderRight: `1px solid ${areaStyle.border}`, borderBottom: `1px solid ${areaStyle.border}`, borderLeft: `4px solid ${spAccent}` }}
                         className="rounded-xl px-4 py-3"
                       >
                         <div className="flex items-start justify-between gap-2">
