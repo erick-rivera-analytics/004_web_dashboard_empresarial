@@ -314,7 +314,6 @@ function HoursCamaOverlay({
 }) {
   const [expandedTypes, setExpandedTypes] = useState<string[]>([]);
   const [expandedActivities, setExpandedActivities] = useState<string[]>([]);
-  const camas30 = camas30;
   const totalEffectiveHours = data?.summary.totalEffectiveHours ?? cycle.effectiveHours;
   const totalActualHours = data?.summary.totalActualHours ?? cycle.actualHours;
   const totalUnitsProduced = data?.summary.totalUnitsProduced ?? cycle.unitsProduced;
