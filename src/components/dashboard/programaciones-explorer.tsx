@@ -1,164 +1,281 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Leaf, Lightbulb, Droplets } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Droplets, Leaf, Lightbulb, LoaderCircle } from "lucide-react";
+import useSWR from "swr";
 
+import { MultiSelectField } from "@/components/ui/multi-select-field";
+import { fetchJson } from "@/lib/fetch-json";
+import { decodeMultiSelectValue } from "@/lib/multi-select";
 import { cn } from "@/lib/utils";
+import type { ProgramacionRecord } from "@/lib/programaciones";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-export type ProgramacionType = "plantas_muertas" | "iluminacion" | "riego";
-
-export type Programacion = {
-  date: string; // "YYYY-MM-DD"
-  type: ProgramacionType;
-  label: string;
-  area?: string;
-  block?: string;
-  notes?: string;
-};
-
-// ── Constants ─────────────────────────────────────────────────────────────────
+type ProgramacionTab = "plantas_muertas" | "iluminacion" | "riego";
 
 const TABS: {
-  key: ProgramacionType;
+  key: ProgramacionTab;
   label: string;
   icon: React.ElementType;
-  pillClass: string;
+  activityCode: string | null;
 }[] = [
-  {
-    key: "plantas_muertas",
-    label: "Plantas Muertas",
-    icon: Leaf,
-    pillClass: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
-  },
-  {
-    key: "iluminacion",
-    label: "Iluminación",
-    icon: Lightbulb,
-    pillClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  },
-  {
-    key: "riego",
-    label: "Riego",
-    icon: Droplets,
-    pillClass: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-  },
+  { key: "plantas_muertas", label: "Plantas Muertas", icon: Leaf,       activityCode: "SMPC" },
+  { key: "iluminacion",     label: "Iluminación",     icon: Lightbulb,  activityCode: "ILUMINACION" },
+  { key: "riego",           label: "Riego",           icon: Droplets,   activityCode: null },
 ];
 
-const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-
+const DAY_LABELS  = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MONTH_NAMES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+  "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+  "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
+];
+const FASE_OPTIONS = ["Planificado", "Activo", "Historia"] as const;
+type FaseOption = (typeof FASE_OPTIONS)[number] | "";
+
+// ── Color palettes (inline styles — safe with Tailwind purge) ─────────────────
+
+/** Each area gets a unique background tint + matching border.  */
+const AREA_PALETTE: { bg: string; border: string }[] = [
+  { bg: "rgba(20,184,166,0.11)",  border: "rgba(20,184,166,0.40)" },  // teal
+  { bg: "rgba(59,130,246,0.11)",  border: "rgba(59,130,246,0.40)" },  // blue
+  { bg: "rgba(139,92,246,0.11)",  border: "rgba(139,92,246,0.40)" },  // violet
+  { bg: "rgba(245,158,11,0.11)",  border: "rgba(245,158,11,0.40)" },  // amber
+  { bg: "rgba(16,185,129,0.11)",  border: "rgba(16,185,129,0.40)" },  // emerald
+  { bg: "rgba(244,63,94,0.11)",   border: "rgba(244,63,94,0.40)" },   // rose
+  { bg: "rgba(249,115,22,0.11)",  border: "rgba(249,115,22,0.40)" },  // orange
+  { bg: "rgba(6,182,212,0.11)",   border: "rgba(6,182,212,0.40)" },   // cyan
+];
+
+/** Variety badge background (more saturated). */
+const VARIETY_COLORS: string[] = [
+  "rgba(20,184,166,0.75)",
+  "rgba(59,130,246,0.75)",
+  "rgba(139,92,246,0.75)",
+  "rgba(245,158,11,0.75)",
+  "rgba(16,185,129,0.75)",
+  "rgba(244,63,94,0.75)",
+  "rgba(249,115,22,0.75)",
+  "rgba(6,182,212,0.75)",
+];
+
+/** SP-type left accent bar (third, independent channel). */
+const SPTYPE_ACCENT_COLORS: string[] = [
+  "#14b8a6",
+  "#3b82f6",
+  "#a855f7",
+  "#f59e0b",
+  "#10b981",
+  "#f43f5e",
+  "#f97316",
+  "#06b6d4",
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function strHash(s: string, len: number): number {
+  if (!s || len <= 0) return 0;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % len;
+  return Math.abs(h);
+}
+
+function getAreaStyle(areaId: string | null): { bg: string; border: string } {
+  return AREA_PALETTE[strHash(areaId ?? "?", AREA_PALETTE.length)];
+}
+
+function getVarietyColor(variety: string | null): string {
+  return VARIETY_COLORS[strHash(variety ?? "?", VARIETY_COLORS.length)];
+}
+
+function getSpTypeAccent(spType: string | null): string {
+  return SPTYPE_ACCENT_COLORS[strHash(spType ?? "?", SPTYPE_ACCENT_COLORS.length)];
+}
+
+function getVarietyAbbr(variety: string | null): string {
+  if (!variety) return "?";
+  const parts = variety.trim().split(/[\s_\-]+/);
+  return parts.length >= 2
+    ? (parts[0]![0]! + parts[1]![0]!).toUpperCase()
+    : variety.slice(0, 2).toUpperCase();
+}
+
 function toDateStr(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function monthRange(year: number, month: number): { dateFrom: string; dateTo: string } {
+  const dateFrom = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const lastDay  = new Date(year, month + 1, 0).getDate();
+  const dateTo   = `${year}-${String(month + 1).padStart(2, "0")}-${lastDay}`;
+  return { dateFrom, dateTo };
 }
 
 function buildCalendarCells(year: number, month: number) {
-  const firstWeekday = new Date(year, month, 1).getDay(); // 0 = Sun
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const daysInPrevMonth = new Date(year, month, 0).getDate();
-
+  const firstWeekday  = new Date(year, month, 1).getDay();
+  const daysInMonth   = new Date(year, month + 1, 0).getDate();
+  const daysInPrev    = new Date(year, month, 0).getDate();
   const cells: { date: Date; isCurrentMonth: boolean }[] = [];
 
-  for (let i = firstWeekday - 1; i >= 0; i--) {
-    cells.push({ date: new Date(year, month - 1, daysInPrevMonth - i), isCurrentMonth: false });
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
+  for (let i = firstWeekday - 1; i >= 0; i--)
+    cells.push({ date: new Date(year, month - 1, daysInPrev - i), isCurrentMonth: false });
+  for (let d = 1; d <= daysInMonth; d++)
     cells.push({ date: new Date(year, month, d), isCurrentMonth: true });
-  }
   const remaining = 42 - cells.length;
-  for (let d = 1; d <= remaining; d++) {
+  for (let d = 1; d <= remaining; d++)
     cells.push({ date: new Date(year, month + 1, d), isCurrentMonth: false });
-  }
 
   return cells;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const progFetcher = (url: string) =>
+  fetchJson<ProgramacionRecord[]>(url, "No se pudo cargar las programaciones.");
+
+// ── Event pill ────────────────────────────────────────────────────────────────
+
+function EventPill({ record }: { record: ProgramacionRecord }) {
+  const areaStyle    = getAreaStyle(record.areaId);
+  const varietyColor = getVarietyColor(record.variety);
+  const spAccent     = getSpTypeAccent(record.spType);
+  const abbr         = getVarietyAbbr(record.variety);
+
+  return (
+    <div
+      style={{
+        background:   areaStyle.bg,
+        border:       `1px solid ${areaStyle.border}`,
+        borderLeft:   `3px solid ${spAccent}`,
+        borderRadius: "6px",
+        padding:      "2px 5px 2px 5px",
+      }}
+      className="flex items-center justify-between gap-1"
+      title={`${record.blockId} · ${record.variety ?? "—"} · SP: ${record.spType ?? "—"} · Área: ${record.areaId ?? "—"}`}
+    >
+      {/* block_id */}
+      <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-tight text-foreground">
+        {record.blockId}
+      </span>
+      {/* variety badge */}
+      <span
+        style={{
+          background:   varietyColor,
+          borderRadius: "4px",
+          padding:      "0 4px",
+          fontSize:     "9px",
+          fontWeight:   700,
+          color:        "#fff",
+          letterSpacing: "0.02em",
+          lineHeight:   "16px",
+          flexShrink:   0,
+        }}
+      >
+        {abbr}
+      </span>
+    </div>
+  );
+}
+
+// ── Main explorer ─────────────────────────────────────────────────────────────
 
 type ProgramacionesExplorerProps = {
-  /**
-   * Programaciones cargadas desde la API (vacío hasta que se conecte la BD).
-   * Cada item tiene: date "YYYY-MM-DD", type, label, y campos opcionales.
-   */
-  initialData?: Programacion[];
+  initialData?: ProgramacionRecord[];
+  initialDateFrom?: string;
+  initialDateTo?: string;
 };
 
 export function ProgramacionesExplorer({
   initialData = [],
+  initialDateFrom,
+  initialDateTo,
 }: ProgramacionesExplorerProps) {
-  const today = new Date();
+  const today    = new Date();
   const todayStr = toDateStr(today);
 
-  const [activeTab, setActiveTab] = useState<ProgramacionType>("plantas_muertas");
-  const [viewDate, setViewDate] = useState(
-    new Date(today.getFullYear(), today.getMonth(), 1),
+  const [activeTab,  setActiveTab]  = useState<ProgramacionTab>("plantas_muertas");
+  const [viewDate,   setViewDate]   = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selected,   setSelected]   = useState<string | null>(null);
+  const [areaFilter, setAreaFilter] = useState("all");
+  const [faseFilter, setFaseFilter] = useState<FaseOption>("");
+
+  const { dateFrom, dateTo } = useMemo(
+    () => monthRange(viewDate.getFullYear(), viewDate.getMonth()),
+    [viewDate],
   );
-  const [selected, setSelected] = useState<string | null>(null); // selected date string
 
-  // When API is connected, replace initialData with SWR/fetch
-  const programaciones: Programacion[] = initialData;
+  const isCurrentInitialRange =
+    dateFrom === initialDateFrom && dateTo === initialDateTo;
 
-  const activeTabMeta = TABS.find((t) => t.key === activeTab)!;
-
-  // Filter by active tab
-  const filteredByType = useMemo(
-    () => programaciones.filter((p) => p.type === activeTab),
-    [programaciones, activeTab],
+  // SWR — skips initial fetch if server already gave us the right month
+  const { data: swrData, isLoading } = useSWR<ProgramacionRecord[]>(
+    `/api/programaciones?dateFrom=${dateFrom}&dateTo=${dateTo}`,
+    progFetcher,
+    {
+      fallbackData: isCurrentInitialRange ? initialData : undefined,
+      keepPreviousData: true,
+      dedupingInterval: 60_000,
+    },
   );
+
+  const allRecords = swrData ?? [];
+
+  // Derived option lists (unique areas from loaded data)
+  const areaOptions = useMemo(
+    () => Array.from(new Set(allRecords.map((r) => r.areaId).filter(Boolean) as string[])).sort(),
+    [allRecords],
+  );
+
+  const selectedAreas = useMemo(() => decodeMultiSelectValue(areaFilter), [areaFilter]);
+
+  // Active tab → activity code filter
+  const activeCode = TABS.find((t) => t.key === activeTab)?.activityCode ?? null;
+
+  // Filtered records
+  const filtered = useMemo(() => {
+    return allRecords.filter((r) => {
+      if (activeCode && r.activityCode !== activeCode) return false;
+      if (selectedAreas.length && !selectedAreas.includes(r.areaId ?? "")) return false;
+      if (faseFilter && r.fase !== faseFilter) return false;
+      return true;
+    });
+  }, [allRecords, activeCode, selectedAreas, faseFilter]);
 
   // Index by date
   const byDate = useMemo(() => {
-    const map = new Map<string, Programacion[]>();
-    for (const p of filteredByType) {
-      const list = map.get(p.date) ?? [];
-      list.push(p);
-      map.set(p.date, list);
+    const map = new Map<string, ProgramacionRecord[]>();
+    for (const rec of filtered) {
+      const list = map.get(rec.eventDate) ?? [];
+      list.push(rec);
+      map.set(rec.eventDate, list);
     }
     return map;
-  }, [filteredByType]);
+  }, [filtered]);
 
-  // Calendar grid
   const cells = useMemo(
     () => buildCalendarCells(viewDate.getFullYear(), viewDate.getMonth()),
     [viewDate],
   );
 
-  function prevMonth() {
-    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));
-    setSelected(null);
-  }
-  function nextMonth() {
-    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
-    setSelected(null);
-  }
+  function prevMonth() { setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1)); setSelected(null); }
+  function nextMonth() { setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1)); setSelected(null); }
 
   const selectedEvents = selected ? (byDate.get(selected) ?? []) : [];
 
   return (
     <div className="space-y-5">
-      {/* ── Tab selector ───────────────────────────────────────────────────── */}
+
+      {/* ── Activity tabs ───────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-2">
         {TABS.map((tab) => {
-          const Icon = tab.icon;
+          const Icon   = tab.icon;
           const active = activeTab === tab.key;
+          const hasData = tab.activityCode
+            ? allRecords.some((r) => r.activityCode === tab.activityCode)
+            : false;
           return (
             <button
               key={tab.key}
               type="button"
-              onClick={() => {
-                setActiveTab(tab.key);
-                setSelected(null);
-              }}
+              onClick={() => { setActiveTab(tab.key); setSelected(null); }}
               className={cn(
                 "flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all",
                 active
@@ -166,61 +283,120 @@ export function ProgramacionesExplorer({
                   : "border-border/60 bg-card text-muted-foreground hover:border-border hover:text-foreground",
               )}
             >
-              <Icon
-                className={cn("size-4", active ? "text-background" : "")}
-                aria-hidden
-              />
+              <Icon className="size-4 shrink-0" aria-hidden />
               {tab.label}
+              {!hasData && tab.activityCode && (
+                <span className="rounded-full bg-border/50 px-1.5 text-[9px] font-semibold uppercase tracking-wide">
+                  pronto
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_320px]">
-        {/* ── Calendar ─────────────────────────────────────────────────────── */}
-        <div className="rounded-2xl border border-border/60 bg-card shadow-sm">
-          {/* Month navigation */}
-          <div className="flex items-center justify-between border-b border-border/50 px-6 py-4">
+      {/* ── Filters ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="w-56">
+          <MultiSelectField
+            id="prog-area"
+            label="Área"
+            value={areaFilter}
+            options={areaOptions}
+            onChange={setAreaFilter}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium leading-none">Fase</p>
+          <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-card p-1">
             <button
               type="button"
-              onClick={prevMonth}
-              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Mes anterior"
+              onClick={() => setFaseFilter("")}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                faseFilter === "" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+              )}
             >
+              Todas
+            </button>
+            {FASE_OPTIONS.map((fase) => (
+              <button
+                key={fase}
+                type="button"
+                onClick={() => setFaseFilter(fase)}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                  faseFilter === fase
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {fase}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {isLoading && (
+          <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
+        )}
+      </div>
+
+      {/* ── Visual legend ────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-5 rounded-xl border border-border/50 bg-muted/20 px-4 py-2.5 text-[11px] text-muted-foreground">
+        <span className="font-semibold uppercase tracking-wide">Leyenda</span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-1 rounded-full" style={{ background: SPTYPE_ACCENT_COLORS[0] }} />
+          Borde izq. = Tipo SP
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block size-3 rounded" style={{ background: AREA_PALETTE[0]!.bg, border: `1px solid ${AREA_PALETTE[0]!.border}` }} />
+          Fondo = Área
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block rounded px-1 text-[9px] font-bold text-white" style={{ background: VARIETY_COLORS[0] }}>Va</span>
+          Badge = Variedad
+        </span>
+      </div>
+
+      {/* ── Main grid ────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_300px]">
+
+        {/* Calendar card */}
+        <div className="rounded-2xl border border-border/60 bg-card shadow-sm">
+
+          {/* Month nav */}
+          <div className="flex items-center justify-between border-b border-border/50 px-6 py-4">
+            <button type="button" onClick={prevMonth} aria-label="Mes anterior"
+              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <ChevronLeft className="size-4" aria-hidden />
             </button>
             <h2 className="text-sm font-semibold">
               {MONTH_NAMES[viewDate.getMonth()]} {viewDate.getFullYear()}
             </h2>
-            <button
-              type="button"
-              onClick={nextMonth}
-              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Mes siguiente"
-            >
+            <button type="button" onClick={nextMonth} aria-label="Mes siguiente"
+              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <ChevronRight className="size-4" aria-hidden />
             </button>
           </div>
 
-          {/* Day-of-week headers */}
+          {/* Day headers */}
           <div className="grid grid-cols-7 border-b border-border/50">
             {DAY_LABELS.map((d) => (
-              <div
-                key={d}
-                className="py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70"
-              >
+              <div key={d} className="py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
                 {d}
               </div>
             ))}
           </div>
 
-          {/* Grid cells */}
+          {/* Grid */}
           <div className="grid grid-cols-7">
             {cells.map((cell, i) => {
-              const dateStr = toDateStr(cell.date);
-              const events = byDate.get(dateStr) ?? [];
-              const isToday = dateStr === todayStr;
-              const isSelected = dateStr === selected;
+              const dateStr  = toDateStr(cell.date);
+              const events   = byDate.get(dateStr) ?? [];
+              const isToday  = dateStr === todayStr;
+              const isSel    = dateStr === selected;
               const isLastRow = i >= 35;
               const isLastCol = (i + 1) % 7 === 0;
 
@@ -228,44 +404,34 @@ export function ProgramacionesExplorer({
                 <button
                   key={dateStr}
                   type="button"
-                  onClick={() => setSelected(isSelected ? null : dateStr)}
+                  onClick={() => setSelected(isSel ? null : dateStr)}
                   className={cn(
-                    "group min-h-[90px] border-b border-r border-border/40 p-2 text-left transition-colors",
+                    "group min-h-[88px] border-b border-r border-border/40 p-2 text-left transition-colors",
                     isLastRow && "border-b-0",
                     isLastCol && "border-r-0",
                     !cell.isCurrentMonth && "bg-muted/20",
-                    isSelected && "bg-muted/40 ring-1 ring-inset ring-border",
-                    cell.isCurrentMonth && !isSelected && "hover:bg-muted/30",
+                    isSel && "ring-1 ring-inset ring-border bg-muted/40",
+                    cell.isCurrentMonth && !isSel && "hover:bg-muted/25",
                   )}
                 >
                   {/* Day number */}
-                  <span
-                    className={cn(
-                      "flex size-7 items-center justify-center rounded-full text-sm font-medium leading-none transition-colors",
-                      isToday && "bg-foreground text-background",
-                      !isToday && cell.isCurrentMonth && "text-foreground group-hover:bg-muted",
-                      !isToday && !cell.isCurrentMonth && "text-muted-foreground/40",
-                    )}
-                  >
+                  <span className={cn(
+                    "flex size-7 items-center justify-center rounded-full text-sm font-medium leading-none",
+                    isToday  && "bg-foreground text-background",
+                    !isToday && cell.isCurrentMonth  && "text-foreground",
+                    !isToday && !cell.isCurrentMonth && "text-muted-foreground/40",
+                  )}>
                     {cell.date.getDate()}
                   </span>
 
                   {/* Event pills */}
-                  <div className="mt-1 space-y-0.5">
-                    {events.slice(0, 3).map((ev, ei) => (
-                      <div
-                        key={ei}
-                        className={cn(
-                          "truncate rounded px-1.5 py-0.5 text-[11px] font-medium",
-                          activeTabMeta.pillClass,
-                        )}
-                      >
-                        {ev.label}
-                      </div>
+                  <div className="mt-1 space-y-[3px]">
+                    {events.slice(0, 4).map((ev, ei) => (
+                      <EventPill key={`${ev.cycleKey}-${ei}`} record={ev} />
                     ))}
-                    {events.length > 3 && (
+                    {events.length > 4 && (
                       <p className="px-1 text-[10px] text-muted-foreground">
-                        +{events.length - 3} más
+                        +{events.length - 4} más
                       </p>
                     )}
                   </div>
@@ -275,17 +441,16 @@ export function ProgramacionesExplorer({
           </div>
         </div>
 
-        {/* ── Side panel ───────────────────────────────────────────────────── */}
+        {/* Side panel */}
         <div className="space-y-4">
-          {/* Selected day detail */}
+
+          {/* Day detail */}
           <div className="rounded-2xl border border-border/60 bg-card shadow-sm">
             <div className="border-b border-border/50 bg-muted/20 px-5 py-4">
               <h3 className="text-sm font-semibold">
                 {selected
                   ? new Date(selected + "T00:00:00").toLocaleDateString("es-ES", {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
+                      weekday: "long", day: "numeric", month: "long",
                     })
                   : "Selecciona un día"}
               </h3>
@@ -293,80 +458,87 @@ export function ProgramacionesExplorer({
                 <p className="mt-0.5 text-[12px] text-muted-foreground">
                   {selectedEvents.length === 0
                     ? "Sin programaciones"
-                    : `${selectedEvents.length} programación${selectedEvents.length > 1 ? "es" : ""}`}
+                    : `${selectedEvents.length} programación${selectedEvents.length !== 1 ? "es" : ""}`}
                 </p>
               )}
             </div>
 
             <div className="px-5 py-4">
               {!selected && (
-                <p className="text-center text-sm text-muted-foreground/60">
-                  Haz clic en un día del calendario para ver el detalle.
+                <p className="py-4 text-center text-sm text-muted-foreground/60">
+                  Haz clic en un día para ver el detalle.
                 </p>
               )}
-
               {selected && selectedEvents.length === 0 && (
-                <div className="py-6 text-center">
-                  <p className="text-sm text-muted-foreground">Sin programaciones para este día.</p>
-                </div>
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  Sin programaciones para este día.
+                </p>
               )}
-
               {selected && selectedEvents.length > 0 && (
                 <div className="space-y-2">
-                  {selectedEvents.map((ev, i) => (
-                    <div
-                      key={i}
-                      className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3"
-                    >
-                      <p className="text-sm font-medium">{ev.label}</p>
-                      {ev.area && (
-                        <p className="mt-0.5 text-[12px] text-muted-foreground">
-                          Área: {ev.area}
-                        </p>
-                      )}
-                      {ev.block && (
-                        <p className="text-[12px] text-muted-foreground">
-                          Bloque: {ev.block}
-                        </p>
-                      )}
-                      {ev.notes && (
-                        <p className="mt-1.5 text-[12px] text-muted-foreground/80 italic">
-                          {ev.notes}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                  {selectedEvents.map((ev, i) => {
+                    const areaStyle    = getAreaStyle(ev.areaId);
+                    const spAccent     = getSpTypeAccent(ev.spType);
+                    const varietyColor = getVarietyColor(ev.variety);
+                    return (
+                      <div
+                        key={i}
+                        style={{ background: areaStyle.bg, border: `1px solid ${areaStyle.border}`, borderLeft: `4px solid ${spAccent}` }}
+                        className="rounded-xl px-4 py-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-semibold">{ev.blockId}</p>
+                          <span
+                            style={{ background: varietyColor, color: "#fff", borderRadius: "4px", padding: "1px 5px", fontSize: "10px", fontWeight: 700 }}
+                          >
+                            {getVarietyAbbr(ev.variety)}
+                          </span>
+                        </div>
+                        <dl className="mt-1.5 space-y-0.5 text-[12px] text-muted-foreground">
+                          {ev.variety  && <div className="flex gap-1.5"><dt>Variedad:</dt><dd className="font-medium text-foreground">{ev.variety}</dd></div>}
+                          {ev.spType   && <div className="flex gap-1.5"><dt>Tipo SP:</dt><dd className="font-medium text-foreground">{ev.spType}</dd></div>}
+                          {ev.areaId   && <div className="flex gap-1.5"><dt>Área:</dt><dd className="font-medium text-foreground">{ev.areaId}</dd></div>}
+                          {ev.fase     && <div className="flex gap-1.5"><dt>Fase:</dt><dd className="font-medium text-foreground">{ev.fase}</dd></div>}
+                        </dl>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Monthly summary */}
+          {/* Month summary */}
           <div className="rounded-2xl border border-border/60 bg-card shadow-sm">
             <div className="border-b border-border/50 bg-muted/20 px-5 py-4">
               <h3 className="text-sm font-semibold">Resumen del mes</h3>
             </div>
             <div className="px-5 py-4">
-              {filteredByType.length === 0 ? (
-                <div className="py-4 text-center">
-                  <p className="text-sm text-muted-foreground/60">
-                    Sin datos. Pendiente de conexión a base de datos.
-                  </p>
-                </div>
+              {filtered.length === 0 ? (
+                <p className="py-2 text-center text-sm text-muted-foreground/60">
+                  Sin registros para los filtros actuales.
+                </p>
               ) : (
-                <dl className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <dt className="text-muted-foreground">Total programaciones</dt>
-                    <dd className="font-semibold">{filteredByType.length}</dd>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Total registros</dt>
+                    <dd className="font-semibold">{filtered.length.toLocaleString()}</dd>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <dt className="text-muted-foreground">Días activos</dt>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Días con actividad</dt>
                     <dd className="font-semibold">{byDate.size}</dd>
                   </div>
+                  {areaOptions.length > 0 && (
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Áreas</dt>
+                      <dd className="font-semibold">{areaOptions.length}</dd>
+                    </div>
+                  )}
                 </dl>
               )}
             </div>
           </div>
+
         </div>
       </div>
     </div>
