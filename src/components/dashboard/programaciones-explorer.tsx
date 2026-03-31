@@ -281,7 +281,7 @@ export function ProgramacionesExplorer({
   // Fetch correct min/max from API (includes all months, not just current month)
   const { data: cycleRangeData } = useSWR<{ min: string | null; max: string | null }>(
     selectedIlumCycleKey ? `/api/programaciones/cycle-range/${encodeURIComponent(selectedIlumCycleKey)}` : null,
-    fetchJson,
+    (url) => fetch(url).then((r) => r.json()),
     { revalidateOnFocus: false, dedupingInterval: 60000 }
   );
 
@@ -556,50 +556,52 @@ export function ProgramacionesExplorer({
                   </p>
                 ) : (() => {
                   const rec = ilumCycleRecords[0] ?? null;
-                  if (!rec) return (
-                    <p className="py-3 text-center text-sm text-muted-foreground">Sin datos para este ciclo.</p>
-                  );
-                  const spAccent     = getSpTypeAccent(rec.spType);
-                  const varietyColor = getVarietyColor(rec.variety);
+                  const spAccent     = rec ? getSpTypeAccent(rec.spType) : undefined;
+                  const varietyColor = rec ? getVarietyColor(rec.variety) : undefined;
                   return (
                     <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-base font-semibold">{rec.blockId}</p>
-                        {rec.variety && (
-                          <span
-                            style={{ background: varietyColor, color: "#fff", borderRadius: "4px", padding: "1px 6px", fontSize: "10px", fontWeight: 700 }}
-                          >
-                            {getVarietyAbbr(rec.variety)}
-                          </span>
-                        )}
-                      </div>
-                      <dl className="space-y-1.5 text-[12px]">
-                        {rec.variety && (
-                          <div className="flex justify-between gap-2">
-                            <dt className="text-muted-foreground">Variedad</dt>
-                            <dd className="font-medium text-right">{rec.variety}</dd>
+                      {rec ? (
+                        <>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-base font-semibold">{rec.blockId}</p>
+                            {rec.variety && (
+                              <span
+                                style={{ background: varietyColor, color: "#fff", borderRadius: "4px", padding: "1px 6px", fontSize: "10px", fontWeight: 700 }}
+                              >
+                                {getVarietyAbbr(rec.variety)}
+                              </span>
+                            )}
                           </div>
-                        )}
-                        {rec.areaId && (
-                          <div className="flex justify-between gap-2">
-                            <dt className="text-muted-foreground">Área</dt>
-                            <dd className="font-medium text-right">{rec.areaId}</dd>
-                          </div>
-                        )}
-                        {rec.spType && (
-                          <div className="flex justify-between gap-2">
-                            <dt className="text-muted-foreground">Tipo SP</dt>
-                            <dd className="font-medium text-right" style={{ color: spAccent }}>{rec.spType}</dd>
-                          </div>
-                        )}
-                        {rec.fase && (
-                          <div className="flex justify-between gap-2">
-                            <dt className="text-muted-foreground">Fase</dt>
-                            <dd className="font-medium text-right">{rec.fase}</dd>
-                          </div>
-                        )}
-                      </dl>
-
+                          <dl className="space-y-1.5 text-[12px]">
+                            {rec.variety && (
+                              <div className="flex justify-between gap-2">
+                                <dt className="text-muted-foreground">Variedad</dt>
+                                <dd className="font-medium text-right">{rec.variety}</dd>
+                              </div>
+                            )}
+                            {rec.areaId && (
+                              <div className="flex justify-between gap-2">
+                                <dt className="text-muted-foreground">Área</dt>
+                                <dd className="font-medium text-right">{rec.areaId}</dd>
+                              </div>
+                            )}
+                            {rec.spType && (
+                              <div className="flex justify-between gap-2">
+                                <dt className="text-muted-foreground">Tipo SP</dt>
+                                <dd className="font-medium text-right" style={{ color: spAccent }}>{rec.spType}</dd>
+                              </div>
+                            )}
+                            {rec.fase && (
+                              <div className="flex justify-between gap-2">
+                                <dt className="text-muted-foreground">Fase</dt>
+                                <dd className="font-medium text-right">{rec.fase}</dd>
+                              </div>
+                            )}
+                          </dl>
+                        </>
+                      ) : (
+                        <p className="py-3 text-center text-sm text-muted-foreground">Sin datos para este ciclo en el mes actual.</p>
+                      )}
 
                       <div className="mt-3 space-y-2">
                         {ilumCycleDateRange?.min && (
