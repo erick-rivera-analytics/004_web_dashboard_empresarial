@@ -3,14 +3,10 @@ import { query } from "@/lib/db";
 
 export async function GET(
   _request: Request,
-  context: { params: Promise<{ cycleKey?: string }> }
+  context: { params: Promise<{ cycleKey: string }> }
 ) {
   try {
     const { cycleKey } = await context.params;
-    if (!cycleKey) {
-      return NextResponse.json({ min: null, max: null });
-    }
-
     const decodedKey = decodeURIComponent(cycleKey);
 
     const result = await query<{
