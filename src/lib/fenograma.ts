@@ -188,6 +188,34 @@ type CycleLaborHoursQueryRow = {
   units_produced: string | number | null;
 };
 
+type CycleLaborPersonProfileQueryRow = {
+  full_name: string | null;
+  area_name: string | null;
+  marital_status: string | null;
+  age_years: string | number | null;
+  gender: string | null;
+};
+
+type CycleLaborPersonLookupQueryRow = {
+  person_id: string | null;
+  full_name: string | null;
+};
+
+type CycleLaborPersonActivityDetailQueryRow = {
+  activity_id: string | null;
+  activity_name: string | null;
+  activity_type: string | null;
+  unit_of_measure: string | null;
+  actual_hours: string | number | null;
+  effective_hours: string | number | null;
+  units_produced: string | number | null;
+  non_normal_actual_hours: string | number | null;
+  historical_actual_hours: string | number | null;
+  historical_units_produced: string | number | null;
+  cycle_actual_hours: string | number | null;
+  cycle_units_produced: string | number | null;
+};
+
 type GreenDailyQueryRow = {
   event_date: string | null;
   green_weight_kg: number | string | null;
@@ -468,6 +496,7 @@ export type HarvestCurvePayload = {
 
 export type CycleLaborPersonSummary = {
   personId: string;
+  personName: string | null;
   unitOfMeasure: string;
   actualHours: number;
   effectiveHours: number;
@@ -511,6 +540,46 @@ export type CycleLaborHoursPayload = {
     personCount: number;
   };
   activityTypes: CycleLaborActivityTypeSummary[];
+};
+
+export type CycleLaborPersonProfile = {
+  fullName: string | null;
+  areaName: string | null;
+  maritalStatus: string | null;
+  ageYears: number | null;
+  gender: string | null;
+};
+
+export type CycleLaborPersonActivityTypeSummary = {
+  activityId: string;
+  activityName: string;
+  activityType: string;
+  unitOfMeasure: string;
+  actualHours: number;
+  effectiveHours: number;
+  unitsProduced: number;
+  productivity: number | null;
+  rendimientoPct: number | null;
+  historicalProductivity: number | null;
+  cycleProductivity: number | null;
+};
+
+export type CycleLaborPersonDetailPayload = {
+  cycleKey: string;
+  personId: string;
+  generatedAt: string;
+  profile: CycleLaborPersonProfile | null;
+  summary: {
+    totalActualHours: number;
+    totalEffectiveHours: number;
+    totalUnitsProduced: number;
+    totalNonNormalActualHours: number;
+    productivity: number | null;
+    rendimientoPct: number | null;
+    nonNormalActualHoursPct: number | null;
+    activityCount: number;
+  };
+  activities: CycleLaborPersonActivityTypeSummary[];
 };
 
 export const defaultFenogramaFilters: FenogramaFilters = {
@@ -664,6 +733,52 @@ function toRatio(numerator: number | null, denominator: number | null) {
 function toPercentFromNumbers(numerator: number | null, denominator: number | null) {
   const ratio = toRatio(numerator, denominator);
   return ratio === null ? null : roundValue(ratio * 100);
+}
+
+async function getPersonNameMap(personIds: string[]) {
+  const normalizedPersonIds = Array.from(new Set(
+    personIds
+      .map((personId) => personId.trim())
+      .filter((personId) => personId.length > 0),
+  ));
+
+  if (!normalizedPersonIds.length) {
+    return new Map<string, string>();
+  }
+
+  const result = await query<CycleLaborPersonLookupQueryRow>(
+    `
+      with ranked_profiles as (
+        select
+          trim(person_id::text) as person_id,
+          nullif(trim(full_name), '') as full_name,
+          row_number() over (
+            partition by trim(person_id::text)
+            order by
+              case when nullif(trim(full_name), '') is null then 1 else 0 end,
+              nullif(trim(full_name), '') asc
+          ) as rn
+        from slv.tthh_dim_person_profile_scd2
+        where trim(person_id::text) = any($1::text[])
+      )
+      select
+        person_id,
+        full_name
+      from ranked_profiles
+      where rn = 1
+    `,
+    [normalizedPersonIds],
+  );
+
+  return new Map<string, string>(
+    result.rows
+      .map((row) => {
+        const personId = cleanText(row.person_id);
+        const fullName = cleanText(row.full_name);
+        return personId && fullName ? [personId, fullName] as const : null;
+      })
+      .filter((row): row is readonly [string, string] => row !== null),
+  );
 }
 
 function isMultipleOfTwenty(value: number) {
@@ -1616,6 +1731,9 @@ export async function getCycleLaborHoursByCycleKey(
       `,
       [normalizedCycleKey],
     );
+    const personNameMap = await getPersonNameMap(
+      result.rows.map((row) => cleanText(row.person_id === null ? null : String(row.person_id))),
+    );
 
     const activityTypeMap = new Map<string, {
       activityType: string;
@@ -1683,6 +1801,7 @@ export async function getCycleLaborHoursByCycleKey(
 
       const personEntry = activityEntry.people.get(personId) ?? {
         personId,
+        personName: personNameMap.get(personId) ?? null,
         unitOfMeasure,
         actualHours: 0,
         effectiveHours: 0,
@@ -1770,6 +1889,218 @@ export async function getCycleLaborHoursByCycleKey(
       activityTypes,
     };
   });
+}
+
+export async function getCycleLaborPersonDetailByCycleKey(
+  cycleKey: string,
+  personId: string,
+): Promise<CycleLaborPersonDetailPayload> {
+  const normalizedCycleKey = cycleKey.trim();
+  const normalizedPersonId = personId.trim();
+
+  return cachedAsync(
+    `fenograma:hours:${normalizedCycleKey}:person:${normalizedPersonId}`,
+    FENOGRAMA_HOURS_TTL_MS,
+    async () => {
+      const [profileResult, activitiesResult] = await Promise.all([
+        query<CycleLaborPersonProfileQueryRow>(
+          `
+            with ranked_profiles as (
+              select
+                nullif(trim(full_name), '') as full_name,
+                nullif(trim(area_name), '') as area_name,
+                nullif(trim(marital_status), '') as marital_status,
+                age_years,
+                nullif(trim(gender), '') as gender,
+                row_number() over (
+                  order by
+                    case when age_years is null then 1 else 0 end,
+                    age_years desc nulls last,
+                    nullif(trim(full_name), '') asc nulls last
+                ) as rn
+              from slv.tthh_dim_person_profile_scd2
+              where trim(person_id::text) = $1
+            )
+            select
+              full_name,
+              area_name,
+              marital_status,
+              age_years,
+              gender
+            from ranked_profiles
+            where rn = 1
+          `,
+          [normalizedPersonId],
+        ),
+        query<CycleLaborPersonActivityDetailQueryRow>(
+          `
+            with normalized_source as (
+              select
+                cycle_key,
+                trim(person_id::text) as person_id,
+                coalesce(nullif(trim(activity_id::text), ''), 'Sin actividad') as activity_id,
+                coalesce(
+                  nullif(trim(activity_name), ''),
+                  coalesce(nullif(trim(activity_id::text), ''), 'Sin actividad')
+                ) as activity_name,
+                coalesce(nullif(trim(activity_type), ''), 'Sin tipo') as activity_type,
+                coalesce(nullif(trim(unit_of_measure), ''), '') as unit_of_measure,
+                coalesce(actual_hours, 0) as actual_hours,
+                coalesce(effective_hours, 0) as effective_hours,
+                coalesce(units_produced, 0) as units_produced
+              from ${PROD_HOURS_SOURCE}
+            ),
+            person_cycle_activities as (
+              select
+                activity_id,
+                activity_name,
+                activity_type,
+                unit_of_measure,
+                sum(actual_hours) as actual_hours,
+                sum(effective_hours) as effective_hours,
+                sum(units_produced) as units_produced,
+                sum(
+                  case
+                    when replace(replace(lower(unit_of_measure), ' ', ''), '.', '') <> 'hnormales'
+                      then actual_hours
+                    else 0
+                  end
+                ) as non_normal_actual_hours
+              from normalized_source
+              where cycle_key = $1
+                and person_id = $2
+              group by 1, 2, 3, 4
+            ),
+            cycle_activity_totals as (
+              select
+                activity_id,
+                activity_name,
+                activity_type,
+                unit_of_measure,
+                sum(actual_hours) as cycle_actual_hours,
+                sum(units_produced) as cycle_units_produced
+              from normalized_source
+              where cycle_key = $1
+              group by 1, 2, 3, 4
+            ),
+            person_activity_history as (
+              select
+                activity_id,
+                activity_name,
+                activity_type,
+                unit_of_measure,
+                sum(actual_hours) as historical_actual_hours,
+                sum(units_produced) as historical_units_produced
+              from normalized_source
+              where cycle_key <> $1
+                and person_id = $2
+              group by 1, 2, 3, 4
+            )
+            select
+              current_activity.activity_id,
+              current_activity.activity_name,
+              current_activity.activity_type,
+              nullif(current_activity.unit_of_measure, '') as unit_of_measure,
+              current_activity.actual_hours,
+              current_activity.effective_hours,
+              current_activity.units_produced,
+              current_activity.non_normal_actual_hours,
+              history_activity.historical_actual_hours,
+              history_activity.historical_units_produced,
+              cycle_activity.cycle_actual_hours,
+              cycle_activity.cycle_units_produced
+            from person_cycle_activities current_activity
+            left join cycle_activity_totals cycle_activity
+              on cycle_activity.activity_id = current_activity.activity_id
+              and cycle_activity.activity_name = current_activity.activity_name
+              and cycle_activity.activity_type = current_activity.activity_type
+              and cycle_activity.unit_of_measure = current_activity.unit_of_measure
+            left join person_activity_history history_activity
+              on history_activity.activity_id = current_activity.activity_id
+              and history_activity.activity_name = current_activity.activity_name
+              and history_activity.activity_type = current_activity.activity_type
+              and history_activity.unit_of_measure = current_activity.unit_of_measure
+            order by
+              current_activity.activity_name asc,
+              current_activity.activity_id asc
+          `,
+          [normalizedCycleKey, normalizedPersonId],
+        ),
+      ]);
+
+      const profileRow = profileResult.rows[0];
+      const profile = profileRow
+        ? {
+            fullName: cleanText(profileRow.full_name) || null,
+            areaName: cleanText(profileRow.area_name) || null,
+            maritalStatus: cleanText(profileRow.marital_status) || null,
+            ageYears: toNumber(profileRow.age_years),
+            gender: cleanText(profileRow.gender) || null,
+          } satisfies CycleLaborPersonProfile
+        : null;
+
+      const activities = activitiesResult.rows.map((row) => {
+        const actualHours = toNumber(row.actual_hours) ?? 0;
+        const effectiveHours = toNumber(row.effective_hours) ?? 0;
+        const unitsProduced = toNumber(row.units_produced) ?? 0;
+        const historicalActualHours = toNumber(row.historical_actual_hours);
+        const historicalUnitsProduced = toNumber(row.historical_units_produced);
+        const cycleActualHours = toNumber(row.cycle_actual_hours);
+        const cycleUnitsProduced = toNumber(row.cycle_units_produced);
+
+        return {
+          activityId: cleanText(row.activity_id) || "Sin actividad",
+          activityName: cleanText(row.activity_name) || cleanText(row.activity_id) || "Sin actividad",
+          activityType: cleanText(row.activity_type) || "Sin tipo",
+          unitOfMeasure: cleanText(row.unit_of_measure),
+          actualHours: roundValue(actualHours),
+          effectiveHours: roundValue(effectiveHours),
+          unitsProduced: roundValue(unitsProduced),
+          productivity: toRatio(unitsProduced, actualHours),
+          rendimientoPct: toPercentFromNumbers(effectiveHours, actualHours),
+          historicalProductivity: toRatio(historicalUnitsProduced, historicalActualHours),
+          cycleProductivity: toRatio(cycleUnitsProduced, cycleActualHours),
+        } satisfies CycleLaborPersonActivityTypeSummary;
+      });
+
+      const totalActualHours = roundValue(
+        activities.reduce((sum, entry) => sum + entry.actualHours, 0),
+      );
+      const totalEffectiveHours = roundValue(
+        activities.reduce((sum, entry) => sum + entry.effectiveHours, 0),
+      );
+      const totalUnitsProduced = roundValue(
+        activities.reduce((sum, entry) => sum + entry.unitsProduced, 0),
+      );
+      const totalNonNormalActualHours = roundValue(
+        activitiesResult.rows.reduce(
+          (sum, row) => sum + (toNumber(row.non_normal_actual_hours) ?? 0),
+          0,
+        ),
+      );
+
+      return {
+        cycleKey: normalizedCycleKey,
+        personId: normalizedPersonId,
+        generatedAt: new Date().toISOString(),
+        profile,
+        summary: {
+          totalActualHours,
+          totalEffectiveHours,
+          totalUnitsProduced,
+          totalNonNormalActualHours,
+          productivity: toRatio(totalUnitsProduced, totalActualHours),
+          rendimientoPct: toPercentFromNumbers(totalEffectiveHours, totalActualHours),
+          nonNormalActualHoursPct: toPercentFromNumbers(
+            totalNonNormalActualHours,
+            totalActualHours,
+          ),
+          activityCount: activities.length,
+        },
+        activities,
+      };
+    },
+  );
 }
 
 export async function getBedProfilesByCycleKey(
