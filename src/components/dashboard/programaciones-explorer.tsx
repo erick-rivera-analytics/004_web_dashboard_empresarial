@@ -467,17 +467,25 @@ export function ProgramacionesExplorer({
                     cell.isCurrentMonth && !isSel && !isIlumHL && "hover:bg-muted/25",
                   )}
                 >
-                  {/* Gantt-style range bar at bottom of cell */}
+                  {/* Gantt-style range bar - continuous visual */}
                   {isIlumHL && (
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "pointer-events-none absolute bottom-1 h-2 bg-amber-400/50",
-                        isIlumStart ? "left-1/2 rounded-l-full" : "left-0",
-                        isIlumEnd   ? "right-1/2 rounded-r-full" : "right-0",
-                        isIlumStart && isIlumEnd && "left-[25%] right-[25%] rounded-full",
-                      )}
-                    />
+                    <>
+                      {/* Thick continuous bar */}
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "pointer-events-none absolute bottom-0.5 h-3 bg-gradient-to-r from-amber-500 to-orange-500 shadow-sm",
+                          isIlumStart ? "left-1/2 rounded-l-lg" : "left-0",
+                          isIlumEnd   ? "right-1/2 rounded-r-lg" : "right-0",
+                          isIlumStart && isIlumEnd && "left-[20%] right-[20%] rounded-lg",
+                        )}
+                      />
+                      {/* Subtle background tint */}
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-amber-100/30 to-orange-100/20 dark:from-amber-900/15 dark:to-orange-900/10"
+                      />
+                    </>
                   )}
                   {/* Day number */}
                   <span className={cn(
