@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Droplets, Leaf, Lightbulb, LoaderCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Droplets, Leaf, Lightbulb, LoaderCircle, SprayCan } from "lucide-react";
 import useSWR from "swr";
 
 import { MultiSelectField } from "@/components/ui/multi-select-field";
@@ -12,7 +12,8 @@ import type { ProgramacionRecord } from "@/lib/programaciones";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ProgramacionTab = "plantas_muertas" | "iluminacion" | "riego";
+type ProgramacionTab = "plantas_muertas" | "iluminacion" | "fumigacion" | "aplicacion_ga3" | "riego";
+type FumigacionFilter = "todos" | "dron" | "regular";
 
 const TABS: {
   key: ProgramacionTab;
@@ -22,6 +23,8 @@ const TABS: {
 }[] = [
   { key: "plantas_muertas", label: "Plantas Muertas", icon: Leaf,       activityCode: "SPMC" },
   { key: "iluminacion",     label: "Iluminación",     icon: Lightbulb,  activityCode: "ILUMINACION" },
+  { key: "fumigacion",      label: "Fumigación",      icon: SprayCan,   activityCode: null },
+  { key: "aplicacion_ga3",  label: "Aplicación GA3",  icon: SprayCan,   activityCode: "FM13" },
   { key: "riego",           label: "Riego",           icon: Droplets,   activityCode: null },
 ];
 
@@ -141,6 +144,7 @@ function EventPill({ record, onClick, highlighted }: { record: ProgramacionRecor
   const varietyColor = getVarietyColor(record.variety);
   const spAccent     = getSpTypeAccent(record.spType);
   const abbr         = getVarietyAbbr(record.variety);
+  const isDron       = record.activityCode === "03VAFIFMG";
 
   return (
     <div
@@ -159,6 +163,12 @@ function EventPill({ record, onClick, highlighted }: { record: ProgramacionRecor
       title={`${record.blockId} · ${record.variety ?? "—"} · SP: ${record.spType ?? "—"} · Área: ${record.areaId ?? "—"}`}
       onClick={onClick}
     >
+      {/* Fumigación Dron badge */}
+      {isDron && (
+        <span style={{ color: "#0ea5e9", fontSize: "9px", fontWeight: 700, flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          D
+        </span>
+      )}
       {/* ilumLabel badge (Inicio / Fin) */}
       {record.ilumLabel && (
         <span style={{ color: spAccent, fontSize: "9px", fontWeight: 700, flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.04em" }}>
@@ -211,6 +221,7 @@ export function ProgramacionesExplorer({
   const [selectedIlumCycleKey, setSelectedIlumCycleKey] = useState<string | null>(null);
   const [areaFilter,          setAreaFilter]          = useState("all");
   const [faseFilter,          setFaseFilter]          = useState<FaseOption>("");
+  const [fumigacionFilter,    setFumigacionFilter]    = useState<FumigacionFilter>("todos");
 
   const { dateFrom, dateTo } = useMemo(
     () => monthRange(viewDate.getFullYear(), viewDate.getMonth()),
@@ -246,14 +257,22 @@ export function ProgramacionesExplorer({
 
   // Filtered records — Riego sin activityCode → vacío
   const filtered = useMemo(() => {
-    if (!activeCode) return [];
+    if (activeTab === "riego" || (!activeCode && activeTab !== "fumigacion")) return [];
     return allRecords.filter((r) => {
-      if (r.activityCode !== activeCode) return false;
+      // Fumigación: match both dron (03VAFIFMG) and regular (FMGYP)
+      if (activeTab === "fumigacion") {
+        if (r.activityCode !== "03VAFIFMG" && r.activityCode !== "FMGYP") return false;
+        // Apply dron filter
+        if (fumigacionFilter === "dron" && r.activityCode !== "03VAFIFMG") return false;
+        if (fumigacionFilter === "regular" && r.activityCode !== "FMGYP") return false;
+      } else {
+        if (r.activityCode !== activeCode) return false;
+      }
       if (selectedAreas.length && !selectedAreas.includes(r.areaId ?? "")) return false;
       if (faseFilter && r.fase !== faseFilter) return false;
       return true;
     });
-  }, [allRecords, activeCode, selectedAreas, faseFilter]);
+  }, [allRecords, activeCode, activeTab, selectedAreas, faseFilter, fumigacionFilter]);
 
   // Index by date
   const byDate = useMemo(() => {
@@ -315,9 +334,18 @@ export function ProgramacionesExplorer({
         {TABS.map((tab) => {
           const Icon   = tab.icon;
           const active = activeTab === tab.key;
-          const hasData = tab.activityCode
-            ? allRecords.some((r) => r.activityCode === tab.activityCode)
-            : false;
+          let hasData = false;
+          if (tab.key === "fumigacion") {
+            hasData = allRecords.some((r) => r.activityCode === "03VAFIFMG" || r.activityCode === "FMGYP");
+          } else if (tab.key === "aplicacion_ga3") {
+            hasData = true; // FM13 is in the database, never show PRONTO
+          } else if (tab.activityCode) {
+            hasData = allRecords.some((r) => r.activityCode === tab.activityCode);
+          }
+          // Reset fumigacion filter when switching tabs
+          if (active && activeTab !== "fumigacion" && fumigacionFilter !== "todos") {
+            setFumigacionFilter("todos");
+          }
           return (
             <button
               key={tab.key}
@@ -384,6 +412,44 @@ export function ProgramacionesExplorer({
             ))}
           </div>
         </div>
+
+        {activeTab === "fumigacion" && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium leading-none">Tipo</p>
+            <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-card p-1">
+              <button
+                type="button"
+                onClick={() => setFumigacionFilter("todos")}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                  fumigacionFilter === "todos" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setFumigacionFilter("dron")}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                  fumigacionFilter === "dron" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Dron
+              </button>
+              <button
+                type="button"
+                onClick={() => setFumigacionFilter("regular")}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                  fumigacionFilter === "regular" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Regular
+              </button>
+            </div>
+          </div>
+        )}
 
         {isLoading && (
           <LoaderCircle className="size-4 animate-spin text-muted-foreground" />

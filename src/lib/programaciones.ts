@@ -5,7 +5,7 @@ import { cachedAsync } from "@/lib/server-cache";
 
 const PROG_TTL_MS = 5 * 60 * 1000; // 5 min
 
-export const ACTIVITY_CODES = ["SPMC", "ILUMINACION"] as const;
+export const ACTIVITY_CODES = ["SPMC", "ILUMINACION", "FMGYP", "03VAFIFMG", "FM13"] as const;
 export type ActivityCode = (typeof ACTIVITY_CODES)[number];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -79,6 +79,24 @@ export async function getProgramaciones(
           where ib.end_date >= $1::date
             and ib.end_date <= $2::date
             and ib.end_date != ib.start_date
+
+          union all
+
+          -- FUMIGACION: todos los eventos en rango (FMGYP y 03VAFIFMG)
+          select cycle_key, activity_code, event_date, null::text as ilum_label
+          from mdl.prod_ref_vegetativo_subset_scd2
+          where activity_code IN ('FMGYP', '03VAFIFMG')
+            and event_date >= $1::date
+            and event_date <= $2::date
+
+          union all
+
+          -- APLICACION GA3: todos los eventos en rango
+          select cycle_key, activity_code, event_date, null::text as ilum_label
+          from mdl.prod_ref_vegetativo_subset_scd2
+          where activity_code = 'FM13'
+            and event_date >= $1::date
+            and event_date <= $2::date
         )
         select
           nullif(trim(cp.block_id), '')  as block_id,
