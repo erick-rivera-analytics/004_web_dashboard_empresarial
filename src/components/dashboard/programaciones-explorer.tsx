@@ -454,7 +454,11 @@ export function ProgramacionesExplorer({
               const events      = byDate.get(dateStr) ?? [];
               const isToday     = dateStr === todayStr;
               const isSel       = dateStr === selected;
-              const isIlumHL    = activeTab === "iluminacion" && ilumHighlightedDates.has(dateStr);
+              const isIlumHL    = activeTab === "iluminacion" && ilumCycleDateRange != null
+                                    && dateStr >= ilumCycleDateRange.min && dateStr <= ilumCycleDateRange.max;
+              const isIlumStart = activeTab === "iluminacion" && ilumCycleDateRange?.min === dateStr;
+              const isIlumEnd   = activeTab === "iluminacion" && ilumCycleDateRange?.max === dateStr;
+              const col         = i % 7;
               const isLastRow   = i >= 35;
               const isLastCol   = (i + 1) % 7 === 0;
 
@@ -464,20 +468,34 @@ export function ProgramacionesExplorer({
                   type="button"
                   onClick={() => setSelected(isSel ? null : dateStr)}
                   className={cn(
-                    "group min-h-[88px] border-b border-r border-border/40 p-2 text-left transition-colors",
+                    "group relative min-h-[88px] border-b border-r border-border/40 p-2 text-left transition-colors",
                     isLastRow && "border-b-0",
                     isLastCol && "border-r-0",
                     !cell.isCurrentMonth && "bg-muted/20",
                     isSel && "ring-1 ring-inset ring-border bg-muted/40",
-                    isIlumHL && !isSel && "bg-amber-50/40 dark:bg-amber-900/10",
+                    isIlumHL && !isSel && "bg-amber-50/30 dark:bg-amber-900/10",
                     cell.isCurrentMonth && !isSel && !isIlumHL && "hover:bg-muted/25",
                   )}
                 >
+                  {/* Ilum range bar */}
+                  {isIlumHL && (
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "pointer-events-none absolute bottom-0 h-1 bg-amber-400/60",
+                        isIlumStart ? "left-1/2 rounded-l-full" : col === 0 ? "left-0" : "left-0",
+                        isIlumEnd   ? "right-1/2 rounded-r-full" : isLastCol ? "right-0" : "right-0",
+                        isIlumStart && isIlumEnd && "left-[30%] right-[30%] rounded-full",
+                      )}
+                    />
+                  )}
                   {/* Day number */}
                   <span className={cn(
                     "flex size-7 items-center justify-center rounded-full text-sm font-medium leading-none",
-                    isToday   && "bg-foreground text-background",
-                    isIlumHL  && !isToday && "ring-2 ring-amber-400/70",
+                    isToday      && "bg-foreground text-background",
+                    isIlumStart  && !isToday && "bg-amber-400 text-white",
+                    isIlumEnd    && !isToday && !isIlumStart && "bg-orange-400 text-white",
+                    isIlumHL && !isIlumStart && !isIlumEnd && !isToday && "ring-1 ring-amber-300/70",
                     !isToday  && cell.isCurrentMonth  && "text-foreground",
                     !isToday  && !cell.isCurrentMonth && "text-muted-foreground/40",
                   )}>
