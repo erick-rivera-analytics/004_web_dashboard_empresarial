@@ -278,17 +278,16 @@ export function ProgramacionesExplorer({
       : [],
     [filtered, selectedIlumCycleKey],
   );
-  // Get ALL cycle records and compute min/max eventDate
-  const ilumCycleDateRange = useMemo(() => {
-    if (!selectedIlumCycleKey || !swrData) return null;
-    const cycleRecords = swrData.filter((r) => r.cycleKey === selectedIlumCycleKey);
-    if (cycleRecords.length === 0) return null;
-    const dates = cycleRecords.map((r) => r.eventDate).sort();
-    return {
-      min: dates[0],
-      max: dates[dates.length - 1],
-    };
-  }, [selectedIlumCycleKey, swrData]);
+  // Fetch correct min/max from API (includes all months, not just current month)
+  const { data: cycleRangeData } = useSWR<{ min: string | null; max: string | null }>(
+    selectedIlumCycleKey ? `/api/programaciones/cycle-range/${encodeURIComponent(selectedIlumCycleKey)}` : null,
+    fetchJson,
+    { revalidateOnFocus: false, dedupingInterval: 60000 }
+  );
+
+  const ilumCycleDateRange = cycleRangeData?.min && cycleRangeData?.max
+    ? { min: cycleRangeData.min, max: cycleRangeData.max }
+    : null;
 
   const ilumDays = ilumCycleDateRange?.min && ilumCycleDateRange?.max
     ? Math.round(
