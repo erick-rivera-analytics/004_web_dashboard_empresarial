@@ -548,7 +548,7 @@ export function ProgramacionesExplorer({
                     Haz clic en una etiqueta de iluminación para ver el detalle del ciclo.
                   </p>
                 ) : (() => {
-                  const rec = ilumStartRec ?? ilumEndRec;
+                  const rec = ilumCycleRecords[0] ?? null;
                   if (!rec) return (
                     <p className="py-3 text-center text-sm text-muted-foreground">Sin datos para este ciclo.</p>
                   );
