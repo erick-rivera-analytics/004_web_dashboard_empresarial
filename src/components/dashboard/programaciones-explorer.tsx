@@ -275,33 +275,30 @@ export function ProgramacionesExplorer({
       : [],
     [filtered, selectedIlumCycleKey],
   );
-  // Get ALL cycle dates from swrData (not just current month)
-  const ilumHighlightedDates = useMemo(
-    () => {
-      if (!selectedIlumCycleKey || !swrData) return new Set<string>();
-      return new Set(
-        swrData
-          .filter((r) => r.cycleKey === selectedIlumCycleKey)
-          .map((r) => r.eventDate)
-      );
-    },
-    [selectedIlumCycleKey, swrData],
-  );
   // Get start/end from cycle records (month-specific) for detail display
   const ilumStartRec = ilumCycleRecords.find((r) => r.ilumLabel === "Inicio") ?? null;
   const ilumEndRec   = ilumCycleRecords.find((r) => r.ilumLabel === "Fin") ?? null;
 
-  // Get cycle date range from highlighted dates (includes all cycle dates)
-  const ilumCycleDateRange = ilumHighlightedDates.size > 0
-    ? {
-        min: Array.from(ilumHighlightedDates).sort()[0],
-        max: Array.from(ilumHighlightedDates).sort()[ilumHighlightedDates.size - 1],
-      }
-    : null;
+  // Build date range: use swrData for full cross-month range
+  const ilumCycleDateRange = useMemo(() => {
+    if (!selectedIlumCycleKey) return null;
+    // Prefer swrData (full dataset) for the range
+    const allRecs = (swrData ?? []).filter((r) => r.cycleKey === selectedIlumCycleKey);
+    if (allRecs.length === 0) return null;
+    const dates = allRecs.map((r) => r.eventDate).sort();
+    const startRec = allRecs.find((r) => r.ilumLabel === "Inicio");
+    const endRec   = allRecs.find((r) => r.ilumLabel === "Fin");
+    return {
+      min: dates[0],
+      max: dates[dates.length - 1],
+      startDate: startRec?.eventDate ?? null,
+      endDate: endRec?.eventDate ?? null,
+    };
+  }, [selectedIlumCycleKey, swrData]);
 
-  const ilumDays = ilumCycleDateRange
+  const ilumDays = ilumCycleDateRange?.startDate && ilumCycleDateRange?.endDate
     ? Math.round(
-        (new Date(ilumCycleDateRange.max).getTime() - new Date(ilumCycleDateRange.min).getTime())
+        (new Date(ilumCycleDateRange.endDate).getTime() - new Date(ilumCycleDateRange.startDate).getTime())
         / 86_400_000,
       )
     : null;
@@ -456,8 +453,8 @@ export function ProgramacionesExplorer({
               const isSel       = dateStr === selected;
               const isIlumHL    = activeTab === "iluminacion" && ilumCycleDateRange != null
                                     && dateStr >= ilumCycleDateRange.min && dateStr <= ilumCycleDateRange.max;
-              const isIlumStart = activeTab === "iluminacion" && ilumCycleDateRange?.min === dateStr;
-              const isIlumEnd   = activeTab === "iluminacion" && ilumCycleDateRange?.max === dateStr;
+              const isIlumStart = activeTab === "iluminacion" && (ilumCycleDateRange?.startDate ?? ilumCycleDateRange?.min) === dateStr;
+              const isIlumEnd   = activeTab === "iluminacion" && (ilumCycleDateRange?.endDate ?? ilumCycleDateRange?.max) === dateStr;
               const col         = i % 7;
               const isLastRow   = i >= 35;
               const isLastCol   = (i + 1) % 7 === 0;
@@ -477,27 +474,26 @@ export function ProgramacionesExplorer({
                     cell.isCurrentMonth && !isSel && !isIlumHL && "hover:bg-muted/25",
                   )}
                 >
-                  {/* Ilum range bar */}
+                  {/* Gantt-style range bar at bottom of cell */}
                   {isIlumHL && (
                     <span
                       aria-hidden
                       className={cn(
-                        "pointer-events-none absolute bottom-0 h-1 bg-amber-400/60",
-                        isIlumStart ? "left-1/2 rounded-l-full" : col === 0 ? "left-0" : "left-0",
-                        isIlumEnd   ? "right-1/2 rounded-r-full" : isLastCol ? "right-0" : "right-0",
-                        isIlumStart && isIlumEnd && "left-[30%] right-[30%] rounded-full",
+                        "pointer-events-none absolute bottom-1 h-2 bg-amber-400/50",
+                        isIlumStart ? "left-1/2 rounded-l-full" : "left-0",
+                        isIlumEnd   ? "right-1/2 rounded-r-full" : "right-0",
+                        isIlumStart && isIlumEnd && "left-[25%] right-[25%] rounded-full",
                       )}
                     />
                   )}
                   {/* Day number */}
                   <span className={cn(
                     "flex size-7 items-center justify-center rounded-full text-sm font-medium leading-none",
-                    isToday      && "bg-foreground text-background",
-                    isIlumStart  && !isToday && "bg-amber-400 text-white",
-                    isIlumEnd    && !isToday && !isIlumStart && "bg-orange-400 text-white",
-                    isIlumHL && !isIlumStart && !isIlumEnd && !isToday && "ring-1 ring-amber-300/70",
-                    !isToday  && cell.isCurrentMonth  && "text-foreground",
-                    !isToday  && !cell.isCurrentMonth && "text-muted-foreground/40",
+                    isToday     && "bg-foreground text-background",
+                    isIlumStart && !isToday && "bg-amber-400 text-white",
+                    isIlumEnd   && !isToday && !isIlumStart && "bg-orange-400 text-white",
+                    !isToday && cell.isCurrentMonth  && "text-foreground",
+                    !isToday && !cell.isCurrentMonth && "text-muted-foreground/40",
                   )}>
                     {cell.date.getDate()}
                   </span>
@@ -603,27 +599,6 @@ export function ProgramacionesExplorer({
                         )}
                       </dl>
 
-                      {/* Simple timeline connecting start and end */}
-                      {ilumCycleDateRange && (
-                        <div className="mt-4 px-4 py-4">
-                          <div className="relative flex items-start gap-4">
-                            {/* Start date */}
-                            <div className="flex flex-col items-center flex-shrink-0">
-                              <div className="size-2.5 rounded-full bg-amber-400" />
-                            </div>
-                            {/* Connecting line */}
-                            <div className="absolute left-[0.3125rem] top-2.5 bottom-0 w-px bg-gradient-to-b from-amber-400 via-amber-300 to-orange-400" style={{ height: "100%" }} />
-                            {/* Date range text */}
-                            <div className="flex-1 min-w-0">
-                              <div className="text-xs text-muted-foreground mb-1">{formatDate(ilumCycleDateRange.min)}</div>
-                              <div className="text-xs text-muted-foreground mt-2">{formatDate(ilumCycleDateRange.max)}</div>
-                              {ilumDays !== null && (
-                                <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-2">{ilumDays} días</div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
 
                       <div className="mt-3 rounded-xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/30 dark:bg-amber-900/10 divide-y divide-amber-200/40 dark:divide-amber-800/30 text-[12px]">
                         {ilumCycleDateRange ? (
@@ -632,7 +607,11 @@ export function ProgramacionesExplorer({
                               <span className="inline-block size-2 rounded-full bg-amber-400" />
                               Inicio
                             </span>
-                            <span className="font-semibold">{formatDate(ilumCycleDateRange.min)}</span>
+                            <span className="font-semibold">
+                              {ilumCycleDateRange.startDate
+                                ? formatDate(ilumCycleDateRange.startDate)
+                                : <span className="text-muted-foreground/50 italic">otro mes</span>}
+                            </span>
                           </div>
                         ) : null}
                         {ilumCycleDateRange ? (
@@ -641,7 +620,11 @@ export function ProgramacionesExplorer({
                               <span className="inline-block size-2 rounded-full bg-orange-400" />
                               Fin
                             </span>
-                            <span className="font-semibold">{formatDate(ilumCycleDateRange.max)}</span>
+                            <span className="font-semibold">
+                              {ilumCycleDateRange.endDate
+                                ? formatDate(ilumCycleDateRange.endDate)
+                                : <span className="text-muted-foreground/50 italic">otro mes</span>}
+                            </span>
                           </div>
                         ) : null}
                         {ilumDays !== null && (
