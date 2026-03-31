@@ -25,12 +25,12 @@ const TABS: {
   { key: "riego",           label: "Riego",           icon: Droplets,   activityCode: null },
 ];
 
-const DAY_LABELS  = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const DAY_LABELS  = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const MONTH_NAMES = [
   "Enero","Febrero","Marzo","Abril","Mayo","Junio",
   "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
 ];
-const FASE_OPTIONS = ["Planificado", "Activo", "Historia"] as const;
+const FASE_OPTIONS = ["Planificado", "Vegetativo", "Cosecha", "Historia"] as const;
 type FaseOption = (typeof FASE_OPTIONS)[number] | "";
 
 // ── Color palettes (inline styles — safe with Tailwind purge) ─────────────────
