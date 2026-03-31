@@ -278,37 +278,21 @@ export function ProgramacionesExplorer({
       : [],
     [filtered, selectedIlumCycleKey],
   );
-  // Get start/end from ALL cycle records (any month) using swrData
-  const ilumStartRec = useMemo(
-    () => selectedIlumCycleKey && swrData
-      ? swrData.find((r) => r.cycleKey === selectedIlumCycleKey && r.ilumLabel === "Inicio") ?? null
-      : null,
-    [selectedIlumCycleKey, swrData],
-  );
-  const ilumEndRec = useMemo(
-    () => selectedIlumCycleKey && swrData
-      ? swrData.find((r) => r.cycleKey === selectedIlumCycleKey && r.ilumLabel === "Fin") ?? null
-      : null,
-    [selectedIlumCycleKey, swrData],
-  );
-
-  // Build date range from start/end records
+  // Get ALL cycle records and compute min/max eventDate
   const ilumCycleDateRange = useMemo(() => {
-    if (!ilumStartRec && !ilumEndRec) return null;
-    const startDate = ilumStartRec?.eventDate;
-    const endDate = ilumEndRec?.eventDate;
-    if (!startDate && !endDate) return null;
+    if (!selectedIlumCycleKey || !swrData) return null;
+    const cycleRecords = swrData.filter((r) => r.cycleKey === selectedIlumCycleKey);
+    if (cycleRecords.length === 0) return null;
+    const dates = cycleRecords.map((r) => r.eventDate).sort();
     return {
-      min: startDate && endDate ? (startDate <= endDate ? startDate : endDate) : startDate || endDate || null,
-      max: startDate && endDate ? (startDate > endDate ? startDate : endDate) : startDate || endDate || null,
-      startDate,
-      endDate,
+      min: dates[0],
+      max: dates[dates.length - 1],
     };
-  }, [ilumStartRec, ilumEndRec]);
+  }, [selectedIlumCycleKey, swrData]);
 
-  const ilumDays = ilumCycleDateRange?.startDate && ilumCycleDateRange?.endDate
+  const ilumDays = ilumCycleDateRange?.min && ilumCycleDateRange?.max
     ? Math.round(
-        (new Date(ilumCycleDateRange.endDate).getTime() - new Date(ilumCycleDateRange.startDate).getTime())
+        (new Date(ilumCycleDateRange.max).getTime() - new Date(ilumCycleDateRange.min).getTime())
         / 86_400_000,
       )
     : null;
@@ -463,8 +447,8 @@ export function ProgramacionesExplorer({
               const isSel       = dateStr === selected;
               const isIlumHL    = activeTab === "iluminacion" && ilumCycleDateRange != null
                                     && dateStr >= ilumCycleDateRange.min && dateStr <= ilumCycleDateRange.max;
-              const isIlumStart = activeTab === "iluminacion" && (ilumCycleDateRange?.startDate ?? ilumCycleDateRange?.min) === dateStr;
-              const isIlumEnd   = activeTab === "iluminacion" && (ilumCycleDateRange?.endDate ?? ilumCycleDateRange?.max) === dateStr;
+              const isIlumStart = activeTab === "iluminacion" && ilumCycleDateRange?.min === dateStr;
+              const isIlumEnd   = activeTab === "iluminacion" && ilumCycleDateRange?.max === dateStr;
               const col         = i % 7;
               const isLastRow   = i >= 35;
               const isLastCol   = (i + 1) % 7 === 0;
@@ -611,32 +595,24 @@ export function ProgramacionesExplorer({
 
 
                       <div className="mt-3 rounded-xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/30 dark:bg-amber-900/10 divide-y divide-amber-200/40 dark:divide-amber-800/30 text-[12px]">
-                        {(ilumStartRec || ilumCycleDateRange) ? (
+                        {ilumCycleDateRange?.min && (
                           <div className="flex items-center justify-between gap-2 px-4 py-2.5">
                             <span className="flex items-center gap-1.5 text-muted-foreground">
                               <span className="inline-block size-2 rounded-full bg-amber-400" />
                               Inicio
                             </span>
-                            <span className="font-semibold">
-                              {ilumStartRec
-                                ? formatDate(ilumStartRec.eventDate)
-                                : ilumCycleDateRange?.min ? formatDate(ilumCycleDateRange.min) : "-"}
-                            </span>
+                            <span className="font-semibold">{formatDate(ilumCycleDateRange.min)}</span>
                           </div>
-                        ) : null}
-                        {(ilumEndRec || ilumCycleDateRange) ? (
+                        )}
+                        {ilumCycleDateRange?.max && (
                           <div className="flex items-center justify-between gap-2 px-4 py-2.5">
                             <span className="flex items-center gap-1.5 text-muted-foreground">
                               <span className="inline-block size-2 rounded-full bg-orange-400" />
                               Fin
                             </span>
-                            <span className="font-semibold">
-                              {ilumEndRec
-                                ? formatDate(ilumEndRec.eventDate)
-                                : ilumCycleDateRange?.max ? formatDate(ilumCycleDateRange.max) : "-"}
-                            </span>
+                            <span className="font-semibold">{formatDate(ilumCycleDateRange.max)}</span>
                           </div>
-                        ) : null}
+                        )}
                         {ilumDays !== null && (
                           <div className="flex items-center justify-between gap-2 px-4 py-2.5">
                             <span className="text-muted-foreground">Duración</span>
