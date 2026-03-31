@@ -594,29 +594,29 @@ export function ProgramacionesExplorer({
                       </dl>
 
 
-                      <div className="mt-3 rounded-xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/30 dark:bg-amber-900/10 divide-y divide-amber-200/40 dark:divide-amber-800/30 text-[12px]">
+                      <div className="mt-3 space-y-2">
                         {ilumCycleDateRange?.min && (
-                          <div className="flex items-center justify-between gap-2 px-4 py-2.5">
-                            <span className="flex items-center gap-1.5 text-muted-foreground">
-                              <span className="inline-block size-2 rounded-full bg-amber-400" />
-                              Inicio
+                          <div className="flex items-center justify-between rounded-lg bg-amber-50/50 dark:bg-amber-900/20 px-3 py-2">
+                            <span className="flex items-center gap-2">
+                              <span className="inline-block size-2.5 rounded-full bg-amber-400 shadow-sm" />
+                              <span className="text-xs text-muted-foreground">Inicio</span>
                             </span>
-                            <span className="font-semibold">{formatDate(ilumCycleDateRange.min)}</span>
+                            <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">{formatDate(ilumCycleDateRange.min)}</span>
                           </div>
                         )}
                         {ilumCycleDateRange?.max && (
-                          <div className="flex items-center justify-between gap-2 px-4 py-2.5">
-                            <span className="flex items-center gap-1.5 text-muted-foreground">
-                              <span className="inline-block size-2 rounded-full bg-orange-400" />
-                              Fin
+                          <div className="flex items-center justify-between rounded-lg bg-orange-50/50 dark:bg-orange-900/20 px-3 py-2">
+                            <span className="flex items-center gap-2">
+                              <span className="inline-block size-2.5 rounded-full bg-orange-400 shadow-sm" />
+                              <span className="text-xs text-muted-foreground">Fin</span>
                             </span>
-                            <span className="font-semibold">{formatDate(ilumCycleDateRange.max)}</span>
+                            <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">{formatDate(ilumCycleDateRange.max)}</span>
                           </div>
                         )}
                         {ilumDays !== null && (
-                          <div className="flex items-center justify-between gap-2 px-4 py-2.5">
-                            <span className="text-muted-foreground">Duración</span>
-                            <span className="font-bold text-amber-600 dark:text-amber-400">{ilumDays} días</span>
+                          <div className="flex items-center justify-between rounded-lg bg-slate-100/60 dark:bg-slate-800/40 px-3 py-2">
+                            <span className="text-xs text-muted-foreground">Duración</span>
+                            <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{ilumDays} días</span>
                           </div>
                         )}
                       </div>

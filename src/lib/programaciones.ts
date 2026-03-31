@@ -89,13 +89,14 @@ export async function getProgramaciones(
           nullif(trim(cp.variety), '')   as variety,
           nullif(trim(cp.sp_type), '')   as sp_type,
           case
-            when current_date < cp.pruning_date then 'Planificado'
-            when cp.pruning_date <= current_date and current_date < coalesce(cp.harvest_start_date, cp.harvest_end_date, cp.pruning_date)
-              then 'Vegetativo'
-            when coalesce(cp.harvest_start_date, cp.pruning_date) <= current_date and current_date < coalesce(cp.harvest_end_date, cp.harvest_start_date)
-              then 'Cosecha'
-            when current_date >= coalesce(cp.harvest_end_date, cp.harvest_start_date, '2099-12-31')
+            when current_date < cp.pruning_date
+              then 'Planificado'
+            when current_date >= cp.harvest_end_date
               then 'Historia'
+            when current_date >= cp.harvest_start_date and current_date < cp.harvest_end_date
+              then 'Cosecha'
+            when current_date >= cp.pruning_date and current_date < cp.harvest_start_date
+              then 'Vegetativo'
             else 'Historia'
           end as fase,
           area_info.area_id
