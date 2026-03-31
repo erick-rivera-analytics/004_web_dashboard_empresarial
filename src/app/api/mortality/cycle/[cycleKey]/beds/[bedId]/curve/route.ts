@@ -1,14 +1,18 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import { handleApiError } from "@/lib/api-error";
+import { requireAuth } from "@/lib/api-auth";
 import { getBedMortalityCurveByCycleAndBed } from "@/lib/mortality";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   context: { params: Promise<{ cycleKey: string; bedId: string }> },
 ) {
+  const authError = requireAuth(request);
+  if (authError) return authError;
+
   try {
     const { cycleKey, bedId } = await context.params;
     const data = await getBedMortalityCurveByCycleAndBed(

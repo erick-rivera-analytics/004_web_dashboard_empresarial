@@ -1,14 +1,18 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import { handleApiError } from "@/lib/api-error";
+import { requireAuth } from "@/lib/api-auth";
 import { getCycleProfilesByBlock } from "@/lib/fenograma";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   context: { params: Promise<{ parentBlock: string }> },
 ) {
+  const authError = requireAuth(request);
+  if (authError) return authError;
+
   try {
     const { parentBlock } = await context.params;
     const url = new URL(request.url);

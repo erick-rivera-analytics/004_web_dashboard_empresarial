@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { requireAuth } from "@/lib/api-auth";
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   context: { params: Promise<{ cycleKey: string }> }
 ) {
+  const authError = requireAuth(request);
+  if (authError) return authError;
+
   try {
     const { cycleKey } = await context.params;
     const decodedKey = decodeURIComponent(cycleKey);

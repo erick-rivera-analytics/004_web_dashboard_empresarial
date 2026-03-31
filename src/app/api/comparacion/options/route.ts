@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { handleApiError } from "@/lib/api-error";
+import { requireAuth } from "@/lib/api-auth";
 import { normalizeComparisonFilters, searchComparisonCycles } from "@/lib/comparacion";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const authError = requireAuth(request);
+  if (authError) return authError;
+
   try {
     const filters = normalizeComparisonFilters({
       q: request.nextUrl.searchParams.get("q") ?? undefined,

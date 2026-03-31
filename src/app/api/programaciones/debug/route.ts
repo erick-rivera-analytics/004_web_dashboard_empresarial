@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { requireAuth } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
 /** Endpoint temporal de diagnóstico — borrar después de confirmar datos */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = requireAuth(request);
+  if (authError) return authError;
+
   const results: Record<string, unknown> = {};
 
   // 1. Columnas de la tabla

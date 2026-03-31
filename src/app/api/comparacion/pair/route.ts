@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { handleApiError } from "@/lib/api-error";
+import { requireAuth } from "@/lib/api-auth";
 import { getComparisonPair } from "@/lib/comparacion";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const authError = requireAuth(request);
+  if (authError) return authError;
+
   try {
     const left = request.nextUrl.searchParams.get("left");
     const right = request.nextUrl.searchParams.get("right");
