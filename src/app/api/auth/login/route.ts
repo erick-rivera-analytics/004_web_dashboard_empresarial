@@ -4,7 +4,8 @@ import { validateCredentials, setSessionCookie } from "@/lib/auth";
 export async function POST(req: Request) {
   const { username, password } = await req.json();
 
-  if (!validateCredentials(username, password)) {
+  const isValid = await validateCredentials(username, password);
+  if (!isValid) {
     return NextResponse.json(
       { error: "Credenciales incorrectas" },
       { status: 401 },

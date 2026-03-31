@@ -1,14 +1,29 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
+import { query } from "./db";
 
-const ADMIN_USERNAME = "admin";
-const ADMIN_PASSWORD = "atlas2026";
 const SECRET = "wh-dashboard-secret-key-2026";
 const COOKIE_NAME = "wh-session";
 
-/** Validate credentials. Returns true if valid. */
-export function validateCredentials(username: string, password: string) {
-  return username === ADMIN_USERNAME && password === ADMIN_PASSWORD;
+/** Validate credentials against PostgreSQL users table. */
+export async function validateCredentials(username: string, password: string): Promise<boolean> {
+  try {
+    const result = await query<{ password_hash: string; is_active: boolean }>(
+      "SELECT password_hash, is_active FROM public.users WHERE username = $1 LIMIT 1",
+      [username]
+    );
+
+    if (result.rows.length === 0) return false;
+
+    const user = result.rows[0];
+    if (!user.is_active) return false;
+
+    return await bcrypt.compare(password, user.password_hash);
+  } catch (error) {
+    console.error("[AUTH] Validation error:", error);
+    return false;
+  }
 }
 
 /** Create a signed session token. */
