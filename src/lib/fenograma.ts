@@ -42,7 +42,7 @@ type CycleProfileQueryRow = {
   block_id: string | null;
   area_id: string | null;
   soil_type: string | null;
-  pruning_date: string | null;
+  sp_date: string | null;
   status: string | null;
   is_valid: boolean | null;
   change_reason: string | null;
@@ -76,6 +76,7 @@ type BedProfileQueryRow = {
   length: number | string | null;
   width: number | string | null;
   pambiles_count: string | number | null;
+  bed_area: string | number | null;
   variety: string | null;
   sp_type: string | null;
   attributes: string | null;
@@ -102,6 +103,7 @@ type BedProfileBaseQueryRow = {
   length: number | string | null;
   width: number | string | null;
   pambiles_count: string | number | null;
+  bed_area: string | number | null;
   variety: string | null;
   sp_type: string | null;
   attributes: string | null;
@@ -177,6 +179,8 @@ type HarvestCurveQueryRow = {
 };
 
 type CycleLaborHoursQueryRow = {
+  cost_area: string | null;
+  sub_cost_center: string | null;
   cycle_key: string;
   person_id: string | number | null;
   activity_id: string | number | null;
@@ -189,7 +193,7 @@ type CycleLaborHoursQueryRow = {
 };
 
 type CycleLaborPersonProfileQueryRow = {
-  full_name: string | null;
+  person_name: string | null;
   area_name: string | null;
   marital_status: string | null;
   age_years: string | number | null;
@@ -198,7 +202,7 @@ type CycleLaborPersonProfileQueryRow = {
 
 type CycleLaborPersonLookupQueryRow = {
   person_id: string | null;
-  full_name: string | null;
+  person_name: string | null;
 };
 
 type CycleLaborPersonActivityDetailQueryRow = {
@@ -528,6 +532,27 @@ export type CycleLaborActivityTypeSummary = {
   activities: CycleLaborActivitySummary[];
 };
 
+export type CycleLaborSubCostCenterSummary = {
+  subCostCenter: string;
+  costArea: string;
+  actualHours: number;
+  effectiveHours: number;
+  unitsProduced: number;
+  productivity: number | null;
+  rendimientoPct: number | null;
+  activityTypes: CycleLaborActivityTypeSummary[];
+};
+
+export type CycleLaborCostAreaSummary = {
+  costArea: string;
+  actualHours: number;
+  effectiveHours: number;
+  unitsProduced: number;
+  productivity: number | null;
+  rendimientoPct: number | null;
+  subCostCenters: CycleLaborSubCostCenterSummary[];
+};
+
 export type CycleLaborHoursPayload = {
   cycleKey: string;
   generatedAt: string;
@@ -535,11 +560,13 @@ export type CycleLaborHoursPayload = {
     totalActualHours: number;
     totalEffectiveHours: number;
     totalUnitsProduced: number;
+    costAreaCount: number;
+    subCostCenterCount: number;
     activityTypeCount: number;
     activityCount: number;
     personCount: number;
   };
-  activityTypes: CycleLaborActivityTypeSummary[];
+  costAreas: CycleLaborCostAreaSummary[];
 };
 
 export type CycleLaborPersonProfile = {
@@ -751,19 +778,19 @@ async function getPersonNameMap(personIds: string[]) {
       with ranked_profiles as (
         select
           trim(person_id::text) as person_id,
-          nullif(trim(full_name), '') as full_name,
+          nullif(trim(person_name), '') as person_name,
           row_number() over (
             partition by trim(person_id::text)
             order by
-              case when nullif(trim(full_name), '') is null then 1 else 0 end,
-              nullif(trim(full_name), '') asc
+              case when nullif(trim(person_name), '') is null then 1 else 0 end,
+              nullif(trim(person_name), '') asc
           ) as rn
         from slv.tthh_dim_person_profile_scd2
         where trim(person_id::text) = any($1::text[])
       )
       select
         person_id,
-        full_name
+        person_name
       from ranked_profiles
       where rn = 1
     `,
@@ -774,7 +801,7 @@ async function getPersonNameMap(personIds: string[]) {
     result.rows
       .map((row) => {
         const personId = cleanText(row.person_id);
-        const fullName = cleanText(row.full_name);
+        const fullName = cleanText(row.person_name);
         return personId && fullName ? [personId, fullName] as const : null;
       })
       .filter((row): row is readonly [string, string] => row !== null),
@@ -958,7 +985,7 @@ function mapBedProfileRow(row: BedProfileQueryRow): BedProfileCard {
     isValid: row.is_valid !== false,
     length: toNumber(row.length),
     width: toNumber(row.width),
-    bedArea: toBedArea(attributes),
+    bedArea: toNumber(row.bed_area),
     pambilesCount: toNumber(row.pambiles_count),
     variety: cleanText(row.variety),
     spType: cleanText(row.sp_type),
@@ -1085,12 +1112,20 @@ async function getBedProfiles(
         bp.length,
         bp.width,
         bp.pambiles_count,
-        bp.variety,
-        bp.sp_type,
-        bp.attributes,
+        bp.bed_area,
+        cp_info.variety,
+        cp_info.sp_type,
+        bp.attributes_jsonb as attributes,
         bp.is_valid,
         bp.change_reason
       from slv.camp_dim_bed_profile_scd2 bp
+      left join lateral (
+        select cp2.variety, cp2.sp_type
+        from slv.camp_dim_cycle_profile_scd2 cp2
+        where cp2.cycle_key = bp.cycle_key
+        order by cp2.is_current desc, cp2.valid_from desc nulls last
+        limit 1
+      ) cp_info on true
       ${baseWhereClause}
       order by
         bp.is_current desc,
@@ -1247,7 +1282,7 @@ export async function getFenogramaDashboardData(
             from ${FENOGRAMA_SOURCE} mv
             left join lateral (
               select
-                pruning_date      as cp_sp_date,
+                sp_date           as cp_sp_date,
                 harvest_start_date as cp_harvest_start_date,
                 harvest_end_date   as cp_harvest_end_date
               from slv.camp_dim_cycle_profile_scd2 cp2
@@ -1405,7 +1440,7 @@ export async function getBlockModalRowsByParentBlocks(parentBlocks: string[]) {
         from ${FENOGRAMA_SOURCE} mv
         left join lateral (
           select
-            pruning_date      as cp_sp_date,
+            sp_date           as cp_sp_date,
             harvest_start_date as cp_harvest_start_date,
             harvest_end_date   as cp_harvest_end_date
           from slv.camp_dim_cycle_profile_scd2 cp2
@@ -1481,8 +1516,8 @@ export async function getBlockModalRowsByParentBlocks(parentBlocks: string[]) {
           nullif(cp.variety, '') as variety,
           nullif(cp.sp_type, '') as sp_type,
           to_char(bp.valid_from, 'YYYY-MM-DD') as sp_date,
-          nullif(bp.attributes::jsonb ->> 'projected_harvest_start_date', 'NaT') as harvest_start_date,
-          nullif(bp.attributes::jsonb ->> 'projected_harvest_end_date', 'NaT') as harvest_end_date,
+          to_char(cp.harvest_start_date, 'YYYY-MM-DD') as harvest_start_date,
+          to_char(cp.harvest_end_date, 'YYYY-MM-DD') as harvest_end_date,
           0::numeric as total_stems,
           row_number() over (
             partition by bp.parent_block
@@ -1553,8 +1588,8 @@ export async function getCycleProfilesByBlock(
           cp.block_id,
           area_info.area_id,
           cp.soil_type,
-          to_char(cp.pruning_date, 'YYYY-MM-DD') as pruning_date,
-          valves.status,
+          to_char(cp.sp_date, 'YYYY-MM-DD') as sp_date,
+          cp.attributes_jsonb::jsonb ->> 'status' as status,
           cp.is_valid,
           cp.change_reason,
           plants.programmed_plants,
@@ -1585,8 +1620,7 @@ export async function getCycleProfilesByBlock(
         ) area_info on true
         left join lateral (
           select
-            count(distinct valve_id) as valve_count,
-            min(nullif(vp.attributes::jsonb ->> 'status', '')) as status
+            count(distinct valve_id) as valve_count
           from slv.camp_dim_valve_profile_scd2 vp
           where vp.cycle_key = cp.cycle_key
         ) valves on true
@@ -1665,7 +1699,7 @@ export async function getCycleProfilesByBlock(
       blockId: cleanText(row.block_id),
       areaId: cleanText(row.area_id),
       soilType: cleanText(row.soil_type),
-      pruningDate: row.pruning_date ?? null,
+      pruningDate: row.sp_date ?? null,
       status: cleanText(row.status),
       changeReason: cleanText(row.change_reason),
       programmedPlants: toNumber(row.programmed_plants),
@@ -1713,6 +1747,8 @@ export async function getCycleLaborHoursByCycleKey(
       `
         select
           cycle_key,
+          cost_area,
+          sub_cost_center,
           person_id,
           activity_id,
           activity_name,
@@ -1724,6 +1760,8 @@ export async function getCycleLaborHoursByCycleKey(
         from ${PROD_HOURS_SOURCE}
         where cycle_key = $1
         order by
+          coalesce(cost_area, '') asc,
+          coalesce(sub_cost_center, '') asc,
           coalesce(activity_type, '') asc,
           coalesce(activity_name, '') asc,
           coalesce(activity_id::text, '') asc,
@@ -1735,20 +1773,33 @@ export async function getCycleLaborHoursByCycleKey(
       result.rows.map((row) => cleanText(row.person_id === null ? null : String(row.person_id))),
     );
 
-    const activityTypeMap = new Map<string, {
-      activityType: string;
+    const costAreaMap = new Map<string, {
+      costArea: string;
       actualHours: number;
       effectiveHours: number;
       unitsProduced: number;
-      activities: Map<string, {
-        activityId: string;
-        activityName: string;
-        activityType: string;
-        unitOfMeasure: string;
+      subCostCenters: Map<string, {
+        subCostCenter: string;
+        costArea: string;
         actualHours: number;
         effectiveHours: number;
         unitsProduced: number;
-        people: Map<string, CycleLaborPersonSummary>;
+        activityTypes: Map<string, {
+          activityType: string;
+          actualHours: number;
+          effectiveHours: number;
+          unitsProduced: number;
+          activities: Map<string, {
+            activityId: string;
+            activityName: string;
+            activityType: string;
+            unitOfMeasure: string;
+            actualHours: number;
+            effectiveHours: number;
+            unitsProduced: number;
+            people: Map<string, CycleLaborPersonSummary>;
+          }>;
+        }>;
       }>;
     }>();
     const personIds = new Set<string>();
@@ -1757,6 +1808,8 @@ export async function getCycleLaborHoursByCycleKey(
     let totalUnitsProduced = 0;
 
     for (const row of result.rows) {
+      const costArea = cleanText(row.cost_area) || "Sin área";
+      const subCostCenter = cleanText(row.sub_cost_center) || "Sin subcentro";
       const activityType = cleanText(row.activity_type) || "Sin tipo";
       const activityId = cleanText(row.activity_id === null ? null : String(row.activity_id)) || "Sin actividad";
       const activityName = cleanText(row.activity_name) || activityId;
@@ -1771,43 +1824,47 @@ export async function getCycleLaborHoursByCycleKey(
       totalUnitsProduced += unitsProduced;
       personIds.add(personId);
 
-      const activityTypeEntry = activityTypeMap.get(activityType) ?? {
-        activityType,
-        actualHours: 0,
-        effectiveHours: 0,
-        unitsProduced: 0,
-        activities: new Map(),
+      const costAreaEntry = costAreaMap.get(costArea) ?? {
+        costArea, actualHours: 0, effectiveHours: 0, unitsProduced: 0, subCostCenters: new Map(),
       };
-      activityTypeEntry.actualHours += actualHours;
-      activityTypeEntry.effectiveHours += effectiveHours;
-      activityTypeEntry.unitsProduced += unitsProduced;
-      activityTypeMap.set(activityType, activityTypeEntry);
+      costAreaEntry.actualHours += actualHours;
+      costAreaEntry.effectiveHours += effectiveHours;
+      costAreaEntry.unitsProduced += unitsProduced;
+      costAreaMap.set(costArea, costAreaEntry);
 
-      const activityKey = `${activityType}|${activityId}|${activityName}|${unitOfMeasure}`;
-      const activityEntry = activityTypeEntry.activities.get(activityKey) ?? {
-        activityId,
-        activityName,
-        activityType,
-        unitOfMeasure,
-        actualHours: 0,
-        effectiveHours: 0,
-        unitsProduced: 0,
-        people: new Map<string, CycleLaborPersonSummary>(),
+      const subKey = `${costArea}|${subCostCenter}`;
+      const subEntry = costAreaEntry.subCostCenters.get(subKey) ?? {
+        subCostCenter, costArea, actualHours: 0, effectiveHours: 0, unitsProduced: 0, activityTypes: new Map(),
+      };
+      subEntry.actualHours += actualHours;
+      subEntry.effectiveHours += effectiveHours;
+      subEntry.unitsProduced += unitsProduced;
+      costAreaEntry.subCostCenters.set(subKey, subEntry);
+
+      const typeKey = `${subKey}|${activityType}`;
+      const typeEntry = subEntry.activityTypes.get(typeKey) ?? {
+        activityType, actualHours: 0, effectiveHours: 0, unitsProduced: 0, activities: new Map(),
+      };
+      typeEntry.actualHours += actualHours;
+      typeEntry.effectiveHours += effectiveHours;
+      typeEntry.unitsProduced += unitsProduced;
+      subEntry.activityTypes.set(typeKey, typeEntry);
+
+      const activityKey = `${typeKey}|${activityId}|${activityName}|${unitOfMeasure}`;
+      const activityEntry = typeEntry.activities.get(activityKey) ?? {
+        activityId, activityName, activityType, unitOfMeasure,
+        actualHours: 0, effectiveHours: 0, unitsProduced: 0, people: new Map<string, CycleLaborPersonSummary>(),
       };
       activityEntry.actualHours += actualHours;
       activityEntry.effectiveHours += effectiveHours;
       activityEntry.unitsProduced += unitsProduced;
-      activityTypeEntry.activities.set(activityKey, activityEntry);
+      typeEntry.activities.set(activityKey, activityEntry);
 
       const personEntry = activityEntry.people.get(personId) ?? {
         personId,
         personName: personNameMap.get(personId) ?? null,
         unitOfMeasure,
-        actualHours: 0,
-        effectiveHours: 0,
-        unitsProduced: 0,
-        productivity: null,
-        rendimientoPct: null,
+        actualHours: 0, effectiveHours: 0, unitsProduced: 0, productivity: null, rendimientoPct: null,
       };
       personEntry.actualHours += actualHours;
       personEntry.effectiveHours += effectiveHours;
@@ -1815,65 +1872,81 @@ export async function getCycleLaborHoursByCycleKey(
       activityEntry.people.set(personId, personEntry);
     }
 
-    const activityTypes = Array.from(activityTypeMap.values())
-      .sort((left, right) => left.activityType.localeCompare(right.activityType, "en-US", {
-        numeric: true,
-        sensitivity: "base",
-      }))
-      .map((activityTypeEntry) => {
-        const activities = Array.from(activityTypeEntry.activities.values())
-          .sort((left, right) => {
-            const nameCompare = left.activityName.localeCompare(right.activityName, "en-US", {
-              numeric: true,
-              sensitivity: "base",
-            });
+    const sortLocale = (a: string, b: string) => a.localeCompare(b, "en-US", { numeric: true, sensitivity: "base" });
 
-            return nameCompare !== 0
-              ? nameCompare
-              : left.activityId.localeCompare(right.activityId, "en-US", {
-                numeric: true,
-                sensitivity: "base",
+    const costAreas = Array.from(costAreaMap.values())
+      .sort((a, b) => sortLocale(a.costArea, b.costArea))
+      .map((caEntry) => {
+        const subCostCenters = Array.from(caEntry.subCostCenters.values())
+          .sort((a, b) => sortLocale(a.subCostCenter, b.subCostCenter))
+          .map((scEntry) => {
+            const activityTypes = Array.from(scEntry.activityTypes.values())
+              .sort((a, b) => sortLocale(a.activityType, b.activityType))
+              .map((typeEntry) => {
+                const activities = Array.from(typeEntry.activities.values())
+                  .sort((a, b) => {
+                    const nc = sortLocale(a.activityName, b.activityName);
+                    return nc !== 0 ? nc : sortLocale(a.activityId, b.activityId);
+                  })
+                  .map((actEntry) => {
+                    const people = Array.from(actEntry.people.values())
+                      .sort((a, b) => sortLocale(a.personId, b.personId))
+                      .map((pe) => ({
+                        ...pe,
+                        actualHours: roundValue(pe.actualHours),
+                        effectiveHours: roundValue(pe.effectiveHours),
+                        unitsProduced: roundValue(pe.unitsProduced),
+                        productivity: toRatio(pe.unitsProduced, pe.actualHours),
+                        rendimientoPct: toPercentFromNumbers(pe.effectiveHours, pe.actualHours),
+                      }));
+                    return {
+                      activityId: actEntry.activityId,
+                      activityName: actEntry.activityName,
+                      activityType: actEntry.activityType,
+                      unitOfMeasure: actEntry.unitOfMeasure,
+                      actualHours: roundValue(actEntry.actualHours),
+                      effectiveHours: roundValue(actEntry.effectiveHours),
+                      unitsProduced: roundValue(actEntry.unitsProduced),
+                      productivity: toRatio(actEntry.unitsProduced, actEntry.actualHours),
+                      rendimientoPct: toPercentFromNumbers(actEntry.effectiveHours, actEntry.actualHours),
+                      people,
+                    } satisfies CycleLaborActivitySummary;
+                  });
+                return {
+                  activityType: typeEntry.activityType,
+                  actualHours: roundValue(typeEntry.actualHours),
+                  effectiveHours: roundValue(typeEntry.effectiveHours),
+                  unitsProduced: roundValue(typeEntry.unitsProduced),
+                  productivity: toRatio(typeEntry.unitsProduced, typeEntry.actualHours),
+                  rendimientoPct: toPercentFromNumbers(typeEntry.effectiveHours, typeEntry.actualHours),
+                  activities,
+                } satisfies CycleLaborActivityTypeSummary;
               });
-          })
-          .map((activityEntry) => {
-            const people = Array.from(activityEntry.people.values())
-              .sort((left, right) => left.personId.localeCompare(right.personId, "en-US", {
-                numeric: true,
-                sensitivity: "base",
-              }))
-              .map((personEntry) => ({
-                ...personEntry,
-                actualHours: roundValue(personEntry.actualHours),
-                effectiveHours: roundValue(personEntry.effectiveHours),
-                unitsProduced: roundValue(personEntry.unitsProduced),
-                productivity: toRatio(personEntry.unitsProduced, personEntry.actualHours),
-                rendimientoPct: toPercentFromNumbers(personEntry.effectiveHours, personEntry.actualHours),
-              }));
-
             return {
-              activityId: activityEntry.activityId,
-              activityName: activityEntry.activityName,
-              activityType: activityEntry.activityType,
-              unitOfMeasure: activityEntry.unitOfMeasure,
-              actualHours: roundValue(activityEntry.actualHours),
-              effectiveHours: roundValue(activityEntry.effectiveHours),
-              unitsProduced: roundValue(activityEntry.unitsProduced),
-              productivity: toRatio(activityEntry.unitsProduced, activityEntry.actualHours),
-              rendimientoPct: toPercentFromNumbers(activityEntry.effectiveHours, activityEntry.actualHours),
-              people,
-            } satisfies CycleLaborActivitySummary;
+              subCostCenter: scEntry.subCostCenter,
+              costArea: scEntry.costArea,
+              actualHours: roundValue(scEntry.actualHours),
+              effectiveHours: roundValue(scEntry.effectiveHours),
+              unitsProduced: roundValue(scEntry.unitsProduced),
+              productivity: toRatio(scEntry.unitsProduced, scEntry.actualHours),
+              rendimientoPct: toPercentFromNumbers(scEntry.effectiveHours, scEntry.actualHours),
+              activityTypes,
+            } satisfies CycleLaborSubCostCenterSummary;
           });
-
         return {
-          activityType: activityTypeEntry.activityType,
-          actualHours: roundValue(activityTypeEntry.actualHours),
-          effectiveHours: roundValue(activityTypeEntry.effectiveHours),
-          unitsProduced: roundValue(activityTypeEntry.unitsProduced),
-          productivity: toRatio(activityTypeEntry.unitsProduced, activityTypeEntry.actualHours),
-          rendimientoPct: toPercentFromNumbers(activityTypeEntry.effectiveHours, activityTypeEntry.actualHours),
-          activities,
-        } satisfies CycleLaborActivityTypeSummary;
+          costArea: caEntry.costArea,
+          actualHours: roundValue(caEntry.actualHours),
+          effectiveHours: roundValue(caEntry.effectiveHours),
+          unitsProduced: roundValue(caEntry.unitsProduced),
+          productivity: toRatio(caEntry.unitsProduced, caEntry.actualHours),
+          rendimientoPct: toPercentFromNumbers(caEntry.effectiveHours, caEntry.actualHours),
+          subCostCenters,
+        } satisfies CycleLaborCostAreaSummary;
       });
+
+    const allSubCostCenters = costAreas.flatMap((ca) => ca.subCostCenters);
+    const allActivityTypes = allSubCostCenters.flatMap((sc) => sc.activityTypes);
+    const allActivities = allActivityTypes.flatMap((at) => at.activities);
 
     return {
       cycleKey: normalizedCycleKey,
@@ -1882,11 +1955,13 @@ export async function getCycleLaborHoursByCycleKey(
         totalActualHours: roundValue(totalActualHours),
         totalEffectiveHours: roundValue(totalEffectiveHours),
         totalUnitsProduced: roundValue(totalUnitsProduced),
-        activityTypeCount: activityTypes.length,
-        activityCount: activityTypes.reduce((sum, activityType) => sum + activityType.activities.length, 0),
+        costAreaCount: costAreas.length,
+        subCostCenterCount: allSubCostCenters.length,
+        activityTypeCount: allActivityTypes.length,
+        activityCount: allActivities.length,
         personCount: personIds.size,
       },
-      activityTypes,
+      costAreas,
     };
   });
 }
@@ -1907,7 +1982,7 @@ export async function getCycleLaborPersonDetailByCycleKey(
           `
             with ranked_profiles as (
               select
-                nullif(trim(full_name), '') as full_name,
+                nullif(trim(person_name), '') as person_name,
                 nullif(trim(area_name), '') as area_name,
                 nullif(trim(marital_status), '') as marital_status,
                 age_years,
@@ -1916,13 +1991,13 @@ export async function getCycleLaborPersonDetailByCycleKey(
                   order by
                     case when age_years is null then 1 else 0 end,
                     age_years desc nulls last,
-                    nullif(trim(full_name), '') asc nulls last
+                    nullif(trim(person_name), '') asc nulls last
                 ) as rn
               from slv.tthh_dim_person_profile_scd2
               where trim(person_id::text) = $1
             )
             select
-              full_name,
+              person_name,
               area_name,
               marital_status,
               age_years,
@@ -2031,7 +2106,7 @@ export async function getCycleLaborPersonDetailByCycleKey(
       const profileRow = profileResult.rows[0];
       const profile = profileRow
         ? {
-            fullName: cleanText(profileRow.full_name) || null,
+            fullName: cleanText(profileRow.person_name) || null,
             areaName: cleanText(profileRow.area_name) || null,
             maritalStatus: cleanText(profileRow.marital_status) || null,
             ageYears: toNumber(profileRow.age_years),
@@ -2135,16 +2210,23 @@ export async function getValveProfilesByCycleKey(
           to_char(vp.valid_from, 'YYYY-MM-DD') as valid_from,
           to_char(vp.valid_to, 'YYYY-MM-DD') as valid_to,
           vp.is_current,
-          vp.attributes,
+          cp_attrs.attributes_jsonb as attributes,
           valve_beds.pambiles_count,
           valve_beds.bed_area,
           vp.is_valid,
           vp.change_reason
         from slv.camp_dim_valve_profile_scd2 vp
         left join lateral (
+          select cp2.attributes_jsonb
+          from slv.camp_dim_cycle_profile_scd2 cp2
+          where cp2.cycle_key = vp.cycle_key
+          order by cp2.is_current desc, cp2.valid_from desc nulls last
+          limit 1
+        ) cp_attrs on true
+        left join lateral (
           select
             sum(coalesce(bp.pambiles_count, 0)) as pambiles_count,
-            sum(coalesce((bp.attributes::jsonb ->> 'bed_area')::numeric, 0)) as bed_area
+            sum(coalesce(bp.bed_area, 0)) as bed_area
           from slv.camp_dim_bed_profile_scd2 bp
           where bp.cycle_key = vp.cycle_key
             and bp.valve_id = vp.valve_id
@@ -2227,7 +2309,7 @@ export async function getValveProfileByCycleAndValve(
               to_char(vp.valid_from, 'YYYY-MM-DD') as valid_from,
               to_char(vp.valid_to, 'YYYY-MM-DD') as valid_to,
               vp.is_current,
-              vp.attributes,
+              cp_attrs.attributes_jsonb as attributes,
               valve_beds.pambiles_count,
               valve_beds.bed_area,
               vp.is_valid,
@@ -2242,9 +2324,16 @@ export async function getValveProfileByCycleAndValve(
               plants.mortality_pct
             from slv.camp_dim_valve_profile_scd2 vp
             left join lateral (
+              select cp2.attributes_jsonb
+              from slv.camp_dim_cycle_profile_scd2 cp2
+              where cp2.cycle_key = vp.cycle_key
+              order by cp2.is_current desc, cp2.valid_from desc nulls last
+              limit 1
+            ) cp_attrs on true
+            left join lateral (
               select
                 sum(coalesce(bp.pambiles_count, 0)) as pambiles_count,
-                sum(coalesce((bp.attributes::jsonb ->> 'bed_area')::numeric, 0)) as bed_area
+                sum(coalesce(bp.bed_area, 0)) as bed_area
               from slv.camp_dim_bed_profile_scd2 bp
               where bp.cycle_key = vp.cycle_key
                 and bp.valve_id = vp.valve_id

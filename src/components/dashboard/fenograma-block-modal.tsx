@@ -30,9 +30,11 @@ import type {
   BedProfileCard,
   BedProfilePayload,
   BlockModalRow,
+  CycleLaborCostAreaSummary,
   CycleLaborHoursPayload,
   CycleLaborPersonDetailPayload,
   CycleLaborPersonSummary,
+  CycleLaborSubCostCenterSummary,
   CycleProfileBlockPayload,
   CycleProfileCard,
   HarvestCurvePayload,
@@ -634,6 +636,8 @@ function HoursCamaOverlay({
   error: string | null;
   onClose: () => void;
 }) {
+  const [expandedCostAreas, setExpandedCostAreas] = useState<string[]>([]);
+  const [expandedSubCostCenters, setExpandedSubCostCenters] = useState<string[]>([]);
   const [expandedTypes, setExpandedTypes] = useState<string[]>([]);
   const [expandedActivities, setExpandedActivities] = useState<string[]>([]);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
@@ -670,6 +674,18 @@ function HoursCamaOverlay({
     window.addEventListener("keydown", handleEscape, true);
     return () => window.removeEventListener("keydown", handleEscape, true);
   }, [selectedPersonId]);
+
+  function toggleCostArea(key: string) {
+    setExpandedCostAreas((current) => (
+      current.includes(key) ? current.filter((v) => v !== key) : [...current, key]
+    ));
+  }
+
+  function toggleSubCostCenter(key: string) {
+    setExpandedSubCostCenters((current) => (
+      current.includes(key) ? current.filter((v) => v !== key) : [...current, key]
+    ));
+  }
 
   function toggleType(activityType: string) {
     setExpandedTypes((current) => (
@@ -750,6 +766,8 @@ function HoursCamaOverlay({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <DetailBadges
                     items={[
+                      `${data.summary.costAreaCount} áreas`,
+                      `${data.summary.subCostCenterCount} subcentros`,
                       `${data.summary.activityTypeCount} tipos`,
                       `${data.summary.activityCount} actividades`,
                       `${data.summary.personCount} personas`,
@@ -766,6 +784,8 @@ function HoursCamaOverlay({
                     <thead className="sticky top-0 z-20 bg-card/95 backdrop-blur">
                       <tr>
                         {[
+                          "Área costo",
+                          "Sub centro",
                           "Tipo actividad",
                           "Nombre actividad",
                           "ID personal",
@@ -787,70 +807,121 @@ function HoursCamaOverlay({
                       </tr>
                     </thead>
                     <tbody>
-                      {data.activityTypes.length ? data.activityTypes.map((activityType, typeIndex) => {
-                        const typeExpanded = expandedTypes.includes(activityType.activityType);
-
+                      {data.costAreas.length ? data.costAreas.map((costArea, caIndex) => {
+                        const caExpanded = expandedCostAreas.includes(costArea.costArea);
                         return (
-                          <Fragment key={`type-${activityType.activityType}`}>
-                            <tr className={cn(typeIndex % 2 === 0 ? "bg-primary/6" : "bg-primary/10")}>
+                          <Fragment key={`ca-${costArea.costArea}`}>
+                            <tr className={cn(caIndex % 2 === 0 ? "bg-primary/6" : "bg-primary/10")}>
                               <td className="border-b border-r border-border/50 px-3 py-2.5 font-semibold text-foreground">
-                                <button
-                                  type="button"
-                                  className="flex items-center gap-2 text-left"
-                                  onClick={() => toggleType(activityType.activityType)}
-                                >
-                                  {typeExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                                  <span>{activityType.activityType}</span>
+                                <button type="button" className="flex items-center gap-2 text-left" onClick={() => toggleCostArea(costArea.costArea)}>
+                                  {caExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                                  <span>{costArea.costArea}</span>
                                 </button>
                               </td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">Resumen del tipo</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">Resumen</td>
                               <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
                               <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.unitsProduced)}</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.actualHours)}</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.effectiveHours)}</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.effectiveHours / (camas30))}</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.productivity)}</td>
-                              <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(activityType.rendimientoPct)}</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(costArea.unitsProduced)}</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(costArea.actualHours)}</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(costArea.effectiveHours)}</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(costArea.effectiveHours / camas30)}</td>
+                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(costArea.productivity)}</td>
+                              <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(costArea.rendimientoPct)}</td>
                             </tr>
 
-                            {typeExpanded ? activityType.activities.map((activity) => {
-                              const activityKey = `${activity.activityType}|${activity.activityId}|${activity.activityName}`;
-                              const activityExpanded = expandedActivities.includes(activityKey);
-
+                            {caExpanded ? costArea.subCostCenters.map((sub) => {
+                              const subKey = `${costArea.costArea}|${sub.subCostCenter}`;
+                              const subExpanded = expandedSubCostCenters.includes(subKey);
                               return (
-                                <Fragment key={`activity-${activityKey}`}>
+                                <Fragment key={`sc-${subKey}`}>
                                   <tr className="bg-background/84">
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground"> </td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 font-medium text-foreground">
-                                      <button
-                                        type="button"
-                                        className="flex items-center gap-2 text-left"
-                                        onClick={() => toggleActivity(activityKey)}
-                                      >
-                                        {activityExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                                        <span>{activity.activityName}</span>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground pl-6"> </td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 font-semibold text-foreground">
+                                      <button type="button" className="flex items-center gap-2 text-left" onClick={() => toggleSubCostCenter(subKey)}>
+                                        {subExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                                        <span>{sub.subCostCenter}</span>
                                       </button>
                                     </td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">Resumen</td>
                                     <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5">{activity.unitOfMeasure || "-"}</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.unitsProduced)}</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.actualHours)}</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.effectiveHours)}</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.effectiveHours / (camas30))}</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.productivity)}</td>
-                                    <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(activity.rendimientoPct)}</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(sub.unitsProduced)}</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(sub.actualHours)}</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(sub.effectiveHours)}</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(sub.effectiveHours / camas30)}</td>
+                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(sub.productivity)}</td>
+                                    <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(sub.rendimientoPct)}</td>
                                   </tr>
 
-                                  {activityExpanded ? activity.people.map((person) => (
-                                    <HoursCamaPersonRow
-                                      key={`person-${activityKey}-${person.personId}`}
-                                      person={person}
-                                      camas30={camas30}
-                                      isSelected={selectedPersonId === person.personId}
-                                      onOpenPerson={setSelectedPersonId}
-                                    />
-                                  )) : null}
+                                  {subExpanded ? sub.activityTypes.map((activityType) => {
+                                    const typeKey = `${subKey}|${activityType.activityType}`;
+                                    const typeExpanded = expandedTypes.includes(typeKey);
+                                    return (
+                                      <Fragment key={`type-${typeKey}`}>
+                                        <tr className="bg-muted/30">
+                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground pl-6"> </td>
+                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground pl-6"> </td>
+                                          <td className="border-b border-r border-border/50 px-3 py-2.5 font-semibold text-foreground">
+                                            <button type="button" className="flex items-center gap-2 text-left" onClick={() => toggleType(typeKey)}>
+                                              {typeExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                                              <span>{activityType.activityType}</span>
+                                            </button>
+                                          </td>
+                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">Resumen del tipo</td>
+                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
+                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
+                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.unitsProduced)}</td>
+                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.actualHours)}</td>
+                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.effectiveHours)}</td>
+                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.effectiveHours / camas30)}</td>
+                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.productivity)}</td>
+                                          <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(activityType.rendimientoPct)}</td>
+                                        </tr>
+
+                                        {typeExpanded ? activityType.activities.map((activity) => {
+                                          const activityKey = `${typeKey}|${activity.activityId}|${activity.activityName}`;
+                                          const activityExpanded = expandedActivities.includes(activityKey);
+                                          return (
+                                            <Fragment key={`activity-${activityKey}`}>
+                                              <tr className="bg-background/84">
+                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground"> </td>
+                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground"> </td>
+                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground"> </td>
+                                                <td className="border-b border-r border-border/50 px-3 py-2.5 font-medium text-foreground">
+                                                  <button type="button" className="flex items-center gap-2 text-left" onClick={() => toggleActivity(activityKey)}>
+                                                    {activityExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                                                    <span>{activity.activityName}</span>
+                                                  </button>
+                                                </td>
+                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
+                                                <td className="border-b border-r border-border/50 px-3 py-2.5">{activity.unitOfMeasure || "-"}</td>
+                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.unitsProduced)}</td>
+                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.actualHours)}</td>
+                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.effectiveHours)}</td>
+                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.effectiveHours / camas30)}</td>
+                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.productivity)}</td>
+                                                <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(activity.rendimientoPct)}</td>
+                                              </tr>
+
+                                              {activityExpanded ? activity.people.map((person) => (
+                                                <HoursCamaPersonRow
+                                                  key={`person-${activityKey}-${person.personId}`}
+                                                  person={person}
+                                                  camas30={camas30}
+                                                  isSelected={selectedPersonId === person.personId}
+                                                  onOpenPerson={setSelectedPersonId}
+                                                  colOffset={3}
+                                                />
+                                              )) : null}
+                                            </Fragment>
+                                          );
+                                        }) : null}
+                                      </Fragment>
+                                    );
+                                  }) : null}
                                 </Fragment>
                               );
                             }) : null}
@@ -858,7 +929,7 @@ function HoursCamaOverlay({
                         );
                       }) : (
                         <tr>
-                          <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          <td colSpan={12} className="px-4 py-8 text-center text-sm text-muted-foreground">
                             No hay horas registradas para este ciclo.
                           </td>
                         </tr>
@@ -901,14 +972,19 @@ function HoursCamaPersonRow({
   camas30,
   isSelected,
   onOpenPerson,
+  colOffset = 0,
 }: {
   person: CycleLaborPersonSummary;
   camas30: number;
   isSelected?: boolean;
   onOpenPerson?: (personId: string) => void;
+  colOffset?: number;
 }) {
   return (
     <tr className={cn("bg-muted/24", isSelected && "bg-primary/10")}>
+      {Array.from({ length: colOffset }).map((_, i) => (
+        <td key={i} className="border-b border-r border-border/40 px-3 py-2.5"> </td>
+      ))}
       <td className="border-b border-r border-border/40 px-3 py-2.5 text-muted-foreground"> </td>
       <td className="border-b border-r border-border/40 px-3 py-2.5 text-foreground">
         <div className="min-w-[12rem]">

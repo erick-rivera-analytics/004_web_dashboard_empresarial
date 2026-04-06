@@ -107,13 +107,13 @@ export async function getProgramaciones(
           nullif(trim(cp.variety), '')   as variety,
           nullif(trim(cp.sp_type), '')   as sp_type,
           case
-            when current_date < cp.pruning_date
+            when current_date < cp.sp_date
               then 'Planificado'
             when current_date >= cp.harvest_end_date
               then 'Historia'
             when current_date >= cp.harvest_start_date and current_date < cp.harvest_end_date
               then 'Cosecha'
-            when current_date >= cp.pruning_date and current_date < cp.harvest_start_date
+            when current_date >= cp.sp_date and current_date < cp.harvest_start_date
               then 'Vegetativo'
             else 'Historia'
           end as fase,
@@ -125,7 +125,7 @@ export async function getProgramaciones(
             cp2.variety,
             cp2.sp_type,
             cp2.parent_block,
-            cp2.pruning_date,
+            cp2.sp_date,
             cp2.harvest_start_date,
             cp2.harvest_end_date
           from slv.camp_dim_cycle_profile_scd2 cp2
