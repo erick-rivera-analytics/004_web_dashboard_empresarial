@@ -422,8 +422,8 @@ function PersonHoursOverlay({
               <h3 id="modal-title-person-hours" className="text-2xl font-semibold tracking-tight">
                 {displayName}
               </h3>
-              <p className="break-words text-sm text-muted-foreground">
-                Vista demográfica y desempeño del personal dentro de este ciclo.
+              <p className="mt-1 text-sm text-muted-foreground">
+                {profile?.jobTitle ?? "Personal de campo"}
               </p>
             </div>
           </div>
@@ -470,23 +470,67 @@ function PersonHoursOverlay({
               <div className="py-8 text-sm text-destructive">{error}</div>
             ) : data ? (
               view === "info" ? (
-                <div className="space-y-4">
+                <div className="space-y-5">
+                  {/* Datos personales */}
                   <div className="rounded-2xl border border-border/60 bg-muted/14 px-4 py-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/65">
-                      Resumen demografico
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/65">
+                      Datos personales
                     </p>
-                    <p className="mt-2 text-xl font-semibold text-foreground">{displayName}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {profile?.areaName ?? "Area no disponible"}
-                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <InfoField label="Nombre completo" value={profile?.fullName ?? "Sin dato"} />
+                      <InfoField label="Cédula / ID" value={profile?.nationalId ?? "Sin dato"} />
+                      <InfoField label="Género" value={profile?.gender ?? "Sin dato"} />
+                      <InfoField label="Estado civil" value={profile?.maritalStatus ?? "Sin dato"} />
+                      <InfoField label="Fecha de nacimiento" value={profile?.birthDate ?? "Sin dato"} />
+                      <InfoField label="Lugar de nacimiento" value={profile?.birthPlace ?? "Sin dato"} />
+                      <InfoField label="Nacionalidad" value={profile?.nationality ?? "Sin dato"} />
+                      <InfoField label="Nivel educativo" value={profile?.educationTitle ?? "Sin dato"} />
+                      <InfoField label="Hijos" value={profile?.childrenCount == null ? "Sin dato" : String(profile.childrenCount)} />
+                      <InfoField label="Dependientes" value={profile?.dependentsCount == null ? "Sin dato" : String(profile.dependentsCount)} />
+                      <InfoField label="Discapacidad" value={profile?.disabledFlag == null ? "Sin dato" : profile.disabledFlag ? "Sí" : "No"} />
+                    </div>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                    <InfoField label="Nombre completo" value={profile?.fullName ?? "Sin dato"} />
-                    <InfoField label="Area" value={profile?.areaName ?? "Sin dato"} />
-                    <InfoField label="Estado civil" value={profile?.maritalStatus ?? "Sin dato"} />
-                    <InfoField label="Edad" value={profile?.ageYears == null ? "Sin dato" : `${formatNumber(profile.ageYears)} anos`} />
-                    <InfoField label="Genero" value={profile?.gender ?? "Sin dato"} />
+                  {/* Datos laborales */}
+                  <div className="rounded-2xl border border-border/60 bg-muted/14 px-4 py-4">
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/65">
+                      Datos laborales
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <InfoField label="Cargo" value={profile?.jobTitle ?? "Sin dato"} />
+                      <InfoField label="Tipo de empleado" value={profile?.employeeType ?? "Sin dato"} />
+                      <InfoField label="Tipo de contrato" value={profile?.contractType ?? "Sin dato"} />
+                      <InfoField label="Clasificación de cargo" value={profile?.jobClassificationCode ?? "Sin dato"} />
+                      <InfoField label="Empleador" value={profile?.employerName ?? "Sin dato"} />
+                      <InfoField label="Código de finca" value={profile?.farmCode ?? "Sin dato"} />
+                      <InfoField label="Trabajador asociado" value={profile?.associatedWorkerName ?? "Sin dato"} />
+                      <InfoField label="Pago por rendimiento" value={profile?.performancePayApplicable == null ? "Sin dato" : profile.performancePayApplicable ? "Sí" : "No"} />
+                    </div>
+                  </div>
+
+                  {/* Contacto */}
+                  <div className="rounded-2xl border border-border/60 bg-muted/14 px-4 py-4">
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/65">
+                      Contacto
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <InfoField label="Email" value={profile?.email ?? "Sin dato"} />
+                      <InfoField label="Teléfono" value={profile?.phoneNumber ?? "Sin dato"} />
+                      <InfoField label="Dirección" value={profile?.address ?? "Sin dato"} />
+                      <InfoField label="Ciudad" value={profile?.city ?? "Sin dato"} />
+                      <InfoField label="Parroquia" value={profile?.parish ?? "Sin dato"} />
+                    </div>
+                  </div>
+
+                  {/* Acceso */}
+                  <div className="rounded-2xl border border-border/60 bg-muted/14 px-4 py-4">
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/65">
+                      Acceso a la empresa
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <InfoField label="Última entrada" value={profile?.lastEntryDate ?? "Sin dato"} />
+                      <InfoField label="Última salida" value={profile?.lastExitDate ?? "Sin dato"} />
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -780,55 +824,41 @@ function HoursCamaOverlay({
                 </div>
 
                 <div className="max-h-[56vh] overflow-auto rounded-[24px] border border-border/70">
-                  <table className="min-w-full border-separate border-spacing-0 text-sm">
-                    <thead className="sticky top-0 z-20 bg-card/95 backdrop-blur">
+                  <table className="min-w-full border-separate border-spacing-0 text-xs">
+                    <thead className="sticky top-0 z-20">
                       <tr>
-                        {[
-                          "Área costo",
-                          "Sub centro",
-                          "Tipo actividad",
-                          "Nombre actividad",
-                          "ID personal",
-                          "Medida",
-                          "Unidades producidas",
-                          "Horas presenciales",
-                          "Horas trabajadas",
-                          "Horas cama",
-                          "Productividad",
-                          "Rendimiento",
-                        ].map((label) => (
-                          <th
-                            key={label}
-                            className="border-b border-r border-border/70 bg-card px-3 py-3 text-left font-semibold text-foreground last:border-r-0"
-                          >
-                            {label}
-                          </th>
-                        ))}
+                        <th className="border-b border-r border-border/60 bg-muted/60 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground min-w-[260px]">Descripción</th>
+                        <th className="border-b border-r border-border/60 bg-muted/60 px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap">Medida</th>
+                        <th className="border-b border-r border-border/60 bg-muted/60 px-2.5 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap">Unidades</th>
+                        <th className="border-b border-r border-border/60 bg-muted/60 px-2.5 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap">Hs. presencial</th>
+                        <th className="border-b border-r border-border/60 bg-muted/60 px-2.5 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap">Hs. trabajadas</th>
+                        <th className="border-b border-r border-border/60 bg-muted/60 px-2.5 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap">Hs. cama</th>
+                        <th className="border-b border-r border-border/60 bg-muted/60 px-2.5 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap">Productividad</th>
+                        <th className="border-b border-border/60 bg-muted/60 px-2.5 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap">Rendimiento</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.costAreas.length ? data.costAreas.map((costArea, caIndex) => {
+                      {data.costAreas.length ? data.costAreas.map((costArea) => {
                         const caExpanded = expandedCostAreas.includes(costArea.costArea);
                         return (
                           <Fragment key={`ca-${costArea.costArea}`}>
-                            <tr className={cn(caIndex % 2 === 0 ? "bg-primary/6" : "bg-primary/10")}>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 font-semibold text-foreground">
-                                <button type="button" className="flex items-center gap-2 text-left" onClick={() => toggleCostArea(costArea.costArea)}>
-                                  {caExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                                  <span>{costArea.costArea}</span>
+                            {/* L1: Área de costo */}
+                            <tr className="bg-foreground/[0.06] hover:bg-foreground/[0.09] transition-colors">
+                              <td className="border-b border-r border-border/40 px-3 py-2">
+                                <button type="button" className="flex items-center gap-2 text-left w-full" onClick={() => toggleCostArea(costArea.costArea)}>
+                                  {caExpanded ? <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />}
+                                  <span className="text-[10px] font-semibold uppercase tracking-wider bg-foreground/10 text-muted-foreground rounded px-1.5 py-0.5">Área</span>
+                                  <span className="font-bold text-foreground">{costArea.costArea}</span>
+                                  <span className="ml-auto text-[10px] text-muted-foreground/60">{costArea.subCostCenters.length} sub</span>
                                 </button>
                               </td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">Resumen</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(costArea.unitsProduced)}</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(costArea.actualHours)}</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(costArea.effectiveHours)}</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(costArea.effectiveHours / camas30)}</td>
-                              <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(costArea.productivity)}</td>
-                              <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(costArea.rendimientoPct)}</td>
+                              <td className="border-b border-r border-border/40 px-2.5 py-2 text-muted-foreground/40">—</td>
+                              <td className="border-b border-r border-border/40 px-2.5 py-2 text-right tabular-nums font-semibold">{formatNumber(costArea.unitsProduced)}</td>
+                              <td className="border-b border-r border-border/40 px-2.5 py-2 text-right tabular-nums font-semibold">{formatNumber(costArea.actualHours)}</td>
+                              <td className="border-b border-r border-border/40 px-2.5 py-2 text-right tabular-nums font-semibold">{formatNumber(costArea.effectiveHours)}</td>
+                              <td className="border-b border-r border-border/40 px-2.5 py-2 text-right tabular-nums font-semibold">{formatNumber(costArea.effectiveHours / camas30)}</td>
+                              <td className="border-b border-r border-border/40 px-2.5 py-2 text-right tabular-nums font-semibold">{formatNumber(costArea.productivity)}</td>
+                              <td className="border-b px-2.5 py-2 text-right tabular-nums font-semibold">{formatPercent(costArea.rendimientoPct)}</td>
                             </tr>
 
                             {caExpanded ? costArea.subCostCenters.map((sub) => {
@@ -836,24 +866,23 @@ function HoursCamaOverlay({
                               const subExpanded = expandedSubCostCenters.includes(subKey);
                               return (
                                 <Fragment key={`sc-${subKey}`}>
-                                  <tr className="bg-background/84">
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground pl-6"> </td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 font-semibold text-foreground">
-                                      <button type="button" className="flex items-center gap-2 text-left" onClick={() => toggleSubCostCenter(subKey)}>
-                                        {subExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                                        <span>{sub.subCostCenter}</span>
+                                  {/* L2: Sub centro */}
+                                  <tr className="bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors">
+                                    <td className="border-b border-r border-border/40 px-3 py-2 pl-7">
+                                      <button type="button" className="flex items-center gap-2 text-left w-full" onClick={() => toggleSubCostCenter(subKey)}>
+                                        {subExpanded ? <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />}
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider bg-primary/10 text-primary/70 rounded px-1.5 py-0.5">Sub</span>
+                                        <span className="font-semibold text-foreground">{sub.subCostCenter}</span>
+                                        <span className="ml-auto text-[10px] text-muted-foreground/60">{sub.activityTypes.length} tipos</span>
                                       </button>
                                     </td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">Resumen</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(sub.unitsProduced)}</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(sub.actualHours)}</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(sub.effectiveHours)}</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(sub.effectiveHours / camas30)}</td>
-                                    <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(sub.productivity)}</td>
-                                    <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(sub.rendimientoPct)}</td>
+                                    <td className="border-b border-r border-border/40 px-2.5 py-2 text-muted-foreground/40">—</td>
+                                    <td className="border-b border-r border-border/40 px-2.5 py-2 text-right tabular-nums font-medium">{formatNumber(sub.unitsProduced)}</td>
+                                    <td className="border-b border-r border-border/40 px-2.5 py-2 text-right tabular-nums font-medium">{formatNumber(sub.actualHours)}</td>
+                                    <td className="border-b border-r border-border/40 px-2.5 py-2 text-right tabular-nums font-medium">{formatNumber(sub.effectiveHours)}</td>
+                                    <td className="border-b border-r border-border/40 px-2.5 py-2 text-right tabular-nums font-medium">{formatNumber(sub.effectiveHours / camas30)}</td>
+                                    <td className="border-b border-r border-border/40 px-2.5 py-2 text-right tabular-nums font-medium">{formatNumber(sub.productivity)}</td>
+                                    <td className="border-b px-2.5 py-2 text-right tabular-nums font-medium">{formatPercent(sub.rendimientoPct)}</td>
                                   </tr>
 
                                   {subExpanded ? sub.activityTypes.map((activityType) => {
@@ -861,24 +890,22 @@ function HoursCamaOverlay({
                                     const typeExpanded = expandedTypes.includes(typeKey);
                                     return (
                                       <Fragment key={`type-${typeKey}`}>
-                                        <tr className="bg-muted/30">
-                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground pl-6"> </td>
-                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground pl-6"> </td>
-                                          <td className="border-b border-r border-border/50 px-3 py-2.5 font-semibold text-foreground">
-                                            <button type="button" className="flex items-center gap-2 text-left" onClick={() => toggleType(typeKey)}>
-                                              {typeExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                                              <span>{activityType.activityType}</span>
+                                        {/* L3: Tipo actividad */}
+                                        <tr className="bg-muted/25 hover:bg-muted/40 transition-colors">
+                                          <td className="border-b border-r border-border/40 px-3 py-1.5 pl-12">
+                                            <button type="button" className="flex items-center gap-2 text-left w-full" onClick={() => toggleType(typeKey)}>
+                                              {typeExpanded ? <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />}
+                                              <span className="font-medium text-foreground">{activityType.activityType}</span>
+                                              <span className="ml-auto text-[10px] text-muted-foreground/60">{activityType.activities.length} act.</span>
                                             </button>
                                           </td>
-                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">Resumen del tipo</td>
-                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.unitsProduced)}</td>
-                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.actualHours)}</td>
-                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.effectiveHours)}</td>
-                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.effectiveHours / camas30)}</td>
-                                          <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activityType.productivity)}</td>
-                                          <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(activityType.rendimientoPct)}</td>
+                                          <td className="border-b border-r border-border/40 px-2.5 py-1.5 text-muted-foreground/40">—</td>
+                                          <td className="border-b border-r border-border/40 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(activityType.unitsProduced)}</td>
+                                          <td className="border-b border-r border-border/40 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(activityType.actualHours)}</td>
+                                          <td className="border-b border-r border-border/40 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(activityType.effectiveHours)}</td>
+                                          <td className="border-b border-r border-border/40 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(activityType.effectiveHours / camas30)}</td>
+                                          <td className="border-b border-r border-border/40 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(activityType.productivity)}</td>
+                                          <td className="border-b px-2.5 py-1.5 text-right tabular-nums">{formatPercent(activityType.rendimientoPct)}</td>
                                         </tr>
 
                                         {typeExpanded ? activityType.activities.map((activity) => {
@@ -886,24 +913,21 @@ function HoursCamaOverlay({
                                           const activityExpanded = expandedActivities.includes(activityKey);
                                           return (
                                             <Fragment key={`activity-${activityKey}`}>
-                                              <tr className="bg-background/84">
-                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground"> </td>
-                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground"> </td>
-                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground"> </td>
-                                                <td className="border-b border-r border-border/50 px-3 py-2.5 font-medium text-foreground">
-                                                  <button type="button" className="flex items-center gap-2 text-left" onClick={() => toggleActivity(activityKey)}>
-                                                    {activityExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                                                    <span>{activity.activityName}</span>
+                                              {/* L4: Actividad */}
+                                              <tr className="bg-background hover:bg-muted/15 transition-colors">
+                                                <td className="border-b border-r border-border/30 px-3 py-1.5 pl-16">
+                                                  <button type="button" className="flex items-center gap-1.5 text-left w-full" onClick={() => toggleActivity(activityKey)}>
+                                                    {activityExpanded ? <ChevronDown className="size-3 shrink-0 text-muted-foreground/60" /> : <ChevronRight className="size-3 shrink-0 text-muted-foreground/60" />}
+                                                    <span className="text-foreground">{activity.activityName}</span>
                                                   </button>
                                                 </td>
-                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-muted-foreground">-</td>
-                                                <td className="border-b border-r border-border/50 px-3 py-2.5">{activity.unitOfMeasure || "-"}</td>
-                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.unitsProduced)}</td>
-                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.actualHours)}</td>
-                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.effectiveHours)}</td>
-                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.effectiveHours / camas30)}</td>
-                                                <td className="border-b border-r border-border/50 px-3 py-2.5 text-right tabular-nums">{formatNumber(activity.productivity)}</td>
-                                                <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(activity.rendimientoPct)}</td>
+                                                <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-muted-foreground">{activity.unitOfMeasure || "—"}</td>
+                                                <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(activity.unitsProduced)}</td>
+                                                <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(activity.actualHours)}</td>
+                                                <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(activity.effectiveHours)}</td>
+                                                <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(activity.effectiveHours / camas30)}</td>
+                                                <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(activity.productivity)}</td>
+                                                <td className="border-b px-2.5 py-1.5 text-right tabular-nums">{formatPercent(activity.rendimientoPct)}</td>
                                               </tr>
 
                                               {activityExpanded ? activity.people.map((person) => (
@@ -913,7 +937,6 @@ function HoursCamaOverlay({
                                                   camas30={camas30}
                                                   isSelected={selectedPersonId === person.personId}
                                                   onOpenPerson={setSelectedPersonId}
-                                                  colOffset={3}
                                                 />
                                               )) : null}
                                             </Fragment>
@@ -929,7 +952,7 @@ function HoursCamaOverlay({
                         );
                       }) : (
                         <tr>
-                          <td colSpan={12} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
                             No hay horas registradas para este ciclo.
                           </td>
                         </tr>
@@ -981,40 +1004,34 @@ function HoursCamaPersonRow({
   colOffset?: number;
 }) {
   return (
-    <tr className={cn("bg-muted/24", isSelected && "bg-primary/10")}>
-      {Array.from({ length: colOffset }).map((_, i) => (
-        <td key={i} className="border-b border-r border-border/40 px-3 py-2.5"> </td>
-      ))}
-      <td className="border-b border-r border-border/40 px-3 py-2.5 text-muted-foreground"> </td>
-      <td className="border-b border-r border-border/40 px-3 py-2.5 text-foreground">
-        <div className="min-w-[12rem]">
-          <p className="font-medium">{person.personName ?? "Personal sin nombre"}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">@ Personal</p>
+    <tr className={cn("bg-muted/10 hover:bg-muted/25 transition-colors", isSelected && "bg-primary/8")}>
+      {/* L5: Persona — columna descripción con indent máximo */}
+      <td className="border-b border-r border-border/30 px-3 py-1.5 pl-20">
+        <div className="flex items-center gap-2">
+          <span className="text-foreground leading-snug">{person.personName ?? <span className="italic text-muted-foreground">Sin nombre</span>}</span>
+          {onOpenPerson ? (
+            <button
+              type="button"
+              className={cn(
+                "inline-flex shrink-0 rounded-full border px-1.5 py-0.5 text-[11px] font-semibold transition-colors",
+                isSelected
+                  ? "border-primary/35 bg-primary/10 text-primary"
+                  : "border-border/60 bg-background text-muted-foreground hover:border-primary/35 hover:text-primary",
+              )}
+              onClick={() => onOpenPerson(person.personId)}
+            >
+              {person.personId}
+            </button>
+          ) : <span className="text-[11px] text-muted-foreground">{person.personId}</span>}
         </div>
       </td>
-      <td className="border-b border-r border-border/40 px-3 py-2.5 font-medium text-foreground">
-        {onOpenPerson ? (
-          <button
-            type="button"
-            className={cn(
-              "inline-flex rounded-full border px-2.5 py-1 text-left text-xs font-semibold transition-colors",
-              isSelected
-                ? "border-primary/35 bg-primary/10 text-primary"
-                : "border-border/60 bg-background text-foreground hover:border-primary/35 hover:text-primary",
-            )}
-            onClick={() => onOpenPerson(person.personId)}
-          >
-            {person.personId}
-          </button>
-        ) : person.personId}
-      </td>
-      <td className="border-b border-r border-border/40 px-3 py-2.5">{person.unitOfMeasure || "-"}</td>
-      <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.unitsProduced)}</td>
-      <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.actualHours)}</td>
-      <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.effectiveHours)}</td>
-      <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.effectiveHours / (camas30))}</td>
-      <td className="border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums">{formatNumber(person.productivity)}</td>
-      <td className="border-b px-3 py-2.5 text-right tabular-nums">{formatPercent(person.rendimientoPct)}</td>
+      <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-muted-foreground">{person.unitOfMeasure || "—"}</td>
+      <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(person.unitsProduced)}</td>
+      <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(person.actualHours)}</td>
+      <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(person.effectiveHours)}</td>
+      <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(person.effectiveHours / (camas30))}</td>
+      <td className="border-b border-r border-border/30 px-2.5 py-1.5 text-right tabular-nums">{formatNumber(person.productivity)}</td>
+      <td className="border-b px-2.5 py-1.5 text-right tabular-nums">{formatPercent(person.rendimientoPct)}</td>
     </tr>
   );
 }

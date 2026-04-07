@@ -194,10 +194,31 @@ type CycleLaborHoursQueryRow = {
 
 type CycleLaborPersonProfileQueryRow = {
   person_name: string | null;
-  area_name: string | null;
-  marital_status: string | null;
-  age_years: string | number | null;
+  national_id: string | null;
   gender: string | null;
+  marital_status: string | null;
+  birth_date: string | null;
+  birth_place: string | null;
+  job_title: string | null;
+  employee_type: string | null;
+  contract_type: string | null;
+  farm_code: string | null;
+  associated_worker_name: string | null;
+  email: string | null;
+  phone_number: string | null;
+  address: string | null;
+  city: string | null;
+  parish: string | null;
+  nationality: string | null;
+  education_title: string | null;
+  job_classification_code: string | null;
+  children_count: string | number | null;
+  dependents_count: string | number | null;
+  last_entry_date: string | null;
+  last_exit_date: string | null;
+  employer_name: string | null;
+  performance_pay_applicable: boolean | null;
+  disabled_flag: boolean | null;
 };
 
 type CycleLaborPersonLookupQueryRow = {
@@ -571,10 +592,31 @@ export type CycleLaborHoursPayload = {
 
 export type CycleLaborPersonProfile = {
   fullName: string | null;
-  areaName: string | null;
-  maritalStatus: string | null;
-  ageYears: number | null;
+  nationalId: string | null;
   gender: string | null;
+  maritalStatus: string | null;
+  birthDate: string | null;
+  birthPlace: string | null;
+  jobTitle: string | null;
+  employeeType: string | null;
+  contractType: string | null;
+  farmCode: string | null;
+  associatedWorkerName: string | null;
+  email: string | null;
+  phoneNumber: string | null;
+  address: string | null;
+  city: string | null;
+  parish: string | null;
+  nationality: string | null;
+  educationTitle: string | null;
+  jobClassificationCode: string | null;
+  childrenCount: number | null;
+  dependentsCount: number | null;
+  lastEntryDate: string | null;
+  lastExitDate: string | null;
+  employerName: string | null;
+  performancePayApplicable: boolean | null;
+  disabledFlag: boolean | null;
 };
 
 export type CycleLaborPersonActivityTypeSummary = {
@@ -1983,14 +2025,33 @@ export async function getCycleLaborPersonDetailByCycleKey(
             with ranked_profiles as (
               select
                 nullif(trim(person_name), '') as person_name,
-                nullif(trim(area_name), '') as area_name,
-                nullif(trim(marital_status), '') as marital_status,
-                age_years,
+                nullif(trim(national_id::text), '') as national_id,
                 nullif(trim(gender), '') as gender,
+                nullif(trim(marital_status), '') as marital_status,
+                to_char(birth_date, 'YYYY-MM-DD') as birth_date,
+                nullif(trim(birth_place), '') as birth_place,
+                nullif(trim(job_title), '') as job_title,
+                nullif(trim(employee_type), '') as employee_type,
+                nullif(trim(contract_type), '') as contract_type,
+                nullif(trim(farm_code::text), '') as farm_code,
+                nullif(trim(associated_worker_name), '') as associated_worker_name,
+                nullif(trim(email), '') as email,
+                nullif(trim(phone_number::text), '') as phone_number,
+                nullif(trim(address), '') as address,
+                nullif(trim(city), '') as city,
+                nullif(trim(parish), '') as parish,
+                nullif(trim(nationality), '') as nationality,
+                nullif(trim(education_title), '') as education_title,
+                nullif(trim(job_classification_code::text), '') as job_classification_code,
+                children_count,
+                dependents_count,
+                to_char(last_entry_date, 'YYYY-MM-DD') as last_entry_date,
+                to_char(last_exit_date, 'YYYY-MM-DD') as last_exit_date,
+                nullif(trim(employer_name), '') as employer_name,
+                performance_pay_applicable,
+                disabled_flag,
                 row_number() over (
                   order by
-                    case when age_years is null then 1 else 0 end,
-                    age_years desc nulls last,
                     nullif(trim(person_name), '') asc nulls last
                 ) as rn
               from slv.tthh_dim_person_profile_scd2
@@ -1998,10 +2059,31 @@ export async function getCycleLaborPersonDetailByCycleKey(
             )
             select
               person_name,
-              area_name,
+              national_id,
+              gender,
               marital_status,
-              age_years,
-              gender
+              birth_date,
+              birth_place,
+              job_title,
+              employee_type,
+              contract_type,
+              farm_code,
+              associated_worker_name,
+              email,
+              phone_number,
+              address,
+              city,
+              parish,
+              nationality,
+              education_title,
+              job_classification_code,
+              children_count,
+              dependents_count,
+              last_entry_date,
+              last_exit_date,
+              employer_name,
+              performance_pay_applicable,
+              disabled_flag
             from ranked_profiles
             where rn = 1
           `,
@@ -2107,10 +2189,31 @@ export async function getCycleLaborPersonDetailByCycleKey(
       const profile = profileRow
         ? {
             fullName: cleanText(profileRow.person_name) || null,
-            areaName: cleanText(profileRow.area_name) || null,
-            maritalStatus: cleanText(profileRow.marital_status) || null,
-            ageYears: toNumber(profileRow.age_years),
+            nationalId: cleanText(profileRow.national_id) || null,
             gender: cleanText(profileRow.gender) || null,
+            maritalStatus: cleanText(profileRow.marital_status) || null,
+            birthDate: cleanText(profileRow.birth_date) || null,
+            birthPlace: cleanText(profileRow.birth_place) || null,
+            jobTitle: cleanText(profileRow.job_title) || null,
+            employeeType: cleanText(profileRow.employee_type) || null,
+            contractType: cleanText(profileRow.contract_type) || null,
+            farmCode: cleanText(profileRow.farm_code) || null,
+            associatedWorkerName: cleanText(profileRow.associated_worker_name) || null,
+            email: cleanText(profileRow.email) || null,
+            phoneNumber: cleanText(profileRow.phone_number) || null,
+            address: cleanText(profileRow.address) || null,
+            city: cleanText(profileRow.city) || null,
+            parish: cleanText(profileRow.parish) || null,
+            nationality: cleanText(profileRow.nationality) || null,
+            educationTitle: cleanText(profileRow.education_title) || null,
+            jobClassificationCode: cleanText(profileRow.job_classification_code) || null,
+            childrenCount: toNumber(profileRow.children_count),
+            dependentsCount: toNumber(profileRow.dependents_count),
+            lastEntryDate: cleanText(profileRow.last_entry_date) || null,
+            lastExitDate: cleanText(profileRow.last_exit_date) || null,
+            employerName: cleanText(profileRow.employer_name) || null,
+            performancePayApplicable: profileRow.performance_pay_applicable ?? null,
+            disabledFlag: profileRow.disabled_flag ?? null,
           } satisfies CycleLaborPersonProfile
         : null;
 
