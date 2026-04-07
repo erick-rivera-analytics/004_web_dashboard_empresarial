@@ -1,11 +1,45 @@
+import path from "path";
 import type { NextConfig } from "next";
+
+const projectRoot = path.resolve(__dirname);
+const projectNodeModules = path.join(projectRoot, "node_modules");
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  outputFileTracingRoot: projectRoot,
+  transpilePackages: [
+    "recharts",
+    "react-redux",
+    "immer",
+    "@reduxjs/toolkit",
+    "redux",
+    "reselect",
+    "redux-thunk",
+  ],
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
-  turbopack: {},
+  turbopack: {
+    root: projectRoot,
+  },
+  webpack(config) {
+    config.resolve ??= {};
+    config.resolve.modules = [
+      projectNodeModules,
+      ...(config.resolve.modules ?? []),
+    ];
+    config.resolve.alias = {
+      ...(config.resolve.alias ?? {}),
+      "react-redux": path.join(projectNodeModules, "react-redux"),
+      immer: path.join(projectNodeModules, "immer"),
+      "@reduxjs/toolkit": path.join(projectNodeModules, "@reduxjs", "toolkit"),
+      redux: path.join(projectNodeModules, "redux"),
+      reselect: path.join(projectNodeModules, "reselect"),
+      "redux-thunk": path.join(projectNodeModules, "redux-thunk"),
+    };
+
+    return config;
+  },
   async headers() {
     return [
       {

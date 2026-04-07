@@ -3,11 +3,23 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { query } from "./db";
 
-const SECRET = "wh-dashboard-secret-key-2026";
+const SECRET = process.env.SESSION_SECRET ?? "wh-dashboard-secret-key-2026";
 const COOKIE_NAME = "wh-session";
+
+function hasEnvAdminCredentials() {
+  return Boolean(process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD);
+}
 
 /** Validate credentials against PostgreSQL users table. */
 export async function validateCredentials(username: string, password: string): Promise<boolean> {
+  if (
+    hasEnvAdminCredentials()
+    && username === process.env.ADMIN_USERNAME
+    && password === process.env.ADMIN_PASSWORD
+  ) {
+    return true;
+  }
+
   try {
     const result = await query<{ password_hash: string; is_active: boolean }>(
       "SELECT password_hash, is_active FROM public.users WHERE username = $1 LIMIT 1",
