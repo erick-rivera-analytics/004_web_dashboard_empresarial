@@ -270,7 +270,7 @@ function MetricPill({
 }) {
   const sharedClassName = cn(
     "block h-full w-full rounded-lg border border-border/50 bg-card px-3.5 py-3 text-left shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
-    onClick && "cursor-pointer transition-all hover:border-primary/30 hover:shadow-md active:scale-[0.987]",
+    onClick && "cursor-pointer transition-all hover:border-slate-700/30 hover:shadow-md active:scale-[0.987]",
   );
 
   const content = (
@@ -402,7 +402,7 @@ function PersonHoursOverlay({
   const displayName = profile?.fullName ?? `Personal ${personId}`;
 
   const overlayContent = (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/46 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-person-hours">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-person-hours">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar ficha del personal" />
       <div className="relative z-10 flex max-h-[84vh] w-[min(980px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/16 sm:w-[min(980px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
@@ -748,7 +748,7 @@ function HoursCamaOverlay({
   }
 
   const overlayContent = (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-hours-cama">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-hours-cama">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar detalle de horas cama" />
       <div className="relative z-10 flex max-h-[88vh] w-[min(1500px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1500px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
@@ -867,11 +867,11 @@ function HoursCamaOverlay({
                               return (
                                 <Fragment key={`sc-${subKey}`}>
                                   {/* L2: Sub centro */}
-                                  <tr className="bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors">
+                                  <tr className="bg-slate-900/[0.03] dark:bg-slate-800/[0.08] hover:bg-primary/[0.07] transition-colors">
                                     <td className="border-b border-r border-border/40 px-3 py-2 pl-7">
                                       <button type="button" className="flex items-center gap-2 text-left w-full" onClick={() => toggleSubCostCenter(subKey)}>
                                         {subExpanded ? <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />}
-                                        <span className="text-[10px] font-semibold uppercase tracking-wider bg-primary/10 text-primary/70 rounded px-1.5 py-0.5">Sub</span>
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider bg-primary/10 text-slate-700 dark:text-slate-400/70 rounded px-1.5 py-0.5">Sub</span>
                                         <span className="font-semibold text-foreground">{sub.subCostCenter}</span>
                                         <span className="ml-auto text-[10px] text-muted-foreground/60">{sub.activityTypes.length} tipos</span>
                                       </button>
@@ -1004,7 +1004,7 @@ function HoursCamaPersonRow({
   colOffset?: number;
 }) {
   return (
-    <tr className={cn("bg-muted/10 hover:bg-muted/25 transition-colors", isSelected && "bg-primary/8")}>
+    <tr className={cn("bg-muted/10 hover:bg-muted/25 transition-colors", isSelected && "bg-slate-900/8 dark:bg-slate-800/12")}>
       {/* L5: Persona — columna descripción con indent máximo */}
       <td className="border-b border-r border-border/30 px-3 py-1.5 pl-20">
         <div className="flex items-center gap-2">
@@ -1015,8 +1015,8 @@ function HoursCamaPersonRow({
               className={cn(
                 "inline-flex shrink-0 rounded-full border px-1.5 py-0.5 text-[11px] font-semibold transition-colors",
                 isSelected
-                  ? "border-primary/35 bg-primary/10 text-primary"
-                  : "border-border/60 bg-background text-muted-foreground hover:border-primary/35 hover:text-primary",
+                  ? "border-slate-700/35 bg-primary/10 text-slate-700 dark:text-slate-400"
+                  : "border-border/60 bg-background text-muted-foreground hover:border-slate-700/35 hover:text-slate-700 dark:text-slate-400",
               )}
               onClick={() => onOpenPerson(person.personId)}
             >
@@ -1106,7 +1106,7 @@ function BedsTable({
                   {bed.valveId && onOpenValve ? (
                     <button
                       type="button"
-                      className="font-medium text-primary underline-offset-4 hover:underline"
+                      className="font-medium text-slate-700 dark:text-slate-400 underline-offset-4 hover:underline"
                       onClick={() => onOpenValve(bed.valveId)}
                     >
                       {getValveDisplayName(null, bed.valveId)}
@@ -1183,7 +1183,7 @@ function BedsOverlay({
   const selectedValveId = selectedValve?.cycleKey === cycleKey ? selectedValve.valveId : null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/46 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-beds">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-beds">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar detalle de camas" />
       <div className="relative z-10 flex max-h-[90vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1480px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
@@ -1307,7 +1307,7 @@ function ValveBedsOverlay({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-valve-beds">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-valve-beds">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar camas de la valvula" />
       <div className="relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
@@ -1390,7 +1390,7 @@ function HarvestCurveOverlay({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-harvest-curve">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-harvest-curve">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar curva de cosecha" />
       <div className="relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
@@ -1526,7 +1526,7 @@ function MortalityCurveOverlay({
   const badgeLabel = buildMortalityBadge(data, selectedCurve);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-mortality">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-mortality">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar curva de mortandad" />
       <div className="relative z-10 flex max-h-[88vh] w-[min(1420px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1420px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
@@ -1639,7 +1639,7 @@ function CycleSelector({
   return (
     <div className="relative">
       <select
-        className="w-full appearance-none rounded-2xl border border-border/70 bg-background/80 px-4 py-3 pr-10 text-sm font-medium focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
+        className="w-full appearance-none rounded-2xl border border-border/70 bg-background/80 px-4 py-3 pr-10 text-sm font-medium focus:border-slate-700/40 focus:outline-none focus:ring-2 focus:ring-slate-900/20"
         value={selectedCycleKey ?? ""}
         onChange={(event) => onSelect(event.target.value)}
       >
@@ -2046,7 +2046,7 @@ function ValvesSection({
                   key={valve.recordId}
                   className={cn(
                     "rounded-2xl border border-border/70 bg-background/82 p-4",
-                    isSelected && "border-primary/30",
+                    isSelected && "border-slate-700/30",
                   )}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2129,7 +2129,7 @@ function ValvesOverlay({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/50 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-valves">
+    <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-valves">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar valvulas del ciclo" />
       <div className="relative z-10 flex max-h-[88vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1480px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
@@ -2345,7 +2345,7 @@ export function BlockProfileModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/38 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-block">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="modal-title-block">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar ficha del bloque" />
       <div className={cn("relative z-10 flex max-h-[88vh] w-[min(1320px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/14 sm:w-[min(1320px,calc(100vw-2rem))] animate-in fade-in slide-in-from-bottom-4 duration-200", directMode && "pointer-events-none opacity-0 invisible")}>
         <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">

@@ -205,7 +205,7 @@ export function MortalityExplorer({ initialData }: { initialData: MortalityDashb
       <Card className="starter-panel border-border/70 bg-card/82">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-primary/12 p-3 text-primary">
+            <div className="rounded-full bg-slate-900/10 dark:bg-slate-800/20 p-3 text-slate-700 dark:text-slate-400">
               <Activity className="size-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">

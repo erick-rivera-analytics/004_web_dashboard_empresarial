@@ -29,12 +29,12 @@ type Props = {
 
 function getStatusLabel(cycle: CycleOption): { label: string; cls: string } {
   if (cycle.isCurrent && cycle.isValid) {
-    return { label: "Activo",      cls: "bg-emerald-100 text-emerald-700" };
+    return { label: "Activo",      cls: "bg-chart-success text-chart-success-bold" };
   }
   if (!cycle.isCurrent && cycle.isValid) {
-    return { label: "Cerrado",     cls: "bg-slate-100 text-slate-500" };
+    return { label: "Cerrado",     cls: "bg-chart-neutral text-muted-foreground" };
   }
-  return { label: "Planificado",   cls: "bg-blue-100 text-blue-700" };
+  return { label: "Planificado",   cls: "bg-chart-info text-chart-info-bold" };
 }
 
 /** Extract a readable short label from the cycleKey */
@@ -152,7 +152,7 @@ export function CampoCycleSelectorModal({
                 onClick={() => onSelect(cycle.cycleKey)}
                 className={cn(
                   "group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
-                  isFirst && "bg-emerald-50/60 dark:bg-emerald-950/20",
+                  isFirst && "bg-chart-success/30 dark:bg-chart-success/20",
                 )}
               >
                 {/* Active indicator dot */}
@@ -160,10 +160,10 @@ export function CampoCycleSelectorModal({
                   className={cn(
                     "mt-px size-2 shrink-0 rounded-full",
                     cycle.isCurrent && cycle.isValid
-                      ? "bg-emerald-500"
+                      ? "bg-chart-success-bold"
                       : !cycle.isCurrent && cycle.isValid
-                        ? "bg-slate-300"
-                        : "bg-blue-400",
+                        ? "bg-muted-foreground/40"
+                        : "bg-chart-info-bold",
                   )}
                 />
 

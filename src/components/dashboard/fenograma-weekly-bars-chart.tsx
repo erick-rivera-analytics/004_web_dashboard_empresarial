@@ -86,7 +86,7 @@ export const FenogramaWeeklyBarsChart = memo(function FenogramaWeeklyBarsChart({
                 height={Math.max(barHeight, 2)}
                 rx="8"
                 ry="8"
-                fill="var(--color-primary)"
+                fill="var(--color-slate-900)"
               >
                 <title>{`${entry.week}: ${formatNumber(entry.stems)} tallos`}</title>
               </rect>

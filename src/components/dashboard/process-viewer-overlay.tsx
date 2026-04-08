@@ -138,7 +138,7 @@ export function ProcessViewerOverlay({
     : viewerError;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
       <button
         type="button"
         className="absolute inset-0 border-0 bg-transparent p-0"

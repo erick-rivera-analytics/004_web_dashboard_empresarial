@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { Frame, Minus, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "dashboard-ui-scale";
 const SCALE_EVENT = "dashboard-scale-change";
@@ -72,11 +73,11 @@ export function DashboardScaleToggle() {
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-full border border-border/70 bg-background/82 p-1 backdrop-blur-sm">
+    <div className="flex items-center gap-1 rounded-full border border-slate-700/50 bg-slate-950/80 p-1 backdrop-blur-sm">
       <Button
-        variant="secondary"
+        variant="ghost"
         size="icon"
-        className="size-8 rounded-full"
+        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-800/60"
         onClick={() => persistScale(1)}
         title="Restablecer tamano del dashboard"
       >
@@ -87,7 +88,7 @@ export function DashboardScaleToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className="size-8 rounded-full"
+        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 disabled:opacity-40"
         onClick={() => updateScale(scale - STEP)}
         disabled={scale <= MIN_SCALE}
         title="Reducir tamano del dashboard"
@@ -96,19 +97,20 @@ export function DashboardScaleToggle() {
         <span className="sr-only">Reducir tamano del dashboard</span>
       </Button>
 
-      <button
-        type="button"
-        className="min-w-[58px] rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        onClick={() => persistScale(1)}
+      <span
+        className={cn(
+          "min-w-[58px] cursor-default select-none rounded-full px-2 py-1 text-center text-xs text-slate-400",
+          Math.abs(scale - 1) < 0.01 ? "font-semibold text-slate-200" : "font-medium",
+        )}
         title="Escala visual actual del dashboard"
       >
         {`${Math.round(scale * 100)}%`}
-      </button>
+      </span>
 
       <Button
         variant="ghost"
         size="icon"
-        className="size-8 rounded-full"
+        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 disabled:opacity-40"
         onClick={() => updateScale(scale + STEP)}
         disabled={scale >= MAX_SCALE}
         title="Aumentar tamano del dashboard"

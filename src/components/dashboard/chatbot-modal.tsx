@@ -83,7 +83,7 @@ export function ChatbotModal({ summary }: ChatbotModalProps) {
       {/* Floating button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-white shadow-lg transition-all hover:shadow-xl hover:scale-110"
+        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-lg transition-all hover:shadow-xl hover:scale-110 dark:from-slate-800 dark:to-slate-700"
       >
         {isOpen ? (
           <X className="h-6 w-6" />
@@ -94,9 +94,9 @@ export function ChatbotModal({ summary }: ChatbotModalProps) {
 
       {/* Chat modal */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-3rem)] rounded-2xl border border-border/50 bg-card shadow-2xl flex flex-col h-[500px] backdrop-blur-sm">
+        <div className="fixed bottom-24 right-6 z-50 w-[28rem] max-w-[calc(100vw-3rem)] rounded-2xl border border-border/50 bg-card shadow-2xl flex flex-col h-[560px] backdrop-blur-sm">
           {/* Header */}
-          <div className="border-b border-border/30 bg-gradient-to-r from-primary/5 to-primary/10 p-4 rounded-t-2xl">
+          <div className="border-b border-border/30 bg-gradient-to-r from-slate-900/5 dark:from-slate-800/10 to-slate-900/8 dark:to-slate-800/15 p-4 rounded-t-2xl">
             <h3 className="font-semibold text-foreground">Asistente Dashboard</h3>
             <p className="text-xs text-muted-foreground">Pregunta sobre métricas e interpretaciones</p>
           </div>
@@ -122,7 +122,7 @@ export function ChatbotModal({ summary }: ChatbotModalProps) {
                     <div
                       className={`max-w-xs rounded-lg px-3 py-2 text-sm ${
                         msg.role === "user"
-                          ? "bg-primary text-primary-foreground rounded-br-none"
+                          ? "bg-slate-900 text-white dark:bg-slate-800 rounded-br-none"
                           : "bg-muted text-muted-foreground border border-border/30 rounded-bl-none"
                       }`}
                     >
