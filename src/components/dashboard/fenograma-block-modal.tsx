@@ -8,6 +8,7 @@ import useSWRImmutable from "swr/immutable";
 
 import { HarvestCurvePanel } from "@/components/dashboard/harvest-curve-panel";
 import { MortalityCurvePanel } from "@/components/dashboard/mortality-curve-panel";
+import { PersonMedicalPanel } from "@/components/dashboard/person-medical-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fetchJson } from "@/lib/fetch-json";
@@ -393,7 +394,7 @@ function PersonHoursOverlay({
   error: string | null;
   onClose: () => void;
 }) {
-  const [view, setView] = useState<"info" | "performance">("info");
+  const [view, setView] = useState<"info" | "performance" | "medical">("info");
 
   const totalEffectiveHours = data?.summary.totalEffectiveHours ?? 0;
   const totalActualHours = data?.summary.totalActualHours ?? 0;
@@ -458,6 +459,18 @@ function PersonHoursOverlay({
                 onClick={() => setView("performance")}
               >
                 Rendimiento
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                  view === "medical"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setView("medical")}
+              >
+                Ficha medica
               </button>
             </div>
 
@@ -533,7 +546,7 @@ function PersonHoursOverlay({
                     </div>
                   </div>
                 </div>
-              ) : (
+              ) : view === "performance" ? (
                 <div className="space-y-5">
                   <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -640,14 +653,19 @@ function PersonHoursOverlay({
                         )) : (
                           <tr>
                             <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                              No hay horas registradas para este personal en el ciclo.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
+                        No hay horas registradas para este personal en el ciclo.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
                     </table>
                   </div>
                 </div>
+              ) : (
+                <PersonMedicalPanel
+                  personId={personId}
+                  fallbackName={displayName}
+                />
               )
             ) : (
               <div className="py-8 text-sm text-muted-foreground">

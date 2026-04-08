@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
-const SECRET = "wh-dashboard-secret-key-2026";
+const SECRET = process.env.SESSION_SECRET ?? "wh-dashboard-secret-key-2026";
 const COOKIE_NAME = "wh-session";
 
 const legacyRoutes = new Set([
