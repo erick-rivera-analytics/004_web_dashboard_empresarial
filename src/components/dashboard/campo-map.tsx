@@ -566,7 +566,7 @@ export function CampoRasterControls({
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
               active === layer
-                ? "border-slate-700 bg-slate-900 dark:bg-slate-800 text-white"
+                ? "border-slate-700 bg-slate-900 dark:bg-slate-900 text-white"
                 : "border-border/70 bg-background/72 text-muted-foreground hover:text-foreground",
             )}
           >
@@ -862,17 +862,17 @@ export function CampoLeafletMap({
             eventHandlers={{ remove: () => setClickState(null) }}
           >
             <div className="min-w-[210px] space-y-2.5 p-1">
-              <p className="text-[13px] font-bold text-slate-900">
+              <p className="text-[13px] font-bold text-slate-900 dark:text-white">
                 Bloque {clickState.bloquePad}
               </p>
-              <p className="text-[11px] leading-relaxed text-slate-500">
+              <p className="text-[11px] leading-relaxed text-slate-500 dark:text-white">
                 {activeLayer === "none"
                   ? "Vista operativa del bloque."
                   : `Vista agronómica con ${RASTER_META[activeLayer].label}.`}
               </p>
               <button
                 type="button"
-                className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                 onClick={() => {
                   onFicha(clickState.bloquePad);
                   setClickState(null);
@@ -882,7 +882,7 @@ export function CampoLeafletMap({
               </button>
               <button
                 type="button"
-                className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                 onClick={() => {
                   onValves(clickState.bloquePad);
                   setClickState(null);

@@ -689,7 +689,7 @@ export function ProgramacionesExplorer({
                           </div>
                         )}
                         {ilumDays !== null && (
-                          <div className="flex items-center justify-between rounded-lg bg-slate-100/60 dark:bg-slate-800/40 px-3 py-2">
+                          <div className="flex items-center justify-between rounded-lg bg-slate-100/60 dark:bg-slate-900/40 px-3 py-2">
                             <span className="text-xs text-muted-foreground">Duración</span>
                             <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{ilumDays} días</span>
                           </div>

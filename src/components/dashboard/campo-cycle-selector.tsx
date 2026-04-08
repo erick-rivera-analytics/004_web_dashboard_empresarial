@@ -171,10 +171,10 @@ export function CampoCycleSelectorModal({
                 <span className={cn(
                   "flex-1 truncate font-mono text-[12.5px] leading-snug",
                   cycle.isCurrent && cycle.isValid
-                    ? "text-slate-900 dark:text-slate-100"
+                    ? "text-slate-900 dark:text-white"
                     : !cycle.isCurrent && cycle.isValid
-                      ? "text-slate-700 dark:text-slate-300"
-                      : "text-slate-400 dark:text-slate-500",
+                      ? "text-slate-700 dark:text-white"
+                      : "text-slate-400 dark:text-white",
                 )}>
                   {cycleLabel(cycle.cycleKey)}
                 </span>
