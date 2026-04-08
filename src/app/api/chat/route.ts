@@ -36,8 +36,8 @@ HECHOS (usa estos números exactamente):
 - ${context?.activeCount || 0} ciclos ACTIVOS ahora
 - ${context?.plannedCount || 0} ciclos PLANIFICADOS
 - ${context?.historyCount || 0} ciclos en HISTORIA
-- Áreas: ${context?.areas?.length || 0} (${context?.areas?.join(", ") || "ninguna"})
-- Variedades: ${context?.varieties?.length || 0} (${context?.varieties?.join(", ") || "ninguna"})
+- Áreas: ${Array.isArray(context?.areas) ? context.areas.length : 0} (${Array.isArray(context?.areas) ? context.areas.join(", ") : "ninguna"})
+- Variedades: ${Array.isArray(context?.varieties) ? context.varieties.length : 0} (${Array.isArray(context?.varieties) ? context.varieties.join(", ") : "ninguna"})
 - Total: ${context?.totalStems?.toLocaleString("es-ES") || "0"} tallos
 - Fecha: ${context?.today || "desconocida"}
 
