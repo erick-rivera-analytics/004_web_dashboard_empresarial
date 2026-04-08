@@ -73,50 +73,52 @@ export function DashboardScaleToggle() {
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-full border border-slate-700/50 bg-slate-950/80 p-1 backdrop-blur-sm">
+    <div className="flex items-center gap-0.5 rounded-full border border-slate-700/50 bg-slate-950/80 p-1.5 backdrop-blur-sm shadow-lg shadow-slate-950/40">
       <Button
         variant="ghost"
         size="icon"
-        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-800/60"
+        className="size-7 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 transition-all active:scale-95"
         onClick={() => persistScale(1)}
-        title="Restablecer tamano del dashboard"
+        title="Restablecer a 100%"
       >
-        <Frame className="size-4" aria-hidden="true" />
-        <span className="sr-only">Restablecer tamano del dashboard</span>
+        <Frame className="size-3.5" aria-hidden="true" />
+        <span className="sr-only">Restablecer tamaño</span>
       </Button>
 
       <Button
         variant="ghost"
         size="icon"
-        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 disabled:opacity-40"
+        className="size-7 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
         onClick={() => updateScale(scale - STEP)}
         disabled={scale <= MIN_SCALE}
-        title="Reducir tamano del dashboard"
+        title="Reducir (−)"
       >
-        <Minus className="size-4" aria-hidden="true" />
-        <span className="sr-only">Reducir tamano del dashboard</span>
+        <Minus className="size-3.5" aria-hidden="true" />
+        <span className="sr-only">Reducir tamaño</span>
       </Button>
 
-      <span
-        className={cn(
-          "min-w-[58px] cursor-default select-none rounded-full px-2 py-1 text-center text-xs text-slate-400",
-          Math.abs(scale - 1) < 0.01 ? "font-semibold text-slate-200" : "font-medium",
-        )}
-        title="Escala visual actual del dashboard"
-      >
-        {`${Math.round(scale * 100)}%`}
-      </span>
+      <div className="bg-slate-800/40 rounded-full px-2.5 py-0.5 border border-slate-600/30">
+        <span
+          className={cn(
+            "cursor-default select-none text-center text-xs tabular-nums transition-colors",
+            Math.abs(scale - 1) < 0.01 ? "font-bold text-slate-100" : "font-medium text-slate-300",
+          )}
+          title="Escala actual del dashboard"
+        >
+          {`${Math.round(scale * 100)}%`}
+        </span>
+      </div>
 
       <Button
         variant="ghost"
         size="icon"
-        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 disabled:opacity-40"
+        className="size-7 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
         onClick={() => updateScale(scale + STEP)}
         disabled={scale >= MAX_SCALE}
-        title="Aumentar tamano del dashboard"
+        title="Aumentar (+)"
       >
-        <Plus className="size-4" aria-hidden="true" />
-        <span className="sr-only">Aumentar tamano del dashboard</span>
+        <Plus className="size-3.5" aria-hidden="true" />
+        <span className="sr-only">Aumentar tamaño</span>
       </Button>
     </div>
   );
