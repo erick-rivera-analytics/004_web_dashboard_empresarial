@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { ChatbotModal } from "@/components/dashboard/chatbot-modal";
 import { cn } from "@/lib/utils";
 
 export default function DashboardLayout({
@@ -40,6 +41,7 @@ export default function DashboardLayout({
           </div>
         </div>
       </div>
+      <ChatbotModal />
     </div>
   );
 }
