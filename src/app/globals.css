@@ -35,6 +35,8 @@
   --color-chart-neutral: var(--chart-neutral);
   --color-chart-warning: var(--chart-warning);
   --color-chart-danger: var(--chart-danger);
+  --chart-line-primary: var(--chart-line-primary);
+  --chart-line-secondary: var(--chart-line-secondary);
 }
 
 :root {
@@ -65,6 +67,8 @@
   --chart-neutral: oklch(0.93 0.005 250);
   --chart-warning: oklch(0.88 0.12 85);
   --chart-danger: oklch(0.62 0.21 28);
+  --chart-line-primary: oklch(0.23 0.02 250);
+  --chart-line-secondary: oklch(0.35 0.008 250);
 }
 
 .dark {
@@ -93,6 +97,8 @@
   --chart-neutral: oklch(0.30 0.01 250);
   --chart-warning: oklch(0.42 0.08 85);
   --chart-danger: oklch(0.68 0.17 24);
+  --chart-line-primary: oklch(0.75 0.06 205);
+  --chart-line-secondary: oklch(0.65 0.08 250);
 }
 
 @layer base {
