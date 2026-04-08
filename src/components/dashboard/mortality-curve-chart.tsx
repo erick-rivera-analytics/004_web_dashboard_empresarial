@@ -36,8 +36,8 @@ export const MortalityCurveChart = memo(function MortalityCurveChart({ data }: M
         <ComposedChart data={data} margin={{ top: 10, right: 24, left: 0, bottom: 8 }}>
           <defs>
             <linearGradient id="mortalityCumulativeFill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="5%" stopColor="#1d4ed8" stopOpacity={0.28} />
-              <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0.02} />
+              <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.28} />
+              <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0.02} />
             </linearGradient>
           </defs>
           <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
@@ -83,21 +83,21 @@ export const MortalityCurveChart = memo(function MortalityCurveChart({ data }: M
             type="monotone"
           />
           <Line
-            activeDot={{ fill: "#1d4ed8", r: 4.5, strokeWidth: 0 }}
+            activeDot={{ fill: "var(--color-primary)", r: 4.5, strokeWidth: 0 }}
             dataKey="cumulativeMortalityPct"
             dot={false}
             name="Mortandad acumulada"
-            stroke="#1d4ed8"
+            stroke="var(--color-primary)"
             strokeLinecap="round"
             strokeWidth={3}
             type="monotone"
           />
           <Line
-            activeDot={{ fill: "#312e81", r: 4, strokeWidth: 0 }}
+            activeDot={{ fill: "var(--color-secondary)", r: 4, strokeWidth: 0 }}
             dataKey="dailyMortalityPct"
             dot={false}
             name="Mortandad diaria"
-            stroke="#312e81"
+            stroke="var(--color-secondary)"
             strokeDasharray="7 5"
             strokeLinecap="round"
             strokeWidth={2.4}
