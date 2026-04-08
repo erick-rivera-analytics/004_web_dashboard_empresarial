@@ -41,7 +41,7 @@ function NavItem({
         "flex h-9 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
         collapsed && "justify-center px-2",
         active
-          ? "bg-slate-900 text-slate-100 shadow-sm shadow-slate-900/40 dark:bg-slate-900"
+          ? "bg-slate-900 text-slate-100 shadow-sm shadow-slate-900/40 dark:bg-white dark:text-slate-900 dark:shadow-white/20"
           : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
       )}
     >
@@ -82,7 +82,7 @@ export function AppSidebar({ collapsed, onCollapsedChange }: AppSidebarProps) {
           )}
           title={starterName}
         >
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-slate-100 dark:bg-slate-900">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-slate-100 dark:bg-white dark:text-slate-900">
             <Logo size={16} />
           </div>
           {!collapsed ? (

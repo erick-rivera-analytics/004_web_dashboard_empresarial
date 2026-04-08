@@ -64,14 +64,14 @@ const VARIETY_COLORS: string[] = [
 
 /** SP-type left accent bar (third, independent channel). */
 const SPTYPE_ACCENT_COLORS: string[] = [
-  "#14b8a6",
-  "#3b82f6",
-  "#a855f7",
-  "#f59e0b",
-  "#10b981",
-  "#f43f5e",
-  "#f97316",
-  "#06b6d4",
+  "#e8a35d",
+  "#e8a35d",
+  "#d1a560",
+  "#daa95c",
+  "#e8a35d",
+  "#e8a35d",
+  "#daa95c",
+  "#e8a35d",
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
