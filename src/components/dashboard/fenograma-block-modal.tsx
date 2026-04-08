@@ -433,8 +433,8 @@ function PersonHoursOverlay({
           </Button>
         </div>
 
-        <div className="overflow-y-auto px-4 py-5 sm:px-6">
-          <div className="space-y-5">
+        <div className="overflow-y-auto px-6 py-8 sm:px-8">
+          <div className="space-y-8">
             <div className="inline-flex rounded-full border border-border/60 bg-muted/22 p-1">
               <button
                 type="button"
@@ -485,11 +485,11 @@ function PersonHoursOverlay({
               view === "info" ? (
                 <div className="space-y-5">
                   {/* Datos personales */}
-                  <div className="rounded-2xl border border-border/60 bg-muted/14 px-4 py-4">
+                  <div className="rounded-2xl border border-border/60 bg-muted/14 px-5 py-5">
                     <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/65">
                       Datos personales
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                       <InfoField label="Nombre completo" value={profile?.fullName ?? "Sin dato"} />
                       <InfoField label="Cédula / ID" value={profile?.nationalId ?? "Sin dato"} />
                       <InfoField label="Género" value={profile?.gender ?? "Sin dato"} />
@@ -505,11 +505,11 @@ function PersonHoursOverlay({
                   </div>
 
                   {/* Datos laborales */}
-                  <div className="rounded-2xl border border-border/60 bg-muted/14 px-4 py-4">
+                  <div className="rounded-2xl border border-border/60 bg-muted/14 px-5 py-5">
                     <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/65">
                       Datos laborales
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                       <InfoField label="Cargo" value={profile?.jobTitle ?? "Sin dato"} />
                       <InfoField label="Tipo de empleado" value={profile?.employeeType ?? "Sin dato"} />
                       <InfoField label="Tipo de contrato" value={profile?.contractType ?? "Sin dato"} />
@@ -522,11 +522,11 @@ function PersonHoursOverlay({
                   </div>
 
                   {/* Contacto */}
-                  <div className="rounded-2xl border border-border/60 bg-muted/14 px-4 py-4">
+                  <div className="rounded-2xl border border-border/60 bg-muted/14 px-5 py-5">
                     <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/65">
                       Contacto
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                       <InfoField label="Email" value={profile?.email ?? "Sin dato"} />
                       <InfoField label="Teléfono" value={profile?.phoneNumber ?? "Sin dato"} />
                       <InfoField label="Dirección" value={profile?.address ?? "Sin dato"} />
@@ -536,11 +536,11 @@ function PersonHoursOverlay({
                   </div>
 
                   {/* Acceso */}
-                  <div className="rounded-2xl border border-border/60 bg-muted/14 px-4 py-4">
+                  <div className="rounded-2xl border border-border/60 bg-muted/14 px-5 py-5">
                     <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/65">
                       Acceso a la empresa
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                       <InfoField label="Última entrada" value={profile?.lastEntryDate ?? "Sin dato"} />
                       <InfoField label="Última salida" value={profile?.lastExitDate ?? "Sin dato"} />
                     </div>
@@ -549,7 +549,7 @@ function PersonHoursOverlay({
               ) : view === "performance" ? (
                 <div className="space-y-5">
                   <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                       <MetricPill
                         label="Horas presenciales"
                         value={formatNumber(totalActualHours)}
@@ -791,8 +791,8 @@ function HoursCamaOverlay({
           </Button>
         </div>
 
-        <div className="overflow-y-auto px-4 py-5 sm:px-6">
-          <div className="space-y-5">
+        <div className="overflow-y-auto px-6 py-8 sm:px-8">
+          <div className="space-y-8">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricPill
                 label="Horas cama"
