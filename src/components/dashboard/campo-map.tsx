@@ -566,7 +566,7 @@ export function CampoRasterControls({
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
               active === layer
-                ? "border-primary bg-primary text-primary-foreground"
+                ? "border-slate-700 bg-slate-900 dark:bg-slate-800 text-white"
                 : "border-border/70 bg-background/72 text-muted-foreground hover:text-foreground",
             )}
           >
@@ -594,7 +594,7 @@ export function CampoRasterControls({
           value={opacityPercent}
           disabled={active === "none"}
           onChange={(event) => onOpacityChange(Number(event.currentTarget.value) / 100)}
-          className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-45"
+          className="h-2 w-full cursor-pointer accent-slate-900 dark:accent-slate-400 disabled:cursor-not-allowed disabled:opacity-45"
         />
         <span
           className={cn(

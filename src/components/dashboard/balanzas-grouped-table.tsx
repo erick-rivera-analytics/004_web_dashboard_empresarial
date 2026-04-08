@@ -69,7 +69,7 @@ function getRatioTone(value: number | null) {
   }
 
   if (value >= 95) {
-    return "bg-emerald-500/14";
+    return "bg-chart-success-bold/14";
   }
 
   if (value >= 80) {

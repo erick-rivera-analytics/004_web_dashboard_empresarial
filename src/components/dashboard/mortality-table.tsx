@@ -171,7 +171,7 @@ export function MortalityTable({
                   )}
                   onClick={() => onOpenHistory(row)}
                 >
-                  <td className="border-b border-r border-border/50 px-3 py-2.5 font-medium text-primary underline-offset-4 hover:underline">
+                  <td className="border-b border-r border-border/50 px-3 py-2.5 font-medium text-slate-700 dark:text-slate-400 underline-offset-4 hover:underline">
                     <button
                       type="button"
                       onClick={(event) => {

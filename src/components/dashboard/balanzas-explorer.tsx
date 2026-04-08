@@ -151,7 +151,7 @@ function getRatioTone(value: number | null) {
   }
 
   if (value >= 95) {
-    return "bg-emerald-500/16 text-emerald-950 dark:text-emerald-100";
+    return "bg-chart-success-bold/16 text-foreground";
   }
 
   if (value >= 80) {
@@ -175,7 +175,7 @@ function SummaryPill({
       className={cn(
         "rounded-[24px] border px-4 py-4",
         tone === "positive"
-          ? "border-emerald-300/60 bg-emerald-500/10"
+          ? "border-chart-success-bold/40 bg-chart-success-bold/10"
           : tone === "warning"
             ? "border-amber-300/60 bg-amber-500/10"
             : "border-border/70 bg-background/76",
@@ -297,7 +297,7 @@ function NodeDetailModal({
   ].filter((entry) => entry.options.length > 1);
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/52 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-3 py-4 backdrop-blur-sm sm:px-4 sm:py-6">
       <button type="button" className="absolute inset-0 border-0 bg-transparent p-0" onClick={onClose} aria-label="Cerrar detalle del nodo" />
       <div className="starter-panel relative z-10 flex max-h-[92vh] w-[min(1560px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1560px,calc(100vw-2rem))]">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
@@ -380,7 +380,7 @@ function NodeDetailModal({
 
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-primary/12 p-3 text-primary">
+                  <div className="rounded-full bg-slate-900/10 dark:bg-slate-800/20 p-3 text-slate-700 dark:text-slate-400">
                     <Layers3 className="size-5" aria-hidden="true" />
                   </div>
                     <div>
@@ -396,7 +396,7 @@ function NodeDetailModal({
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="rounded-full bg-primary/12 p-3 text-primary">
+                    <div className="rounded-full bg-slate-900/10 dark:bg-slate-800/20 p-3 text-slate-700 dark:text-slate-400">
                       <TableProperties className="size-5" aria-hidden="true" />
                     </div>
                     <div>
@@ -441,7 +441,7 @@ function NodeDetailModal({
                                 "border-b border-r border-border/50 px-3 py-2.5 align-middle text-foreground last:border-r-0",
                                 column.key === ratioKey && getRatioTone(row.ratioPct),
                                 column.key === sourceKey && "bg-sky-500/6",
-                                column.key === targetKey && "bg-emerald-500/6",
+                                column.key === targetKey && "bg-chart-success-bold/6",
                                 column.key === gapKey && row.gapValue !== null && row.gapValue < 0 && "bg-rose-500/8",
                               )}
                             >
@@ -728,7 +728,7 @@ export function BalanzasExplorer({
       <Card className="starter-panel border-border/70 bg-card/82">
         <CardHeader className="space-y-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-primary/12 p-3 text-primary">
+            <div className="rounded-full bg-slate-900/10 dark:bg-slate-800/20 p-3 text-slate-700 dark:text-slate-400">
               <Scale className="size-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">

@@ -25,7 +25,10 @@
       "Bash(cmd.exe /c \"C:\\\\Users\\\\erick.rivera\\\\nodejs\\\\node\\\\npm.cmd run typecheck\")",
       "Bash(cmd.exe /c \"C:\\\\Users\\\\erick.rivera\\\\nodejs\\\\node\\\\npx.cmd tsc --noEmit 2>&1\")",
       "Bash(cmd.exe /c \"git diff --stat && git add src/components/dashboard/fenograma-block-modal.tsx\")",
-      "Bash(cmd.exe /c \"git diff --stat\")"
+      "Bash(cmd.exe /c \"git diff --stat\")",
+      "Bash(npx tsc:*)",
+      "Bash(xargs -I {} basename {} .md)",
+      "Bash(done)"
     ]
   }
 }

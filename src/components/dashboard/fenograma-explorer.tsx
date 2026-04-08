@@ -86,7 +86,7 @@ function LifecycleChip({ active, label, onClick }: {
       type="button"
       onClick={onClick}
       className={active
-        ? "inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground"
+        ? "inline-flex items-center rounded-full border border-slate-700/40 bg-slate-900/20 dark:border-slate-600/40 dark:bg-slate-800/30 px-3 py-2 text-sm text-foreground font-medium"
         : "inline-flex items-center rounded-full border border-border/70 bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"}
     >
       {label}
@@ -258,7 +258,7 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
       <Card className="starter-panel border-border/70 bg-card/82">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-primary/12 p-3 text-primary"><Sprout className="size-5" aria-hidden="true" /></div>
+            <div className="rounded-full bg-slate-900/10 dark:bg-slate-800/20 p-3 text-slate-700 dark:text-slate-400"><Sprout className="size-5" aria-hidden="true" /></div>
             <div className="min-w-0">
               <CardTitle>Acumulado semanal</CardTitle>
               <p className="text-sm text-muted-foreground">Tallos por semana para el rango visible actual.</p>

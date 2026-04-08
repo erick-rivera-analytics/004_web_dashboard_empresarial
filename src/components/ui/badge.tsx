@@ -9,8 +9,8 @@ type BadgeProps = React.ComponentProps<"span"> & {
 };
 
 const variants: Record<NonNullable<BadgeProps["variant"]>, string> = {
-  default: "border-transparent bg-primary text-primary-foreground",
-  secondary: "border-transparent bg-secondary text-secondary-foreground",
+  default: "border-transparent bg-slate-900 dark:bg-slate-800 text-white",
+  secondary: "border-transparent bg-slate-900/20 dark:bg-slate-800/30 text-slate-700 dark:text-slate-300",
   outline: "border-border text-foreground",
 };
 

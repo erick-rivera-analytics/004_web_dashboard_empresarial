@@ -501,7 +501,7 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
                     className={cn(
                       rowIndex % 2 === 0 ? "bg-background/84" : "bg-background/70",
                       lifecycleTone(row.sourceRows),
-                      isClickable && "cursor-pointer transition-colors hover:bg-primary/6",
+                      isClickable && "cursor-pointer transition-colors hover:bg-slate-900/4 dark:hover:bg-slate-800/8",
                     )}
                     onClick={isClickable ? () => handleRowSelect(row) : undefined}
                     onKeyDown={isClickable ? (event) => {
