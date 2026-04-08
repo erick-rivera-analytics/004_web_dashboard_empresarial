@@ -145,7 +145,7 @@ export function ProcessViewerOverlay({
         onClick={onClose}
         aria-label="Cerrar visor de proceso"
       />
-      <div className="starter-panel relative z-10 flex max-h-[90vh] w-[min(1480px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 sm:w-[min(1480px,calc(100vw-2rem))]">
+      <div className="starter-panel relative z-10 flex max-h-[90vh] w-full max-w-sm sm:max-w-2xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl min-w-0 flex-col overflow-hidden border border-border/70 bg-card/97 shadow-2xl shadow-slate-950/24 mx-auto">
         <div className="flex items-start justify-between gap-4 border-b border-border/60 px-4 py-5 sm:px-6">
           <div className="min-w-0 space-y-2">
             <Badge variant="outline" className="rounded-full px-3 py-1">

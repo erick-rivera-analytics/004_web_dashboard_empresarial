@@ -103,7 +103,7 @@ export function CampoCycleSelectorModal({
       />
 
       {/* Panel — compact, list-style like a dropdown */}
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border/70 bg-white shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200 dark:bg-card">
+      <div className="relative z-10 w-full max-w-sm sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl overflow-hidden rounded-2xl border border-border/70 bg-white shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200 dark:bg-card">
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border/60 bg-muted/30 px-4 py-3">

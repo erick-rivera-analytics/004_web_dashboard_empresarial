@@ -94,7 +94,7 @@ export function ChatbotModal({ summary }: ChatbotModalProps) {
 
       {/* Chat modal */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-[28rem] max-w-[calc(100vw-3rem)] rounded-2xl border border-border/50 bg-card shadow-2xl flex flex-col h-[560px] backdrop-blur-sm">
+        <div className="fixed bottom-24 right-6 z-50 w-full max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl xl:max-w-4xl max-h-[90vh] rounded-2xl border border-border/50 bg-card shadow-2xl flex flex-col h-[560px] backdrop-blur-sm">
           {/* Header */}
           <div className="border-b border-border/30 bg-gradient-to-r from-slate-900/5 dark:from-slate-800/10 to-slate-900/8 dark:to-slate-800/15 p-4 rounded-t-2xl">
             <h3 className="font-semibold text-foreground">Asistente Dashboard</h3>

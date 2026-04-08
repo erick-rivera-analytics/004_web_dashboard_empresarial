@@ -547,7 +547,7 @@ export function CampoSubMapModal({
           aria-hidden="true"
         />
 
-        <div className="relative z-10 flex h-[92vh] w-full max-w-5xl flex-col overflow-visible rounded-[28px] border border-border/70 bg-card shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="relative z-10 flex h-[92vh] w-full max-w-sm sm:max-w-2xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl flex-col overflow-visible rounded-[28px] border border-border/70 bg-card shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/70 px-6 py-4">
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground">
