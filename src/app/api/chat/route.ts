@@ -38,7 +38,7 @@ HECHOS (usa estos números exactamente):
 - ${context?.historyCount || 0} ciclos en HISTORIA
 - Áreas: ${Array.isArray(context?.areas) ? context.areas.length : 0} (${Array.isArray(context?.areas) ? context.areas.join(", ") : "ninguna"})
 - Variedades: ${Array.isArray(context?.varieties) ? context.varieties.length : 0} (${Array.isArray(context?.varieties) ? context.varieties.join(", ") : "ninguna"})
-- Total: ${context?.totalStems?.toLocaleString("es-ES") || "0"} tallos
+- Total: ${(context?.totalStems || 0).toLocaleString("es-ES")} tallos
 - Fecha: ${context?.today || "desconocida"}
 
 IMPORTANTE: Responde SIEMPRE con los números y datos que ves arriba. Sé directo y conciso.
