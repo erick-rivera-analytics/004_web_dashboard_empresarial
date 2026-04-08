@@ -74,7 +74,7 @@ function formatDisplayDate(value: string) {
 function getMarkerTone(color: MedicalMarkerColor) {
   if (color === "green") {
     return {
-      badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      badge: "border-emerald-200 bg-slate-50 text-slate-700",
       border: "border-emerald-200/80",
       shadow: "shadow-emerald-950/5",
     };
@@ -82,16 +82,16 @@ function getMarkerTone(color: MedicalMarkerColor) {
 
   if (color === "yellow") {
     return {
-      badge: "border-amber-200 bg-amber-50 text-amber-700",
-      border: "border-amber-200/80",
+      badge: "border-slate-200 bg-slate-50 text-slate-700",
+      border: "border-slate-200/80",
       shadow: "shadow-amber-950/5",
     };
   }
 
   if (color === "red") {
     return {
-      badge: "border-rose-200 bg-rose-50 text-rose-700",
-      border: "border-rose-200/80",
+      badge: "border-slate-200 bg-slate-50 text-slate-700",
+      border: "border-slate-200/80",
       shadow: "shadow-rose-950/5",
     };
   }
@@ -401,7 +401,7 @@ function MedicalMarkerOverlay({
               </div>
 
               {marker.field === "colinesterasa" ? (
-                <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 px-4 py-4 text-sm text-amber-900">
+                <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-4 text-sm text-slate-900">
                   <p className="font-semibold">Control especial de colinesterasa</p>
                   <p className="mt-1">
                     Caida maxima reciente: {formatSignedPercent(safeWorstDrop)}. Si la variacion entre controles
@@ -451,13 +451,13 @@ function MedicalMarkerOverlay({
                             </td>
                             <td className={cn(
                               "border-b border-r border-border/40 px-3 py-2.5 text-right tabular-nums",
-                              isAlert ? "font-semibold text-rose-600" : "text-foreground",
+                              isAlert ? "font-semibold text-slate-600" : "text-foreground",
                             )}>
                               {formatSignedPercent(point.deltaPct)}
                             </td>
                             <td className={cn(
                               "border-b px-3 py-2.5",
-                              isAlert ? "font-semibold text-rose-600" : "text-muted-foreground",
+                              isAlert ? "font-semibold text-slate-600" : "text-muted-foreground",
                             )}>
                               {isAlert ? "Alerta de caida" : point.marker.status}
                             </td>
@@ -707,7 +707,7 @@ export function PersonMedicalPanel({
                     <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
                       {marker.range}
                     </p>
-                    <p className="mt-3 text-xs font-medium text-cyan-700">
+                    <p className="mt-3 text-xs font-medium text-slate-700">
                       Ver detalle
                     </p>
                   </button>

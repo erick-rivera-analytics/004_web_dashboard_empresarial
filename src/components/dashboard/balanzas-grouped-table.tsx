@@ -73,10 +73,10 @@ function getRatioTone(value: number | null) {
   }
 
   if (value >= 80) {
-    return "bg-amber-500/14";
+    return "bg-slate-500/14";
   }
 
-  return "bg-rose-500/14";
+  return "bg-slate-500/14";
 }
 
 export const BalanzasGroupedTable = memo(function BalanzasGroupedTable({

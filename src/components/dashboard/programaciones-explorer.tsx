@@ -529,7 +529,7 @@ export function ProgramacionesExplorer({
                     isLastCol && "border-r-0",
                     !cell.isCurrentMonth && "bg-muted/20",
                     isSel && "ring-1 ring-inset ring-border bg-muted/40",
-                    isIlumHL && !isSel && "bg-amber-50/30 dark:bg-amber-900/10",
+                    isIlumHL && !isSel && "bg-slate-50/30 dark:bg-slate-900/10",
                     cell.isCurrentMonth && !isSel && !isIlumHL && "hover:bg-muted/25",
                   )}
                 >
@@ -557,8 +557,8 @@ export function ProgramacionesExplorer({
                   <span className={cn(
                     "flex size-7 items-center justify-center rounded-full text-sm font-medium leading-none",
                     isToday     && "bg-foreground text-background",
-                    isIlumStart && !isToday && "bg-amber-400 text-white",
-                    isIlumEnd   && !isToday && !isIlumStart && "bg-orange-400 text-white",
+                    isIlumStart && !isToday && "bg-slate-400 text-white",
+                    isIlumEnd   && !isToday && !isIlumStart && "bg-slate-400 text-white",
                     !isToday && cell.isCurrentMonth  && "text-foreground",
                     !isToday && !cell.isCurrentMonth && "text-muted-foreground/40",
                   )}>
@@ -609,8 +609,8 @@ export function ProgramacionesExplorer({
           {/* Iluminación cycle detail */}
           {activeTab === "iluminacion" && (
             <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
-              <div className="border-b border-border/50 bg-amber-50/40 dark:bg-amber-900/10 px-5 py-4 flex items-center gap-2">
-                <Lightbulb className="size-4 shrink-0 text-amber-500" aria-hidden />
+              <div className="border-b border-border/50 bg-slate-50/40 dark:bg-slate-900/10 px-5 py-4 flex items-center gap-2">
+                <Lightbulb className="size-4 shrink-0 text-slate-500" aria-hidden />
                 <h3 className="text-sm font-semibold">
                   {selectedIlumCycleKey ? "Ciclo de iluminación" : "Iluminación"}
                 </h3>
@@ -671,27 +671,27 @@ export function ProgramacionesExplorer({
 
                       <div className="mt-3 space-y-2">
                         {ilumCycleDateRange?.min && (
-                          <div className="flex items-center justify-between rounded-lg bg-amber-50/50 dark:bg-amber-900/20 px-3 py-2">
+                          <div className="flex items-center justify-between rounded-lg bg-slate-50/50 dark:bg-slate-900/20 px-3 py-2">
                             <span className="flex items-center gap-2">
-                              <span className="inline-block size-2.5 rounded-full bg-amber-400 shadow-sm" />
+                              <span className="inline-block size-2.5 rounded-full bg-slate-400 shadow-sm" />
                               <span className="text-xs text-muted-foreground">Inicio</span>
                             </span>
-                            <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">{formatDate(ilumCycleDateRange.min)}</span>
+                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{formatDate(ilumCycleDateRange.min)}</span>
                           </div>
                         )}
                         {ilumCycleDateRange?.max && (
-                          <div className="flex items-center justify-between rounded-lg bg-orange-50/50 dark:bg-orange-900/20 px-3 py-2">
+                          <div className="flex items-center justify-between rounded-lg bg-slate-50/50 dark:bg-slate-900/20 px-3 py-2">
                             <span className="flex items-center gap-2">
-                              <span className="inline-block size-2.5 rounded-full bg-orange-400 shadow-sm" />
+                              <span className="inline-block size-2.5 rounded-full bg-slate-400 shadow-sm" />
                               <span className="text-xs text-muted-foreground">Fin</span>
                             </span>
-                            <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">{formatDate(ilumCycleDateRange.max)}</span>
+                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{formatDate(ilumCycleDateRange.max)}</span>
                           </div>
                         )}
                         {ilumDays !== null && (
                           <div className="flex items-center justify-between rounded-lg bg-slate-100/60 dark:bg-slate-900/40 px-3 py-2">
                             <span className="text-xs text-muted-foreground">Duración</span>
-                            <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{ilumDays} días</span>
+                            <span className="text-sm font-bold text-slate-600 dark:text-slate-400">{ilumDays} días</span>
                           </div>
                         )}
                       </div>

@@ -189,7 +189,7 @@ export function CampoCycleSelectorModal({
 
                 {/* Hover arrow */}
                 <Check className={cn(
-                  "size-3.5 shrink-0 text-emerald-500 transition-opacity",
+                  "size-3.5 shrink-0 text-slate-500 transition-opacity",
                   cycle.isCurrent && cycle.isValid ? "opacity-100" : "opacity-0 group-hover:opacity-40",
                 )} aria-hidden="true" />
               </button>

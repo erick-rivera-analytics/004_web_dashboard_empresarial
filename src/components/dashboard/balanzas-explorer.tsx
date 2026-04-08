@@ -155,10 +155,10 @@ function getRatioTone(value: number | null) {
   }
 
   if (value >= 80) {
-    return "bg-amber-500/16 text-amber-950 dark:text-amber-100";
+    return "bg-slate-500/16 text-slate-950 dark:text-slate-100";
   }
 
-  return "bg-rose-500/18 text-rose-950 dark:text-rose-100";
+  return "bg-slate-500/18 text-slate-950 dark:text-slate-100";
 }
 
 function SummaryPill({
@@ -177,7 +177,7 @@ function SummaryPill({
         tone === "positive"
           ? "border-chart-success-bold/40 bg-chart-success-bold/10"
           : tone === "warning"
-            ? "border-amber-300/60 bg-amber-500/10"
+            ? "border-slate-300/60 bg-slate-500/10"
             : "border-border/70 bg-background/76",
       )}
     >
@@ -329,7 +329,7 @@ function NodeDetailModal({
 
         <div className="overflow-y-auto px-4 py-5 sm:px-6">
           {node.status !== "ready" ? (
-            <div className="rounded-[24px] border border-amber-300/60 bg-amber-500/10 px-4 py-4 text-sm text-amber-950 dark:text-amber-100">
+            <div className="rounded-[24px] border border-slate-300/60 bg-slate-500/10 px-4 py-4 text-sm text-slate-950 dark:text-slate-100">
               {node.statusMessage ?? "No hay vista disponible para este nodo."}
             </div>
           ) : (
@@ -431,7 +431,7 @@ function NodeDetailModal({
                           key={row.id}
                           className={cn(
                             rowIndex % 2 === 0 ? "bg-background/84" : "bg-background/70",
-                            row.ratioPct !== null && row.ratioPct < 80 && "bg-rose-500/8",
+                            row.ratioPct !== null && row.ratioPct < 80 && "bg-slate-500/8",
                           )}
                         >
                           {visibleColumns.map((column) => (
@@ -440,9 +440,9 @@ function NodeDetailModal({
                               className={cn(
                                 "border-b border-r border-border/50 px-3 py-2.5 align-middle text-foreground last:border-r-0",
                                 column.key === ratioKey && getRatioTone(row.ratioPct),
-                                column.key === sourceKey && "bg-sky-500/6",
+                                column.key === sourceKey && "bg-slate-500/6",
                                 column.key === targetKey && "bg-chart-success-bold/6",
-                                column.key === gapKey && row.gapValue !== null && row.gapValue < 0 && "bg-rose-500/8",
+                                column.key === gapKey && row.gapValue !== null && row.gapValue < 0 && "bg-slate-500/8",
                               )}
                             >
                               {formatDisplayValue(node, column, row)}
@@ -711,7 +711,7 @@ export function BalanzasExplorer({
           ) : null}
 
           {activeMessage ? (
-            <div className="rounded-[24px] border border-amber-300/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
+            <div className="rounded-[24px] border border-slate-300/60 bg-slate-500/10 px-4 py-3 text-sm text-slate-950 dark:text-slate-100">
               <div className="flex items-start gap-3">
                 <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 <div className="min-w-0">
