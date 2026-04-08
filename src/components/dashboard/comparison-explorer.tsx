@@ -73,7 +73,7 @@ function ComparisonSlotCard({
       className={cn(
         "rounded-[26px] border px-5 py-5",
         tone === "left"
-          ? "border-slate-700/25 bg-slate-900/8 dark:bg-slate-800/12"
+          ? "border-slate-700/25 bg-slate-900/8 dark:bg-slate-900/12"
           : "border-accent/25 bg-accent/8",
       )}
     >
@@ -143,7 +143,7 @@ function MetricBattleRow({
 
       <div className="mt-4 grid items-center gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,420px)_minmax(0,1fr)]">
         <div className="text-left lg:text-right">
-          <p className={cn("text-2xl font-semibold", winner === "left" && "text-slate-700 dark:text-slate-400")}>
+          <p className={cn("text-2xl font-semibold", winner === "left" && "text-slate-700 dark:text-white")}>
             {leftDisplay}
           </p>
         </div>
@@ -151,7 +151,7 @@ function MetricBattleRow({
         <div className="relative h-12 overflow-hidden rounded-full border border-border/70 bg-card/95">
           <div className="absolute inset-y-0 left-1/2 w-px bg-foreground/14" />
           <div
-            className="absolute inset-y-2 right-1/2 rounded-l-full bg-slate-900/8 dark:bg-slate-800/125 transition-all"
+            className="absolute inset-y-2 right-1/2 rounded-l-full bg-slate-900/8 dark:bg-slate-900/125 transition-all"
             style={{ width: `${Math.max((leftShare / 100) * 50, leftValue === null ? 0 : 6)}%` }}
           />
           <div
@@ -262,7 +262,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
           <ComparisonSlotCard label="Ciclo A" cycle={leftCycle} tone="left" />
           <div className="flex items-center justify-center">
             <div className="rounded-full border border-border/70 bg-background/90 px-4 py-4 text-center">
-              <Swords className="mx-auto size-6 text-slate-700 dark:text-slate-400" aria-hidden="true" />
+              <Swords className="mx-auto size-6 text-slate-700 dark:text-white" aria-hidden="true" />
               <p className="mt-2 text-xs uppercase tracking-[0.28em] text-muted-foreground">VS</p>
             </div>
           </div>
@@ -412,7 +412,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
             <Card className="starter-panel border-border/70 bg-card/82">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-slate-900/10 dark:bg-slate-800/20 p-3 text-slate-700 dark:text-slate-400">
+                  <div className="rounded-full bg-slate-900/10 dark:bg-slate-900/20 p-3 text-slate-700 dark:text-white">
                     <Trophy className="size-5" aria-hidden="true" />
                   </div>
                   <div>
@@ -435,7 +435,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
             <Card className="starter-panel border-border/70 bg-card/82">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-slate-900/10 dark:bg-slate-800/20 p-3 text-slate-700 dark:text-slate-400">
+                  <div className="rounded-full bg-slate-900/10 dark:bg-slate-900/20 p-3 text-slate-700 dark:text-white">
                     <ArrowLeftRight className="size-5" aria-hidden="true" />
                   </div>
                   <div>
@@ -447,7 +447,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
                 </div>
               </CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[24px] border border-slate-700/20 bg-slate-900/7 dark:bg-slate-800/10 p-4">
+                <div className="rounded-[24px] border border-slate-700/20 bg-slate-900/7 dark:bg-slate-900/10 p-4">
                   <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Ciclo A</p>
                   <p className="mt-2 text-lg font-semibold">{comparison.left.cycleKey}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -478,7 +478,7 @@ export function ComparisonExplorer({ initialData }: { initialData: ComparisonDas
           <Card className="starter-panel border-border/70 bg-card/82">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <div className="rounded-full bg-slate-900/10 dark:bg-slate-800/20 p-3 text-slate-700 dark:text-slate-400">
+                <div className="rounded-full bg-slate-900/10 dark:bg-slate-900/20 p-3 text-slate-700 dark:text-white">
                   <ShieldAlert className="size-5" aria-hidden="true" />
                 </div>
                 <div>

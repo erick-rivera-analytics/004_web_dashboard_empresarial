@@ -885,11 +885,11 @@ function HoursCamaOverlay({
                               return (
                                 <Fragment key={`sc-${subKey}`}>
                                   {/* L2: Sub centro */}
-                                  <tr className="bg-slate-900/[0.03] dark:bg-slate-800/[0.08] hover:bg-primary/[0.07] transition-colors">
+                                  <tr className="bg-slate-900/[0.03] dark:bg-slate-900/[0.08] hover:bg-primary/[0.07] transition-colors">
                                     <td className="border-b border-r border-border/40 px-3 py-2 pl-7">
                                       <button type="button" className="flex items-center gap-2 text-left w-full" onClick={() => toggleSubCostCenter(subKey)}>
                                         {subExpanded ? <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />}
-                                        <span className="text-[10px] font-semibold uppercase tracking-wider bg-primary/10 text-slate-700 dark:text-slate-400/70 rounded px-1.5 py-0.5">Sub</span>
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider bg-primary/10 text-slate-700 dark:text-white/70 rounded px-1.5 py-0.5">Sub</span>
                                         <span className="font-semibold text-foreground">{sub.subCostCenter}</span>
                                         <span className="ml-auto text-[10px] text-muted-foreground/60">{sub.activityTypes.length} tipos</span>
                                       </button>
@@ -1022,7 +1022,7 @@ function HoursCamaPersonRow({
   colOffset?: number;
 }) {
   return (
-    <tr className={cn("bg-muted/10 hover:bg-muted/25 transition-colors", isSelected && "bg-slate-900/8 dark:bg-slate-800/12")}>
+    <tr className={cn("bg-muted/10 hover:bg-muted/25 transition-colors", isSelected && "bg-slate-900/8 dark:bg-slate-900/12")}>
       {/* L5: Persona — columna descripción con indent máximo */}
       <td className="border-b border-r border-border/30 px-3 py-1.5 pl-20">
         <div className="flex items-center gap-2">
@@ -1033,8 +1033,8 @@ function HoursCamaPersonRow({
               className={cn(
                 "inline-flex shrink-0 rounded-full border px-1.5 py-0.5 text-[11px] font-semibold transition-colors",
                 isSelected
-                  ? "border-slate-700/35 bg-primary/10 text-slate-700 dark:text-slate-400"
-                  : "border-border/60 bg-background text-muted-foreground hover:border-slate-700/35 hover:text-slate-700 dark:text-slate-400",
+                  ? "border-slate-700/35 bg-primary/10 text-slate-700 dark:text-white"
+                  : "border-border/60 bg-background text-muted-foreground hover:border-slate-700/35 hover:text-slate-700 dark:text-white",
               )}
               onClick={() => onOpenPerson(person.personId)}
             >
@@ -1124,7 +1124,7 @@ function BedsTable({
                   {bed.valveId && onOpenValve ? (
                     <button
                       type="button"
-                      className="font-medium text-slate-700 dark:text-slate-400 underline-offset-4 hover:underline"
+                      className="font-medium text-slate-700 dark:text-white underline-offset-4 hover:underline"
                       onClick={() => onOpenValve(bed.valveId)}
                     >
                       {getValveDisplayName(null, bed.valveId)}

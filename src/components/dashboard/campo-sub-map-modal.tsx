@@ -306,11 +306,11 @@ function ValveMap({
           eventHandlers={{ remove: () => setClick(null) }}
         >
           <div className="min-w-[180px] space-y-2.5 p-1">
-            <p className="mb-1 text-[13px] font-bold text-slate-900">Válvula {click.valvula}</p>
-            <p className="text-[11px] leading-relaxed text-slate-500">{click.valveId}</p>
+            <p className="mb-1 text-[13px] font-bold text-slate-900 dark:text-white">Válvula {click.valvula}</p>
+            <p className="text-[11px] leading-relaxed text-slate-500 dark:text-white">{click.valveId}</p>
             <button
               type="button"
-              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100"
+              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
               onClick={() => {
                 onValveDetail(click.valveId, click.bloquePad);
                 setClick(null);
@@ -320,7 +320,7 @@ function ValveMap({
             </button>
             <button
               type="button"
-              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100"
+              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
               onClick={() => {
                 onBedMap(click.valveId, click.bloquePad);
                 setClick(null);
@@ -442,13 +442,13 @@ function BedMap({
           eventHandlers={{ remove: () => setClick(null) }}
         >
           <div className="min-w-[170px] space-y-2.5 p-1">
-            <p className="text-[13px] font-bold text-slate-900">Cama {click.cama}</p>
-            <p className="text-[11px] leading-relaxed text-slate-500">
+            <p className="text-[13px] font-bold text-slate-900 dark:text-white">Cama {click.cama}</p>
+            <p className="text-[11px] leading-relaxed text-slate-500 dark:text-white">
               Válvula {click.valvula} · Bloque {click.bloquePad}
             </p>
             <button
               type="button"
-              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100"
+              className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
               onClick={() => {
                 onBedCycleSelect(click.bedId, click.bloquePad);
                 setClick(null);

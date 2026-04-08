@@ -122,7 +122,7 @@ export function ChatbotModal({ summary }: ChatbotModalProps) {
                     <div
                       className={`max-w-xs rounded-lg px-3 py-2 text-sm ${
                         msg.role === "user"
-                          ? "bg-slate-900 text-white dark:bg-slate-800 rounded-br-none"
+                          ? "bg-slate-900 text-white dark:bg-slate-900 rounded-br-none"
                           : "bg-muted text-muted-foreground border border-border/30 rounded-bl-none"
                       }`}
                     >

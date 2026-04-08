@@ -59,7 +59,7 @@ export default function LoginPage() {
       <Card className="relative w-full max-w-md border border-slate-400/20 bg-card/95 shadow-2xl shadow-slate-900/20 backdrop-blur-xl transition-all duration-300 hover:shadow-2xl hover:shadow-slate-900/30 hover:border-slate-400/40 dark:border-slate-600/20 dark:hover:border-slate-600/40">
         <CardHeader className="space-y-4">
           <div className="flex items-center gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 shadow-lg shadow-slate-900/40">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-lg shadow-slate-900/40">
               <Logo size={20} />
             </div>
             <div className="min-w-0">
@@ -68,7 +68,7 @@ export default function LoginPage() {
             </div>
           </div>
           <div className="space-y-3 pt-2">
-            <Badge variant="outline" className="rounded-full px-3 py-1 text-xs border-slate-400/40 bg-slate-900/20 text-slate-700 dark:border-slate-600/40 dark:bg-slate-800/30 dark:text-slate-300">
+            <Badge variant="outline" className="rounded-full px-3 py-1 text-xs border-slate-400/40 bg-slate-900/20 text-slate-700 dark:border-slate-600/40 dark:bg-slate-900/30 dark:text-white">
               Acceso
             </Badge>
             <CardTitle className="text-4xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/75 bg-clip-text text-transparent">Entrar</CardTitle>

@@ -380,7 +380,7 @@ function NodeDetailModal({
 
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-slate-900/10 dark:bg-slate-800/20 p-3 text-slate-700 dark:text-slate-400">
+                  <div className="rounded-full bg-slate-900/10 dark:bg-slate-900/20 p-3 text-slate-700 dark:text-white">
                     <Layers3 className="size-5" aria-hidden="true" />
                   </div>
                     <div>
@@ -396,7 +396,7 @@ function NodeDetailModal({
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="rounded-full bg-slate-900/10 dark:bg-slate-800/20 p-3 text-slate-700 dark:text-slate-400">
+                    <div className="rounded-full bg-slate-900/10 dark:bg-slate-900/20 p-3 text-slate-700 dark:text-white">
                       <TableProperties className="size-5" aria-hidden="true" />
                     </div>
                     <div>
@@ -728,7 +728,7 @@ export function BalanzasExplorer({
       <Card className="starter-panel border-border/70 bg-card/82">
         <CardHeader className="space-y-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-slate-900/10 dark:bg-slate-800/20 p-3 text-slate-700 dark:text-slate-400">
+            <div className="rounded-full bg-slate-900/10 dark:bg-slate-900/20 p-3 text-slate-700 dark:text-white">
               <Scale className="size-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
