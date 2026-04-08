@@ -12,7 +12,7 @@ type ButtonProps = React.ComponentProps<"button"> & {
 const variants: Record<NonNullable<ButtonProps["variant"]>, string> = {
   default: "bg-slate-900 dark:bg-slate-900 text-white hover:bg-slate-900/90",
   outline: "border border-border bg-background hover:bg-muted/70",
-  secondary: "bg-slate-200 dark:bg-slate-900 text-slate-900 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-600",
+  secondary: "bg-slate-200 dark:bg-white dark:text-slate-900 text-slate-900 hover:bg-slate-300 dark:hover:bg-gray-100",
   ghost: "hover:bg-muted/70",
   link: "text-slate-700 dark:text-white underline-offset-4 hover:underline",
   destructive: "bg-destructive text-white hover:bg-destructive/92",
