@@ -351,7 +351,7 @@ function MedicalMarkerOverlay({
         onClick={onClose}
         aria-label="Cerrar detalle del analito"
       />
-      <div className="relative z-10 flex max-h-[88vh] w-[min(980px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/20 sm:w-[min(980px,calc(100vw-2rem))]">
+      <div className="relative z-10 flex max-h-[88vh] w-[min(1200px,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl shadow-slate-950/20 sm:w-[min(1200px,calc(100vw-2rem))]">
         <div className="flex items-start justify-between gap-4 border-b border-border/50 bg-muted/20 px-4 py-4 sm:px-6">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap gap-2">

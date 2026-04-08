@@ -97,8 +97,8 @@
   --chart-neutral: oklch(0.30 0.01 250);
   --chart-warning: oklch(0.42 0.08 85);
   --chart-danger: oklch(0.68 0.17 24);
-  --chart-line-primary: oklch(0.75 0.06 205);
-  --chart-line-secondary: oklch(0.65 0.08 250);
+  --chart-line-primary: oklch(0.95 0.003 95);
+  --chart-line-secondary: oklch(0.90 0.005 95);
 }
 
 @layer base {

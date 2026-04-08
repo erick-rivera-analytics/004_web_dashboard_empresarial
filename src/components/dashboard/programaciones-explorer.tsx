@@ -354,7 +354,7 @@ export function ProgramacionesExplorer({
               className={cn(
                 "flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all",
                 active
-                  ? "border-foreground bg-foreground text-background shadow-sm"
+                  ? "border-white bg-white text-slate-900 shadow-sm dark:border-white dark:bg-white dark:text-slate-900"
                   : "border-border/60 bg-card text-muted-foreground hover:border-border hover:text-foreground",
               )}
             >
