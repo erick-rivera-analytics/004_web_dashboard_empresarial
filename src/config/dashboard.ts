@@ -19,7 +19,6 @@ import {
   GitCompareArrows,
   HelpCircle,
   Home,
-  LayoutDashboard,
   Lock,
   Map,
   PackageCheck,
@@ -41,6 +40,8 @@ type DashboardView = {
   href: string;
   icon: LucideIcon;
   category: "campo" | "poscosecha";
+  home?: boolean;
+  mobile?: boolean;
 };
 
 export type SidebarNode = {
@@ -94,8 +95,8 @@ export const dashboardViews: DashboardView[] = [
   {
     slug: "programaciones",
     title: "Programaciones",
-    eyebrow: "Gestión / Campo / Planificación",
-    summary: "Calendario de programaciones de campo: plantas muertas, iluminación y riego.",
+    eyebrow: "Gestion / Campo / Planificacion",
+    summary: "Calendario de programaciones de campo: plantas muertas, iluminacion y riego.",
     href: "/dashboard/programaciones",
     icon: CalendarClock,
     category: "campo",
@@ -108,6 +109,61 @@ export const dashboardViews: DashboardView[] = [
     href: "/dashboard/poscosecha/balanzas",
     icon: Scale,
     category: "poscosecha",
+  },
+  {
+    slug: "poscosecha-registros",
+    title: "Registros",
+    eyebrow: "Gestion / Poscosecha / Registros",
+    summary: "Espacio reservado para los registros operativos de poscosecha.",
+    href: "/dashboard/poscosecha/registros",
+    icon: ClipboardList,
+    category: "poscosecha",
+    home: false,
+    mobile: false,
+  },
+  {
+    slug: "poscosecha-administrar-skus",
+    title: "Administrar SKU's",
+    eyebrow: "Gestion / Poscosecha / Administrar Maestros",
+    summary: "Maestro transaccional de SKU para alimentar el solver de clasificacion en blanco.",
+    href: "/dashboard/poscosecha/administrar-maestros/skus",
+    icon: DatabaseZap,
+    category: "poscosecha",
+    home: false,
+    mobile: false,
+  },
+  {
+    slug: "poscosecha-programaciones",
+    title: "Programaciones",
+    eyebrow: "Gestion / Poscosecha / Planificacion",
+    summary: "Punto de entrada para la programacion operativa de poscosecha.",
+    href: "/dashboard/poscosecha/planificacion/programaciones",
+    icon: CalendarClock,
+    category: "poscosecha",
+    home: false,
+    mobile: false,
+  },
+  {
+    slug: "poscosecha-plan-de-trabajo",
+    title: "Plan de trabajo",
+    eyebrow: "Gestion / Poscosecha / Planificacion",
+    summary: "Vista reservada para consolidar el plan de trabajo de poscosecha.",
+    href: "/dashboard/poscosecha/planificacion/plan-de-trabajo",
+    icon: CalendarDays,
+    category: "poscosecha",
+    home: false,
+    mobile: false,
+  },
+  {
+    slug: "poscosecha-clasificacion-en-blanco",
+    title: "Clasificacion en blanco",
+    eyebrow: "Gestion / Poscosecha / Planificacion / Solver",
+    summary: "Espacio inicial para migrar el solver de clasificacion en blanco desde Streamlit.",
+    href: "/dashboard/poscosecha/planificacion/solver/clasificacion-en-blanco",
+    icon: Scale,
+    category: "poscosecha",
+    home: false,
+    mobile: false,
   },
 ];
 
@@ -132,7 +188,7 @@ export const sidebarTree: SidebarNode[] = [
               { label: "Mapa", href: "/dashboard/campo", icon: Map },
               { label: "Fenograma", href: "/dashboard/fenograma", icon: CalendarRange },
               { label: "Mortandades", href: "/dashboard/mortality", icon: Activity },
-              { label: "Comparación", href: "/dashboard/comparacion", icon: GitCompareArrows },
+              { label: "Comparacion", href: "/dashboard/comparacion", icon: GitCompareArrows },
               { label: "Avance de labores", icon: ClipboardList, comingSoon: true },
               { label: "Rendimiento", icon: Gauge, comingSoon: true },
             ],
@@ -142,12 +198,12 @@ export const sidebarTree: SidebarNode[] = [
             icon: Factory,
             items: [
               { label: "Balanzas", href: "/dashboard/poscosecha/balanzas", icon: Scale },
-              { label: "Recepción", icon: PackageCheck, comingSoon: true },
+              { label: "Recepcion", icon: PackageCheck, comingSoon: true },
               { label: "Calidad", icon: CheckSquare, comingSoon: true },
               { label: "Productividad", icon: Gauge, comingSoon: true },
             ],
           },
-          { label: "Producción", icon: Factory, comingSoon: true },
+          { label: "Produccion", icon: Factory, comingSoon: true },
           { label: "Talento Humano", icon: Users, comingSoon: true },
           { label: "Calidad", icon: CheckSquare, comingSoon: true },
           { label: "Finanzas", icon: DollarSign, comingSoon: true },
@@ -171,7 +227,7 @@ export const sidebarTree: SidebarNode[] = [
     ],
   },
   {
-    label: "Gestión",
+    label: "Gestion",
     icon: Settings2,
     items: [
       {
@@ -179,50 +235,104 @@ export const sidebarTree: SidebarNode[] = [
         icon: Sprout,
         items: [
           {
-            label: "Planificación",
+            label: "Planificacion",
             icon: CalendarDays,
             items: [
               { label: "Programaciones", href: "/dashboard/programaciones", icon: CalendarClock },
               { label: "Plan semanal", icon: CalendarRange, comingSoon: true },
-              { label: "Asignación de personal", icon: Users, comingSoon: true },
+              { label: "Asignacion de personal", icon: Users, comingSoon: true },
             ],
           },
-          { label: "Ejecución", icon: ClipboardList, comingSoon: true },
+          { label: "Ejecucion", icon: ClipboardList, comingSoon: true },
           { label: "Trazabilidad", icon: Activity, comingSoon: true },
         ],
       },
-      { label: "Poscosecha", icon: Factory, comingSoon: true },
+      {
+        label: "Poscosecha",
+        icon: Factory,
+        items: [
+          {
+            label: "Registros",
+            href: "/dashboard/poscosecha/registros",
+            icon: ClipboardList,
+          },
+          {
+            label: "Administrar Maestros",
+            icon: DatabaseZap,
+            items: [
+              {
+                label: "Administrar SKU's",
+                href: "/dashboard/poscosecha/administrar-maestros/skus",
+                icon: PackageCheck,
+              },
+            ],
+          },
+          {
+            label: "Planificacion",
+            icon: CalendarDays,
+            items: [
+              {
+                label: "Programaciones",
+                href: "/dashboard/poscosecha/planificacion/programaciones",
+                icon: CalendarClock,
+              },
+              {
+                label: "Plan de trabajo",
+                href: "/dashboard/poscosecha/planificacion/plan-de-trabajo",
+                icon: CalendarRange,
+              },
+              {
+                label: "Solver",
+                icon: Settings,
+                items: [
+                  {
+                    label: "Clasificacion en blanco",
+                    href: "/dashboard/poscosecha/planificacion/solver/clasificacion-en-blanco",
+                    icon: Scale,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
       { label: "Inventario", icon: PackageCheck, comingSoon: true },
       { label: "Talento Humano", icon: Users, comingSoon: true },
       { label: "Calidad", icon: CheckSquare, comingSoon: true },
     ],
   },
   {
-    label: "Administración",
+    label: "Administracion",
     icon: Shield,
     items: [
       { label: "Seguridad", icon: Lock, comingSoon: true },
-      { label: "Organización", icon: Building2, comingSoon: true },
+      { label: "Organizacion", icon: Building2, comingSoon: true },
       { label: "Maestros", icon: DatabaseZap, comingSoon: true },
       { label: "Integraciones", icon: Settings, comingSoon: true },
-      { label: "Auditoría", icon: FileText, comingSoon: true },
+      { label: "Auditoria", icon: FileText, comingSoon: true },
     ],
   },
   {
     label: "Ayuda",
     icon: HelpCircle,
     items: [
-      { label: "Documentación", icon: BookOpen, comingSoon: true },
+      { label: "Documentacion", icon: BookOpen, comingSoon: true },
       { label: "Soporte", icon: Users, comingSoon: true },
     ],
   },
 ];
 
-export const mobileNavigation = dashboardViews.map((view) => ({
-  label: view.title,
-  href: view.href,
-  icon: view.icon,
-}));
+export const mobileNavigation = dashboardViews
+  .filter((view) => view.mobile !== false)
+  .map((view) => ({
+    label: view.title,
+    href: view.href,
+    icon: view.icon,
+  }));
+
+export function getSidebarNodeKey(node: SidebarNode, parentKey = "") {
+  return parentKey ? `${parentKey}/${node.label}` : node.label;
+}
 
 export function isPathActive(pathname: string, href: string) {
   return pathname === href;
@@ -235,14 +345,17 @@ export function nodeContainsActive(node: SidebarNode, pathname: string): boolean
 
 export function getInitialOpenSections(nodes: SidebarNode[], pathname: string): Set<string> {
   const open = new Set<string>();
-  function walk(nodes: SidebarNode[]) {
-    for (const node of nodes) {
+
+  function walk(nodesToVisit: SidebarNode[], parentKey = "") {
+    for (const node of nodesToVisit) {
+      const nodeKey = getSidebarNodeKey(node, parentKey);
       if (node.items && nodeContainsActive(node, pathname)) {
-        open.add(node.label);
-        walk(node.items);
+        open.add(nodeKey);
+        walk(node.items, nodeKey);
       }
     }
   }
+
   walk(nodes);
   return open;
 }
