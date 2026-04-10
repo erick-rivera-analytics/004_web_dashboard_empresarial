@@ -39,7 +39,8 @@ type DashboardView = {
   summary: string;
   href: string;
   icon: LucideIcon;
-  category: "campo" | "poscosecha";
+  category: "campo" | "postcosecha";
+  homeSection?: "indicadores" | "gestion";
   home?: boolean;
   mobile?: boolean;
 };
@@ -106,63 +107,63 @@ export const dashboardViews: DashboardView[] = [
     title: "Indicadores Balanzas",
     eyebrow: "Dashboard / Indicadores / Poscosecha",
     summary: "Apertura B1 vs B1C sobre el flujo de postcosecha para peso y tallos.",
-    href: "/dashboard/poscosecha/balanzas",
+    href: "/dashboard/postcosecha/balanzas",
     icon: Scale,
-    category: "poscosecha",
+    category: "postcosecha",
   },
   {
-    slug: "poscosecha-registros",
+    slug: "postcosecha-registros",
     title: "Registros",
     eyebrow: "Gestion / Poscosecha / Registros",
-    summary: "Espacio reservado para los registros operativos de poscosecha.",
-    href: "/dashboard/poscosecha/registros",
+    summary: "Espacio reservado para los registros operativos de postcosecha.",
+    href: "/dashboard/postcosecha/registros",
     icon: ClipboardList,
-    category: "poscosecha",
+    category: "postcosecha",
     home: false,
     mobile: false,
   },
   {
-    slug: "poscosecha-administrar-skus",
+    slug: "postcosecha-administrar-skus",
     title: "Administrar SKU's",
     eyebrow: "Gestion / Poscosecha / Administrar Maestros",
     summary: "Maestro transaccional de SKU para alimentar el solver de clasificacion en blanco.",
-    href: "/dashboard/poscosecha/administrar-maestros/skus",
+    href: "/dashboard/postcosecha/administrar-maestros/skus",
     icon: DatabaseZap,
-    category: "poscosecha",
-    home: false,
+    category: "postcosecha",
+    homeSection: "gestion",
     mobile: false,
   },
   {
-    slug: "poscosecha-programaciones",
+    slug: "postcosecha-programaciones",
     title: "Programaciones",
     eyebrow: "Gestion / Poscosecha / Planificacion",
-    summary: "Punto de entrada para la programacion operativa de poscosecha.",
-    href: "/dashboard/poscosecha/planificacion/programaciones",
+    summary: "Punto de entrada para la programacion operativa de postcosecha.",
+    href: "/dashboard/postcosecha/planificacion/programaciones",
     icon: CalendarClock,
-    category: "poscosecha",
+    category: "postcosecha",
     home: false,
     mobile: false,
   },
   {
-    slug: "poscosecha-plan-de-trabajo",
+    slug: "postcosecha-plan-de-trabajo",
     title: "Plan de trabajo",
     eyebrow: "Gestion / Poscosecha / Planificacion",
-    summary: "Vista reservada para consolidar el plan de trabajo de poscosecha.",
-    href: "/dashboard/poscosecha/planificacion/plan-de-trabajo",
+    summary: "Vista reservada para consolidar el plan de trabajo de postcosecha.",
+    href: "/dashboard/postcosecha/planificacion/plan-de-trabajo",
     icon: CalendarDays,
-    category: "poscosecha",
+    category: "postcosecha",
     home: false,
     mobile: false,
   },
   {
-    slug: "poscosecha-clasificacion-en-blanco",
+    slug: "postcosecha-clasificacion-en-blanco",
     title: "Clasificacion en blanco",
     eyebrow: "Gestion / Poscosecha / Planificacion / Solver",
     summary: "Espacio inicial para migrar el solver de clasificacion en blanco desde Streamlit.",
-    href: "/dashboard/poscosecha/planificacion/solver/clasificacion-en-blanco",
+    href: "/dashboard/postcosecha/planificacion/solver/clasificacion-en-blanco",
     icon: Scale,
-    category: "poscosecha",
-    home: false,
+    category: "postcosecha",
+    homeSection: "gestion",
     mobile: false,
   },
 ];
@@ -197,10 +198,7 @@ export const sidebarTree: SidebarNode[] = [
             label: "Poscosecha",
             icon: Factory,
             items: [
-              { label: "Balanzas", href: "/dashboard/poscosecha/balanzas", icon: Scale },
-              { label: "Recepcion", icon: PackageCheck, comingSoon: true },
-              { label: "Calidad", icon: CheckSquare, comingSoon: true },
-              { label: "Productividad", icon: Gauge, comingSoon: true },
+              { label: "Balanzas", href: "/dashboard/postcosecha/balanzas", icon: Scale },
             ],
           },
           { label: "Produccion", icon: Factory, comingSoon: true },
@@ -239,12 +237,8 @@ export const sidebarTree: SidebarNode[] = [
             icon: CalendarDays,
             items: [
               { label: "Programaciones", href: "/dashboard/programaciones", icon: CalendarClock },
-              { label: "Plan semanal", icon: CalendarRange, comingSoon: true },
-              { label: "Asignacion de personal", icon: Users, comingSoon: true },
             ],
           },
-          { label: "Ejecucion", icon: ClipboardList, comingSoon: true },
-          { label: "Trazabilidad", icon: Activity, comingSoon: true },
         ],
       },
       {
@@ -253,7 +247,7 @@ export const sidebarTree: SidebarNode[] = [
         items: [
           {
             label: "Registros",
-            href: "/dashboard/poscosecha/registros",
+            href: "/dashboard/postcosecha/registros",
             icon: ClipboardList,
           },
           {
@@ -262,7 +256,7 @@ export const sidebarTree: SidebarNode[] = [
             items: [
               {
                 label: "Administrar SKU's",
-                href: "/dashboard/poscosecha/administrar-maestros/skus",
+                href: "/dashboard/postcosecha/administrar-maestros/skus",
                 icon: PackageCheck,
               },
             ],
@@ -273,12 +267,12 @@ export const sidebarTree: SidebarNode[] = [
             items: [
               {
                 label: "Programaciones",
-                href: "/dashboard/poscosecha/planificacion/programaciones",
+                href: "/dashboard/postcosecha/planificacion/programaciones",
                 icon: CalendarClock,
               },
               {
                 label: "Plan de trabajo",
-                href: "/dashboard/poscosecha/planificacion/plan-de-trabajo",
+                href: "/dashboard/postcosecha/planificacion/plan-de-trabajo",
                 icon: CalendarRange,
               },
               {
@@ -287,7 +281,7 @@ export const sidebarTree: SidebarNode[] = [
                 items: [
                   {
                     label: "Clasificacion en blanco",
-                    href: "/dashboard/poscosecha/planificacion/solver/clasificacion-en-blanco",
+                    href: "/dashboard/postcosecha/planificacion/solver/clasificacion-en-blanco",
                     icon: Scale,
                   },
                 ],

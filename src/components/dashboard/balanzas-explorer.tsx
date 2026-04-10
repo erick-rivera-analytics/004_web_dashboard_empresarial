@@ -36,7 +36,7 @@ import type {
   BalanzasNodeKey,
   BalanzasTableColumn,
   BalanzasTableRow,
-} from "@/lib/poscosecha-balanzas";
+} from "@/lib/postcosecha-balanzas";
 
 type BalanzasExplorerProps = {
   initialData: BalanzasDashboardData;
@@ -495,7 +495,7 @@ export function BalanzasExplorer({
     isValidating,
     mutate,
   } = useSWR(
-    `/api/poscosecha/balanzas?${filterKey}`,
+    `/api/postcosecha/balanzas?${filterKey}`,
     balanzasFetcher,
     {
       fallbackData: filterKey === initialFilterKey ? initialData : undefined,

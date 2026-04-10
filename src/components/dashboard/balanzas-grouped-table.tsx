@@ -11,7 +11,7 @@ import type {
   BalanzasNodeData,
   BalanzasTableColumn,
   BalanzasTableRow,
-} from "@/lib/poscosecha-balanzas";
+} from "@/lib/postcosecha-balanzas";
 
 type SortKey = "ratio" | "source" | "target" | "gap" | "rows" | "group";
 type SortDirection = "asc" | "desc";

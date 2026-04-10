@@ -11,7 +11,7 @@ import type {
   BalanzasNodeKey,
   BalanzasProcessBinding,
   BalanzasViewStatus,
-} from "@/lib/poscosecha-balanzas";
+} from "@/lib/postcosecha-balanzas";
 
 type BalanzasProcessViewerProps = {
   assetPath: string;

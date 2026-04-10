@@ -52,7 +52,7 @@ function NavLeaf({
         {!collapsed ? (
           <>
             <span className="flex-1 truncate">{node.label}</span>
-            <span className="shrink-0 rounded-full border border-border/40 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/40">
+            <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/30">
               Próximo
             </span>
           </>
@@ -70,7 +70,7 @@ function NavLeaf({
         "flex h-8 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors",
         collapsed && "justify-center px-2",
         active
-          ? "bg-slate-900 text-slate-100 shadow-sm shadow-slate-900/40 dark:bg-white dark:text-slate-900 dark:shadow-white/20"
+          ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
           : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
       )}
     >
@@ -149,10 +149,10 @@ function NavSection({
       {isOpen && !collapsed ? (
         <div
           className={cn(
-            "mt-0.5 space-y-0.5",
+            "mt-0.5 space-y-1",
             depth === 0
-              ? "ml-3 border-l border-border/40 pl-2"
-              : "ml-2 border-l border-border/30 pl-1.5",
+              ? "ml-3 border-l border-border/50 pl-2"
+              : "ml-2 border-l border-border/50 pl-1.5",
           )}
         >
           {node.items.map((child) =>
@@ -229,7 +229,7 @@ export function AppSidebar({ collapsed, onCollapsedChange }: AppSidebarProps) {
           )}
           title={starterName}
         >
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-slate-100 dark:bg-white dark:text-slate-900">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Logo size={16} />
           </div>
           {!collapsed ? (
@@ -256,7 +256,7 @@ export function AppSidebar({ collapsed, onCollapsedChange }: AppSidebarProps) {
       </div>
 
       {/* ── Navigation ───────────────────────────────────────────────────── */}
-      <nav className="flex flex-1 flex-col gap-0.5">
+      <nav className="flex flex-1 flex-col gap-1">
         {sidebarTree.map((node) =>
           node.items?.length ? (
             <NavSection

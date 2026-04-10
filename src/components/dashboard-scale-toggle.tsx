@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "dashboard-ui-scale";
 const SCALE_EVENT = "dashboard-scale-change";
-const MIN_SCALE = 0.92;
-const MAX_SCALE = 1.08;
-const STEP = 0.05;
+const MIN_SCALE = 0.80;
+const MAX_SCALE = 1.20;
+const STEP = 0.04;
 
 function clampValue(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -73,11 +73,11 @@ export function DashboardScaleToggle() {
   }
 
   return (
-    <div className="flex items-center gap-0.5 rounded-full border border-slate-700/50 bg-slate-950/80 p-1.5 backdrop-blur-sm shadow-lg shadow-slate-950/40">
+    <div className="flex items-center gap-1 rounded-full border border-slate-700/50 bg-slate-950/80 p-2 backdrop-blur-sm shadow-lg shadow-slate-950/40">
       <Button
         variant="ghost"
         size="icon"
-        className="size-7 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 transition-all active:scale-95"
+        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 transition-all active:scale-95"
         onClick={() => persistScale(1)}
         title="Restablecer a 100%"
       >
@@ -88,7 +88,7 @@ export function DashboardScaleToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className="size-7 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
         onClick={() => updateScale(scale - STEP)}
         disabled={scale <= MIN_SCALE}
         title="Reducir (−)"
@@ -112,7 +112,7 @@ export function DashboardScaleToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className="size-7 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
         onClick={() => updateScale(scale + STEP)}
         disabled={scale >= MAX_SCALE}
         title="Aumentar (+)"

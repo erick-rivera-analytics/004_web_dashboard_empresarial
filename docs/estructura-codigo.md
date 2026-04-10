@@ -56,7 +56,7 @@ Entrada server del modulo `Fenograma`. Hace bootstrap inicial con datos reales.
 
 Vista base de comparacion. Hoy usa seed local.
 
-### `src/app/(dashboard)/dashboard/poscosecha/balanzas/page.tsx`
+### `src/app/(dashboard)/dashboard/postcosecha/balanzas/page.tsx`
 
 Entrada server del modulo `Poscosecha Balanzas`. Hace bootstrap inicial del flujo BPMN y sus indicadores reales.
 
@@ -78,7 +78,7 @@ Devuelve perfiles de ciclo por bloque.
 
 Devuelve detalle de camas por ciclo.
 
-### `src/app/api/poscosecha/balanzas/route.ts`
+### `src/app/api/postcosecha/balanzas/route.ts`
 
 Devuelve el dashboard de `Balanzas` con filtros temporales, nodos BPMN, detalle de tablas y resumen por tramo.
 
@@ -224,7 +224,7 @@ Dominio principal del modulo real actual. Contiene:
 - carga de perfiles de cama
 - conversion de mortandad a porcentaje
 
-### `src/lib/poscosecha-balanzas.ts`
+### `src/lib/postcosecha-balanzas.ts`
 
 Dominio principal del modulo de `Balanzas`. Resuelve:
 
@@ -310,7 +310,7 @@ Editar:
 
 Editar:
 
-- `src/lib/poscosecha-balanzas.ts`
+- `src/lib/postcosecha-balanzas.ts`
 - `src/components/dashboard/balanzas-explorer.tsx`
 - `src/components/dashboard/balanzas-process-viewer.tsx`
 - `src/components/dashboard/balanzas-grouped-table.tsx`
@@ -325,7 +325,7 @@ Estos archivos merecen mas cuidado porque concentran comportamiento de negocio o
 - `src/components/app-sidebar.tsx`
 - `src/components/dashboard/fenograma-explorer.tsx`
 - `src/components/dashboard/fenograma-pivot-table.tsx`
-- `src/lib/poscosecha-balanzas.ts`
+- `src/lib/postcosecha-balanzas.ts`
 - `src/components/dashboard/balanzas-explorer.tsx`
 
 Un cambio mal planteado aqui afecta toda la experiencia del dashboard o rompe el modulo principal.
