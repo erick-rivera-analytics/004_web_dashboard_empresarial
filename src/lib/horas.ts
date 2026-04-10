@@ -2,11 +2,12 @@ import { query } from "@/lib/db";
 import { cachedAsync } from "@/lib/server-cache";
 
 // ── Fuente de datos ──────────────────────────────────────────────────────────
-const PROD_HOURS_SOURCE     = "gld.mv_prod_hours_cycle_person_cur";
-const KARDEX_SOURCE         = "gld.mv_camp_kardex_cycle_plants_cur";   // plantas
-const FENOGRAMA_SOURCE      = "gld.mv_prod_fenograma_cur";              // stems_count
-const PRODUCTIVITY_POST_SRC = "gld.mv_prod_productivity_post_cur";     // post_weight_kg
-const CYCLE_PROFILE_SOURCE  = "slv.camp_dim_cycle_profile_scd2";
+const PROD_HOURS_SOURCE      = "gld.mv_prod_hours_cycle_person_cur";
+const KARDEX_SOURCE          = "gld.mv_camp_kardex_cycle_plants_cur";    // plantas
+const FENOGRAMA_SOURCE       = "gld.mv_prod_fenograma_cur";               // stems_count
+const PRODUCTIVITY_POST_SRC  = "gld.mv_prod_productivity_post_cur";      // post_weight_kg
+const PRODUCTIVITY_GREEN_SRC = "gld.mv_prod_productivity_green_cur";     // green_weight_kg → cajas
+const CYCLE_PROFILE_SOURCE   = "slv.camp_dim_cycle_profile_scd2";
 
 // ── TTL ──────────────────────────────────────────────────────────────────────
 const HORAS_TTL_MS = 60 * 1000;
@@ -27,7 +28,8 @@ type HorasDashboardQueryRow = {
   sub_cost_center: string | null;
   effective_hours: number | string | null;
   units_produced: number | string | null;
-  bed_count: number | string | null;
+  bed_area: number | string | null;
+  green_weight_kg: number | string | null;
   total_stems: number | string | null;
   plants_current: number | string | null;
   post_weight_kg: number | string | null;
@@ -41,6 +43,7 @@ export type HorasFilters = {
   month: string;
   spType: string;
   variety: string;
+  area: string;
   costArea: HorasEtapa;
 };
 
@@ -60,7 +63,10 @@ export type HorasRow = {
   subCostCenter: string;
   effectiveHours: number | null;
   unitsProduced: number | null;
-  bedCount: number | null;
+  bedArea: number | null;
+  greenWeightKg: number | null;
+  cajas: number | null;
+  camas30: number | null;
   totalStems: number | null;
   plantsCurrentOrInitial: number | null;
   postWeightKg: number | null;
@@ -76,6 +82,7 @@ export type HorasFilterOptions = {
   months: string[];
   spTypes: string[];
   varieties: string[];
+  areas: string[];
 };
 
 export type HorasDashboardData = {
@@ -97,6 +104,7 @@ export const defaultHorasFilters: HorasFilters = {
   month: "all",
   spType: "all",
   variety: "all",
+  area: "all",
   costArea: "all",
 };
 
@@ -109,6 +117,7 @@ export function normalizeHorasFilters(
     month: input.month?.trim() || "all",
     spType: input.spType?.trim() || "all",
     variety: input.variety?.trim() || "all",
+    area: input.area?.trim() || "all",
     costArea: (input.costArea === "CAMPO" || input.costArea === "COSECHA")
       ? input.costArea
       : "all",
@@ -167,7 +176,7 @@ export async function getHorasDashboardData(
           sp_date,
           harvest_start_date,
           harvest_end_date,
-          coalesce(bed_count, 0)           as bed_count
+          coalesce(bed_area, 0)            as bed_area
         from ${CYCLE_PROFILE_SOURCE}
         order by cycle_key, valid_from desc nulls last
       ),
@@ -195,6 +204,14 @@ export async function getHorasDashboardData(
         from ${PRODUCTIVITY_POST_SRC}
         group by cycle_key
       ),
+      -- peso verde (base para cajas = green_weight_kg / 10)
+      green_weight as (
+        select
+          cycle_key,
+          sum(coalesce(green_weight_kg, 0)) as green_weight_kg
+        from ${PRODUCTIVITY_GREEN_SRC}
+        group by cycle_key
+      ),
       hours_agg as (
         select
           h.cycle_key,
@@ -215,21 +232,23 @@ export async function getHorasDashboardData(
         cp.sp_date,
         cp.harvest_start_date,
         cp.harvest_end_date,
-        extract(year  from cp.harvest_start_date)::int as harvest_year,
-        extract(month from cp.harvest_start_date)::int as harvest_month,
+        extract(year  from cp.harvest_end_date)::int as harvest_year,
+        extract(month from cp.harvest_end_date)::int as harvest_month,
         ha.cost_area,
         ha.sub_cost_center,
         ha.effective_hours,
         ha.units_produced,
-        cp.bed_count,
+        cp.bed_area,
+        coalesce(gw.green_weight_kg, 0) as green_weight_kg,
         coalesce(f.total_stems, 0)      as total_stems,
         coalesce(k.plants_current, 0)   as plants_current,
         coalesce(pw.post_weight_kg, 0)  as post_weight_kg
       from hours_agg ha
-      join  cycle_profile cp on cp.cycle_key  = ha.cycle_key
-      left join kardex     k  on k.cycle_key   = ha.cycle_key
-      left join feno       f  on f.cycle_key   = ha.cycle_key
-      left join post_weight pw on pw.cycle_key = ha.cycle_key
+      join  cycle_profile cp  on cp.cycle_key  = ha.cycle_key
+      left join kardex     k   on k.cycle_key   = ha.cycle_key
+      left join feno       f   on f.cycle_key   = ha.cycle_key
+      left join post_weight pw  on pw.cycle_key = ha.cycle_key
+      left join green_weight gw on gw.cycle_key = ha.cycle_key
       order by
         harvest_year desc nulls last,
         harvest_month desc nulls last,
@@ -245,11 +264,16 @@ export async function getHorasDashboardData(
     const allRows: HorasRow[] = result.rows.map((row) => {
       const effectiveHours = toNumber(row.effective_hours);
       const unitsProduced = toNumber(row.units_produced);
-      const bedCount = toNumber(row.bed_count);
+      const bedArea = toNumber(row.bed_area);
+      const greenWeightKg = toNumber(row.green_weight_kg);
       const totalStems = toNumber(row.total_stems);
       const plantsCurrentOrInitial = toNumber(row.plants_current);
       const postWeightKg = toNumber(row.post_weight_kg);
       const costArea = cleanText(row.cost_area);
+
+      // Derived
+      const cajas = greenWeightKg !== null ? greenWeightKg / 10 : null;
+      const camas30 = bedArea !== null && bedArea > 0 ? bedArea / 30 : null;
 
       return {
         cycleKey: cleanText(row.cycle_key),
@@ -267,12 +291,15 @@ export async function getHorasDashboardData(
         subCostCenter: cleanText(row.sub_cost_center),
         effectiveHours,
         unitsProduced,
-        bedCount,
+        bedArea,
+        greenWeightKg,
+        cajas,
+        camas30,
         totalStems,
         plantsCurrentOrInitial,
         postWeightKg,
-        horaCaja: divOrNull(effectiveHours, unitsProduced),
-        cajaCama: divOrNull(unitsProduced, bedCount),
+        horaCaja: divOrNull(effectiveHours, cajas),
+        cajaCama: divOrNull(cajas, camas30),
         tallosPlanta: divOrNull(totalStems, plantsCurrentOrInitial),
         pesoTalloGramos: divOrNull(
           postWeightKg !== null ? postWeightKg * 1000 : null,
@@ -287,6 +314,7 @@ export async function getHorasDashboardData(
       if (!matchesFilter(filters.month, String(row.harvestMonth ?? ""))) return false;
       if (!matchesFilter(filters.spType, row.spType)) return false;
       if (!matchesFilter(filters.variety, row.variety)) return false;
+      if (!matchesFilter(filters.area, row.area)) return false;
       return true;
     });
 
@@ -309,21 +337,34 @@ export async function getHorasDashboardData(
       allRows.map((r) => r.variety).filter(Boolean),
     )).sort((a, b) => collator.compare(a, b));
 
+    const areas = Array.from(new Set(
+      allRows.map((r) => r.area).filter(Boolean),
+    )).sort((a, b) => collator.compare(a, b));
+
     // ── Summary ──────────────────────────────────────────────────────────────
     const totalEffectiveHours = filtered.reduce((s, r) => s + (r.effectiveHours ?? 0), 0);
     const totalUnitsProduced = filtered.reduce((s, r) => s + (r.unitsProduced ?? 0), 0);
     const uniqueCycles = new Set(filtered.map((r) => r.cycleKey)).size;
 
+    // Hora/Caja ponderada: sum(horas) / sum(cajas únicas por ciclo)
+    const uniqueCyclesCajas = new Map<string, number>();
+    for (const row of filtered) {
+      if (!uniqueCyclesCajas.has(row.cycleKey)) {
+        uniqueCyclesCajas.set(row.cycleKey, row.cajas ?? 0);
+      }
+    }
+    const totalCajas = Array.from(uniqueCyclesCajas.values()).reduce((s, c) => s + c, 0);
+
     return {
       generatedAt: new Date().toISOString(),
       filters,
-      options: { years, months, spTypes, varieties },
+      options: { years, months, spTypes, varieties, areas },
       rows: filtered,
       summary: {
         totalCycles: uniqueCycles,
         totalEffectiveHours,
         totalUnitsProduced,
-        weightedHoraCaja: divOrNull(totalEffectiveHours, totalUnitsProduced),
+        weightedHoraCaja: totalCajas > 0 ? totalEffectiveHours / totalCajas : null,
       },
     };
   });

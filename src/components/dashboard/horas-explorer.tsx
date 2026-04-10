@@ -35,6 +35,7 @@ function buildQueryString(filters: HorasFilters): string {
   params.set("month", filters.month);
   params.set("spType", filters.spType);
   params.set("variety", filters.variety);
+  params.set("area", filters.area);
   params.set("costArea", filters.costArea);
   return params.toString();
 }
@@ -68,6 +69,7 @@ type SubCenterGroup = {
   rows: HorasRow[];
   effectiveHours: number;
   unitsProduced: number;
+  cajas: number | null;
   horaCaja: number | null;
 };
 
@@ -81,6 +83,7 @@ type CycleGroup = {
   etapaGroups: EtapaGroup[];
   totalEffectiveHours: number;
   totalUnitsProduced: number;
+  cajas: number | null;
   horaCaja: number | null;
   cajaCama: number | null;
   tallosPlanta: number | null;
@@ -93,6 +96,7 @@ type EtapaGroup = {
   subCenters: SubCenterGroup[];
   effectiveHours: number;
   unitsProduced: number;
+  cajas: number | null;
   horaCaja: number | null;
 };
 
@@ -120,6 +124,7 @@ function groupRows(rows: HorasRow[]): YearGroup[] {
         etapaGroups: [],
         totalEffectiveHours: 0,
         totalUnitsProduced: 0,
+        cajas: row.cajas,      // cajas is cycle-level (same for all rows of this cycle)
         horaCaja: null,
         cajaCama: row.cajaCama,
         tallosPlanta: row.tallosPlanta,
@@ -144,6 +149,7 @@ function groupRows(rows: HorasRow[]): YearGroup[] {
           subCenters: [],
           effectiveHours: 0,
           unitsProduced: 0,
+          cajas: row.cajas,
           horaCaja: null,
         });
       }
@@ -156,14 +162,15 @@ function groupRows(rows: HorasRow[]): YearGroup[] {
         rows: [row],
         effectiveHours: row.effectiveHours ?? 0,
         unitsProduced: row.unitsProduced ?? 0,
-        horaCaja: row.horaCaja,
+        cajas: row.cajas,
+        horaCaja: row.horaCaja,  // row.horaCaja already uses cajas
       });
     }
 
-    // Compute etapa horaCaja
+    // Compute etapa horaCaja (horas / cajas del ciclo — cajas es nivel ciclo)
     for (const etapa of etapaMap.values()) {
-      etapa.horaCaja = etapa.unitsProduced > 0
-        ? etapa.effectiveHours / etapa.unitsProduced
+      etapa.horaCaja = etapa.cajas !== null && etapa.cajas > 0
+        ? etapa.effectiveHours / etapa.cajas
         : null;
     }
 
@@ -171,8 +178,8 @@ function groupRows(rows: HorasRow[]): YearGroup[] {
       a.etapaLabel.localeCompare(b.etapaLabel),
     );
 
-    cycle.horaCaja = cycle.totalUnitsProduced > 0
-      ? cycle.totalEffectiveHours / cycle.totalUnitsProduced
+    cycle.horaCaja = cycle.cajas !== null && cycle.cajas > 0
+      ? cycle.totalEffectiveHours / cycle.cajas
       : null;
   }
 
@@ -261,14 +268,17 @@ function TD({
   right = false,
   muted = false,
   className = "",
+  colSpan,
 }: {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   right?: boolean;
   muted?: boolean;
   className?: string;
+  colSpan?: number;
 }) {
   return (
     <td
+      colSpan={colSpan}
       className={`border-b border-border/40 px-3 py-2 text-sm whitespace-nowrap ${right ? "text-right" : ""} ${muted ? "text-muted-foreground" : ""} ${className}`}
     >
       {children}
@@ -331,9 +341,9 @@ function HorasTable({
         <tbody>
           {yearGroups.map((yg) => {
             const yearOpen = expandedYears.has(yg.year);
-            const yearHoraCaja = yg.totalUnitsProduced > 0
-              ? yg.totalEffectiveHours / yg.totalUnitsProduced
-              : null;
+            // Hora/Caja del año = sum(horas) / sum(cajas únicas por ciclo en el año)
+            const yearCajas = yg.cycles.reduce((s, c) => s + (c.cajas ?? 0), 0);
+            const yearHoraCaja = yearCajas > 0 ? yg.totalEffectiveHours / yearCajas : null;
 
             return (
               <>
@@ -525,7 +535,7 @@ export function HorasExplorer({ initialData }: { initialData: HorasDashboardData
 
         <CardContent className="space-y-5">
           {/* Filtros */}
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
             <SelectField
               id="horas-year"
               label="Año"
@@ -539,6 +549,13 @@ export function HorasExplorer({ initialData }: { initialData: HorasDashboardData
               value={filters.month}
               options={data.options.months}
               onChange={(v) => updateFilter("month", v)}
+            />
+            <SelectField
+              id="horas-area"
+              label="Area"
+              value={filters.area}
+              options={data.options.areas}
+              onChange={(v) => updateFilter("area", v)}
             />
             <SelectField
               id="horas-sp-type"

@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
       month: request.nextUrl.searchParams.get("month") ?? undefined,
       spType: request.nextUrl.searchParams.get("spType") ?? undefined,
       variety: request.nextUrl.searchParams.get("variety") ?? undefined,
+      area: request.nextUrl.searchParams.get("area") ?? undefined,
       costArea: (request.nextUrl.searchParams.get("costArea") ?? undefined) as
         | "CAMPO"
         | "COSECHA"
