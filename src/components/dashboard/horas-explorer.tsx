@@ -64,11 +64,25 @@ function buildBlockModalRow(row: HorasRow): BlockModalRow {
 }
 
 // ── Grouping logic ────────────────────────────────────────────────────────────
+type ActivityGroup = {
+  activityName: string;
+  effectiveHours: number;
+  horaCaja: number | null;
+};
+
 type SubCenterGroup = {
   subCostCenter: string;
-  rows: HorasRow[];
+  activities: ActivityGroup[];
   effectiveHours: number;
-  unitsProduced: number;
+  cajas: number | null;
+  horaCaja: number | null;
+};
+
+type EtapaGroup = {
+  etapaLabel: string;
+  costArea: string;
+  subCenters: SubCenterGroup[];
+  effectiveHours: number;
   cajas: number | null;
   horaCaja: number | null;
 };
@@ -79,36 +93,25 @@ type CycleGroup = {
   area: string;
   variety: string;
   spType: string;
+  cycleStatus: "Planificado" | "Abierto" | "Cerrado";
   representative: HorasRow;
   etapaGroups: EtapaGroup[];
   totalEffectiveHours: number;
-  totalUnitsProduced: number;
   cajas: number | null;
   horaCaja: number | null;
   cajaCama: number | null;
+  horaCama: number | null;
   tallosPlanta: number | null;
   pesoTalloGramos: number | null;
-};
-
-type EtapaGroup = {
-  etapaLabel: string;
-  costArea: string;
-  subCenters: SubCenterGroup[];
-  effectiveHours: number;
-  unitsProduced: number;
-  cajas: number | null;
-  horaCaja: number | null;
 };
 
 type YearGroup = {
   year: string;
   cycles: CycleGroup[];
   totalEffectiveHours: number;
-  totalUnitsProduced: number;
 };
 
 function groupRows(rows: HorasRow[]): YearGroup[] {
-  // Collect unique cycles first
   const cycleMap = new Map<string, CycleGroup>();
 
   for (const row of rows) {
@@ -120,66 +123,79 @@ function groupRows(rows: HorasRow[]): YearGroup[] {
         area: row.area,
         variety: row.variety,
         spType: row.spType,
+        cycleStatus: row.cycleStatus,
         representative: row,
         etapaGroups: [],
         totalEffectiveHours: 0,
-        totalUnitsProduced: 0,
-        cajas: row.cajas,      // cajas is cycle-level (same for all rows of this cycle)
+        cajas: row.cajas,
         horaCaja: null,
         cajaCama: row.cajaCama,
+        horaCama: row.horaCama,
         tallosPlanta: row.tallosPlanta,
         pesoTalloGramos: row.pesoTalloGramos,
       });
     }
     const cycle = cycleMap.get(key)!;
     cycle.totalEffectiveHours += row.effectiveHours ?? 0;
-    cycle.totalUnitsProduced += row.unitsProduced ?? 0;
   }
 
-  // Build etapa + sub_center groups per cycle
+  // Build etapa → sub → activity groups per cycle
   for (const [cycleKey, cycle] of cycleMap) {
-    const etapaMap = new Map<string, EtapaGroup>();
+    type SubEntry = { sub: SubCenterGroup; actMap: Map<string, ActivityGroup> };
+    type EtapaEntry = { etapa: EtapaGroup; subMap: Map<string, SubEntry> };
+    const etapaMap = new Map<string, EtapaEntry>();
+    const cajas = cycle.cajas;
 
     for (const row of rows.filter((r) => r.cycleKey === cycleKey)) {
       const etapaKey = row.costArea;
       if (!etapaMap.has(etapaKey)) {
         etapaMap.set(etapaKey, {
-          etapaLabel: row.etapaLabel,
-          costArea: row.costArea,
-          subCenters: [],
-          effectiveHours: 0,
-          unitsProduced: 0,
-          cajas: row.cajas,
-          horaCaja: null,
+          etapa: { etapaLabel: row.etapaLabel, costArea: row.costArea, subCenters: [], effectiveHours: 0, cajas, horaCaja: null },
+          subMap: new Map(),
         });
       }
-      const etapa = etapaMap.get(etapaKey)!;
-      etapa.effectiveHours += row.effectiveHours ?? 0;
-      etapa.unitsProduced += row.unitsProduced ?? 0;
+      const etapaEntry = etapaMap.get(etapaKey)!;
+      etapaEntry.etapa.effectiveHours += row.effectiveHours ?? 0;
 
-      etapa.subCenters.push({
-        subCostCenter: row.subCostCenter,
-        rows: [row],
-        effectiveHours: row.effectiveHours ?? 0,
-        unitsProduced: row.unitsProduced ?? 0,
-        cajas: row.cajas,
-        horaCaja: row.horaCaja,  // row.horaCaja already uses cajas
-      });
+      const subKey = row.subCostCenter;
+      if (!etapaEntry.subMap.has(subKey)) {
+        etapaEntry.subMap.set(subKey, {
+          sub: { subCostCenter: row.subCostCenter, activities: [], effectiveHours: 0, cajas, horaCaja: null },
+          actMap: new Map(),
+        });
+      }
+      const subEntry = etapaEntry.subMap.get(subKey)!;
+      subEntry.sub.effectiveHours += row.effectiveHours ?? 0;
+
+      const actKey = row.activityName;
+      if (!subEntry.actMap.has(actKey)) {
+        subEntry.actMap.set(actKey, { activityName: row.activityName, effectiveHours: 0, horaCaja: null });
+      }
+      subEntry.actMap.get(actKey)!.effectiveHours += row.effectiveHours ?? 0;
     }
 
-    // Compute etapa horaCaja (horas / cajas del ciclo — cajas es nivel ciclo)
-    for (const etapa of etapaMap.values()) {
-      etapa.horaCaja = etapa.cajas !== null && etapa.cajas > 0
-        ? etapa.effectiveHours / etapa.cajas
-        : null;
+    // Compute horaCaja at each level (horas_level / cajas_ciclo)
+    for (const { etapa, subMap } of etapaMap.values()) {
+      etapa.horaCaja = cajas !== null && cajas > 0 ? etapa.effectiveHours / cajas : null;
+      for (const { sub, actMap } of subMap.values()) {
+        sub.horaCaja = cajas !== null && cajas > 0 ? sub.effectiveHours / cajas : null;
+        for (const act of actMap.values()) {
+          act.horaCaja = cajas !== null && cajas > 0 ? act.effectiveHours / cajas : null;
+          sub.activities.push(act);
+        }
+        sub.activities.sort((a, b) => a.activityName.localeCompare(b.activityName));
+        etapa.subCenters.push(sub);
+      }
+      etapa.subCenters.sort((a, b) => a.subCostCenter.localeCompare(b.subCostCenter));
     }
 
-    cycle.etapaGroups = Array.from(etapaMap.values()).sort((a, b) =>
-      a.etapaLabel.localeCompare(b.etapaLabel),
-    );
+    cycle.etapaGroups = Array.from(etapaMap.values())
+      .map((e) => e.etapa)
+      .sort((a, b) => a.etapaLabel.localeCompare(b.etapaLabel));
 
-    cycle.horaCaja = cycle.cajas !== null && cycle.cajas > 0
-      ? cycle.totalEffectiveHours / cycle.cajas
+    cycle.horaCaja = cajas !== null && cajas > 0 ? cycle.totalEffectiveHours / cajas : null;
+    cycle.horaCama = (cycle.horaCaja !== null && cycle.cajaCama !== null)
+      ? cycle.horaCaja * cycle.cajaCama
       : null;
   }
 
@@ -190,12 +206,11 @@ function groupRows(rows: HorasRow[]): YearGroup[] {
   for (const cycle of cycleMap.values()) {
     const year = String(cycle.representative.harvestYear ?? "Sin año");
     if (!yearMap.has(year)) {
-      yearMap.set(year, { year, cycles: [], totalEffectiveHours: 0, totalUnitsProduced: 0 });
+      yearMap.set(year, { year, cycles: [], totalEffectiveHours: 0 });
     }
     const yg = yearMap.get(year)!;
     yg.cycles.push(cycle);
     yg.totalEffectiveHours += cycle.totalEffectiveHours;
-    yg.totalUnitsProduced += cycle.totalUnitsProduced;
   }
 
   return Array.from(yearMap.values())
@@ -286,7 +301,23 @@ function TD({
   );
 }
 
+// ── Status badge ──────────────────────────────────────────────────────────────
+const STATUS_STYLES: Record<string, string> = {
+  Abierto:     "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400",
+  Cerrado:     "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+  Planificado: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400",
+};
+
+function StatusBadge({ status }: { status: "Planificado" | "Abierto" | "Cerrado" }) {
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[status]}`}>
+      {status}
+    </span>
+  );
+}
+
 // ── HorasTable ────────────────────────────────────────────────────────────────
+// Columns: Ciclo/Bloque | Area | Variedad | Tipo SP | Estado | H/Caja | Caja/Cama | H/Cama | T/Planta | Peso(g)
 function HorasTable({
   yearGroups,
   onCycleClick,
@@ -298,6 +329,7 @@ function HorasTable({
     () => new Set(yearGroups.map((yg) => yg.year)),
   );
   const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set());
+  const [expandedSubCenters, setExpandedSubCenters] = useState<Set<string>>(new Set());
 
   function toggleYear(year: string) {
     setExpandedYears((prev) => {
@@ -315,6 +347,14 @@ function HorasTable({
     });
   }
 
+  function toggleSubCenter(key: string) {
+    setExpandedSubCenters((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
   if (!yearGroups.length) {
     return (
       <div className="rounded-[24px] border border-border/60 bg-background/72 px-4 py-8 text-center text-sm text-muted-foreground">
@@ -325,15 +365,17 @@ function HorasTable({
 
   return (
     <div className="overflow-x-auto rounded-[24px] border border-border/60">
-      <table className="min-w-[900px] w-full text-sm">
+      <table className="min-w-[1100px] w-full text-sm">
         <thead className="sticky top-0 z-10">
           <tr>
             <TH>Ciclo / Bloque</TH>
             <TH>Area</TH>
             <TH>Variedad</TH>
             <TH>Tipo SP</TH>
+            <TH>Estado</TH>
             <TH right>Hora / Caja</TH>
             <TH right>Caja / Cama</TH>
+            <TH right>Hora / Cama</TH>
             <TH right>Tallos / Planta</TH>
             <TH right>Peso Tallo (g)</TH>
           </tr>
@@ -341,7 +383,6 @@ function HorasTable({
         <tbody>
           {yearGroups.map((yg) => {
             const yearOpen = expandedYears.has(yg.year);
-            // Hora/Caja del año = sum(horas) / sum(cajas únicas por ciclo en el año)
             const yearCajas = yg.cycles.reduce((s, c) => s + (c.cajas ?? 0), 0);
             const yearHoraCaja = yearCajas > 0 ? yg.totalEffectiveHours / yearCajas : null;
 
@@ -353,7 +394,7 @@ function HorasTable({
                   className="cursor-pointer bg-muted/40 hover:bg-muted/60"
                   onClick={() => toggleYear(yg.year)}
                 >
-                  <TD className="font-semibold" colSpan={0}>
+                  <TD className="font-semibold">
                     <div className="flex items-center gap-2">
                       {yearOpen
                         ? <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
@@ -364,13 +405,9 @@ function HorasTable({
                       </Badge>
                     </div>
                   </TD>
-                  <TD />
-                  <TD />
-                  <TD />
+                  <TD /><TD /><TD /><TD />
                   <TD right className="font-semibold">{fmt(yearHoraCaja)}</TD>
-                  <TD />
-                  <TD />
-                  <TD />
+                  <TD /><TD /><TD /><TD />
                 </tr>
 
                 {yearOpen && yg.cycles.map((cycle) => {
@@ -382,11 +419,7 @@ function HorasTable({
                       <tr
                         key={`cycle-${cycle.cycleKey}`}
                         className="cursor-pointer bg-background/60 hover:bg-primary/5 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Expand/collapse on left part, open modal on right part is handled by button
-                          toggleCycle(cycle.cycleKey);
-                        }}
+                        onClick={(e) => { e.stopPropagation(); toggleCycle(cycle.cycleKey); }}
                       >
                         <TD>
                           <div className="flex items-center gap-2">
@@ -397,10 +430,7 @@ function HorasTable({
                               <button
                                 type="button"
                                 className="font-medium text-foreground hover:text-primary hover:underline underline-offset-2"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onCycleClick(cycle.representative);
-                                }}
+                                onClick={(e) => { e.stopPropagation(); onCycleClick(cycle.representative); }}
                                 title="Ver ficha del bloque"
                               >
                                 {cycle.cycleKey}
@@ -412,13 +442,15 @@ function HorasTable({
                         <TD muted>{cycle.area}</TD>
                         <TD muted>{cycle.variety}</TD>
                         <TD muted>{cycle.spType}</TD>
+                        <TD><StatusBadge status={cycle.cycleStatus} /></TD>
                         <TD right className="font-medium">{fmt(cycle.horaCaja)}</TD>
                         <TD right muted>{fmt(cycle.cajaCama)}</TD>
+                        <TD right muted>{fmt(cycle.horaCama)}</TD>
                         <TD right muted>{fmt(cycle.tallosPlanta)}</TD>
                         <TD right muted>{fmt(cycle.pesoTalloGramos)}</TD>
                       </tr>
 
-                      {/* ── Etapa + sub_center rows ── */}
+                      {/* ── Etapa → SubCenter → Activity rows ── */}
                       {cycleOpen && cycle.etapaGroups.map((etapa) => (
                         <>
                           {/* Etapa row */}
@@ -428,34 +460,57 @@ function HorasTable({
                                 {etapa.etapaLabel}
                               </span>
                             </TD>
-                            <TD />
-                            <TD />
-                            <TD />
+                            <TD /><TD /><TD /><TD />
                             <TD right className="text-xs font-semibold">{fmt(etapa.horaCaja)}</TD>
-                            <TD />
-                            <TD />
-                            <TD />
+                            <TD /><TD /><TD /><TD />
                           </tr>
-                          {/* Sub center rows */}
-                          {etapa.subCenters.map((sub) => (
-                            <tr
-                              key={`sub-${cycle.cycleKey}-${etapa.costArea}-${sub.subCostCenter}`}
-                              className="bg-background/30"
-                            >
-                              <TD>
-                                <span className="ml-16 text-xs text-muted-foreground">
-                                  {sub.subCostCenter}
-                                </span>
-                              </TD>
-                              <TD />
-                              <TD />
-                              <TD />
-                              <TD right className="text-xs text-muted-foreground">{fmt(sub.horaCaja)}</TD>
-                              <TD />
-                              <TD />
-                              <TD />
-                            </tr>
-                          ))}
+
+                          {/* Sub center rows — expandable */}
+                          {etapa.subCenters.map((sub) => {
+                            const subKey = `${cycle.cycleKey}|${etapa.costArea}|${sub.subCostCenter}`;
+                            const subOpen = expandedSubCenters.has(subKey);
+                            const hasActivities = sub.activities.length > 1 ||
+                              (sub.activities.length === 1 && sub.activities[0].activityName !== sub.subCostCenter);
+
+                            return (
+                              <>
+                                <tr
+                                  key={subKey}
+                                  className={`bg-background/30 ${hasActivities ? "cursor-pointer hover:bg-muted/20" : ""}`}
+                                  onClick={hasActivities ? (e) => { e.stopPropagation(); toggleSubCenter(subKey); } : undefined}
+                                >
+                                  <TD>
+                                    <span className="ml-16 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                      {hasActivities && (subOpen
+                                        ? <ChevronDown className="size-3 shrink-0" />
+                                        : <ChevronRight className="size-3 shrink-0" />)}
+                                      {sub.subCostCenter}
+                                    </span>
+                                  </TD>
+                                  <TD /><TD /><TD /><TD />
+                                  <TD right className="text-xs text-muted-foreground">{fmt(sub.horaCaja)}</TD>
+                                  <TD /><TD /><TD /><TD />
+                                </tr>
+
+                                {/* Activity rows */}
+                                {subOpen && sub.activities.map((act) => (
+                                  <tr
+                                    key={`act-${subKey}-${act.activityName}`}
+                                    className="bg-background/10"
+                                  >
+                                    <TD>
+                                      <span className="ml-24 text-[11px] text-muted-foreground/70">
+                                        {act.activityName}
+                                      </span>
+                                    </TD>
+                                    <TD /><TD /><TD /><TD />
+                                    <TD right className="text-[11px] text-muted-foreground/70">{fmt(act.horaCaja)}</TD>
+                                    <TD /><TD /><TD /><TD />
+                                  </tr>
+                                ))}
+                              </>
+                            );
+                          })}
                         </>
                       ))}
                     </>

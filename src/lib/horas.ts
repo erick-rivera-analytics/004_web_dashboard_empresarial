@@ -26,6 +26,7 @@ type HorasDashboardQueryRow = {
   harvest_month: number | string | null;
   cost_area: string | null;
   sub_cost_center: string | null;
+  activity_name: string | null;
   effective_hours: number | string | null;
   units_produced: number | string | null;
   bed_area: number | string | null;
@@ -61,6 +62,8 @@ export type HorasRow = {
   costArea: string;
   etapaLabel: string;
   subCostCenter: string;
+  activityName: string;
+  cycleStatus: "Planificado" | "Abierto" | "Cerrado";
   effectiveHours: number | null;
   unitsProduced: number | null;
   bedArea: number | null;
@@ -73,6 +76,7 @@ export type HorasRow = {
   // Calculated metrics
   horaCaja: number | null;
   cajaCama: number | null;
+  horaCama: number | null;
   tallosPlanta: number | null;
   pesoTalloGramos: number | null;
 };
@@ -217,11 +221,12 @@ export async function getHorasDashboardData(
           h.cycle_key,
           h.cost_area,
           coalesce(nullif(trim(h.sub_cost_center), ''), 'General') as sub_cost_center,
+          coalesce(nullif(trim(h.activity_name), ''), 'General')   as activity_name,
           sum(coalesce(h.effective_hours, 0))  as effective_hours,
           sum(coalesce(h.units_produced, 0))   as units_produced
         from ${PROD_HOURS_SOURCE} h
         where true ${costAreaClause}
-        group by h.cycle_key, h.cost_area, h.sub_cost_center
+        group by h.cycle_key, h.cost_area, h.sub_cost_center, h.activity_name
       )
       select
         ha.cycle_key,
@@ -236,6 +241,7 @@ export async function getHorasDashboardData(
         extract(month from cp.harvest_end_date)::int as harvest_month,
         ha.cost_area,
         ha.sub_cost_center,
+        ha.activity_name,
         ha.effective_hours,
         ha.units_produced,
         cp.bed_area,
@@ -255,7 +261,8 @@ export async function getHorasDashboardData(
         cp.block asc,
         ha.cycle_key asc,
         ha.cost_area asc,
-        ha.sub_cost_center asc
+        ha.sub_cost_center asc,
+        ha.activity_name asc
       `,
       [],
     );
@@ -274,6 +281,24 @@ export async function getHorasDashboardData(
       // Derived
       const cajas = greenWeightKg !== null ? greenWeightKg / 10 : null;
       const camas30 = bedArea !== null && bedArea > 0 ? bedArea / 30 : null;
+      const horaCaja = divOrNull(effectiveHours, cajas);
+      const cajaCama = divOrNull(cajas, camas30);
+
+      // Cycle status
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const startDate = row.harvest_start_date ? new Date(row.harvest_start_date) : null;
+      const endDate = row.harvest_end_date ? new Date(row.harvest_end_date) : null;
+      let cycleStatus: "Planificado" | "Abierto" | "Cerrado";
+      if (!startDate) {
+        cycleStatus = "Planificado";
+      } else if (today < startDate) {
+        cycleStatus = "Planificado";
+      } else if (endDate && today > endDate) {
+        cycleStatus = "Cerrado";
+      } else {
+        cycleStatus = "Abierto";
+      }
 
       return {
         cycleKey: cleanText(row.cycle_key),
@@ -289,6 +314,8 @@ export async function getHorasDashboardData(
         costArea,
         etapaLabel: etapaLabel(costArea),
         subCostCenter: cleanText(row.sub_cost_center),
+        activityName: cleanText(row.activity_name),
+        cycleStatus,
         effectiveHours,
         unitsProduced,
         bedArea,
@@ -298,8 +325,9 @@ export async function getHorasDashboardData(
         totalStems,
         plantsCurrentOrInitial,
         postWeightKg,
-        horaCaja: divOrNull(effectiveHours, cajas),
-        cajaCama: divOrNull(cajas, camas30),
+        horaCaja,
+        cajaCama,
+        horaCama: (horaCaja !== null && cajaCama !== null) ? horaCaja * cajaCama : null,
         tallosPlanta: divOrNull(totalStems, plantsCurrentOrInitial),
         pesoTalloGramos: divOrNull(
           postWeightKg !== null ? postWeightKg * 1000 : null,
