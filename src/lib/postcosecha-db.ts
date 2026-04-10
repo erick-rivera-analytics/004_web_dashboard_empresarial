@@ -25,7 +25,7 @@ function buildPoolConfig(): PoolConfig | null {
   return {
     host: process.env.DATABASE_HOST,
     port: Number(process.env.DATABASE_PORT),
-    database: process.env.POSTHARVEST_DATABASE_NAME ?? "datalakehouse_bkp_07042026",
+    database: process.env.POSTHARVEST_DATABASE_NAME ?? "db_postharvest",
     user: process.env.DATABASE_USER,
     password: process.env.DATABASE_PASSWORD,
     ssl: sslEnabled() ? { rejectUnauthorized: false } : undefined,

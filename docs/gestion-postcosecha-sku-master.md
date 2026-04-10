@@ -36,7 +36,19 @@ El maestro original del solver vivia en:
 
 - `C:\Users\paul.loja\PYPROYECTOS\solver_poscosecha\data\sku_master.csv`
 
-Ese CSV deja de ser la fuente operativa para CoreX. Ahora la persistencia vive en PostgreSQL y el CSV solo se usa como semilla inicial si la tabla esta vacia.
+Ese CSV deja de ser la fuente operativa para CoreX. Ahora la persistencia vive en PostgreSQL y el CSV queda solo como opcion de semilla manual.
+
+En la configuracion actual del dashboard el maestro SKU apunta a:
+
+- `db_postharvest`
+
+Y la semilla automatica queda desactivada por defecto para permitir crear el catalogo desde cero en la web.
+
+Si se necesita recuperar la carga semilla desde CSV, se puede habilitar con:
+
+- `POSTHARVEST_AUTO_SEED=true`
+
+Si ese flag no esta activo, una base nueva crea solo el esquema y arranca sin SKU para permitir la carga inicial desde la web.
 
 Reglas funcionales heredadas del solver:
 
@@ -51,7 +63,7 @@ Reglas funcionales heredadas del solver:
 
 Base objetivo:
 
-- `datalakehouse_bkp_07042026`
+- `db_postharvest`
 - esquema: `public`
 
 Tablas creadas:
@@ -88,10 +100,22 @@ Columnas de negocio del perfil:
 - `target_weight_max`
 - `target_max_grades`
 
-Validacion realizada en esta entrega:
+## Ajustes operativos posteriores
 
-- `18` filas vigentes en `public.postharvest_ref_sku_id_core_scd2`
-- `18` filas vigentes en `public.postharvest_dim_sku_profile_scd2`
+Se aplicaron estos ajustes sobre la primera entrega del modulo:
+
+- el fallback de conexion del maestro SKU cambia de `datalakehouse_bkp_07042026` a `db_postharvest`
+- `POSTHARVEST_DATABASE_NAME` queda documentado en el entorno de ejemplo
+- la semilla automatica queda desactivada por defecto con `POSTHARVEST_AUTO_SEED=false`
+- una base nueva crea tablas e indices, pero no carga SKU hasta que el usuario los registre en la web o habilite la semilla
+- la vista de `Administrar SKU's` usa formateo de fecha estable entre servidor y cliente para evitar errores de hidratacion en Next.js
+
+Validacion realizada para este ajuste:
+
+- `datalakehouse_bkp_07042026` conserva `18` filas vigentes en `public.postharvest_dim_sku_profile_scd2`
+- `db_postharvest` queda con `0` filas vigentes en `public.postharvest_dim_sku_profile_scd2`
+- `db_postharvest` si crea `public.postharvest_ref_sku_id_core_scd2`
+- `db_postharvest` si crea `public.postharvest_dim_sku_profile_scd2`
 
 ## Componentes y rutas nuevas
 
@@ -142,7 +166,7 @@ Validado en `next dev --webpack`:
 
 - `GET /login` responde `200`
 - `GET /dashboard/postcosecha/administrar-maestros/skus` responde `200`
-- `GET /api/postcosecha/administrar-maestros/skus` responde con `18` SKU
+- la vista de `Administrar SKU's` deja de mostrar el maestro legacy despues de reiniciar el servidor local con el nuevo `.env`
 - placeholders nuevos de `Poscosecha` responden `200`
 
 Nota importante:

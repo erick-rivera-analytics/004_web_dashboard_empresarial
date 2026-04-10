@@ -44,6 +44,10 @@ declare global {
   var __dashboardPostharvestSkuSetup: Promise<void> | undefined;
 }
 
+function autoSeedEnabled() {
+  return process.env.POSTHARVEST_AUTO_SEED === "true";
+}
+
 function toNumber(value: string | number | null | undefined) {
   if (value === null || value === undefined || value === "") {
     return null;
@@ -180,11 +184,15 @@ function parseCsvSeedRows(filePath: string) {
 }
 
 async function ensureTables(client?: PoolClient) {
-  const runner = client ?? {
-    query: queryPostharvest,
+  const runQuery = (text: string) => {
+    if (client) {
+      return client.query(text);
+    }
+
+    return queryPostharvest(text);
   };
 
-  await runner.query(`
+  await runQuery(`
     create table if not exists ${REF_TABLE} (
       record_id text primary key,
       sku_id text not null,
@@ -199,7 +207,7 @@ async function ensureTables(client?: PoolClient) {
     )
   `);
 
-  await runner.query(`
+  await runQuery(`
     create table if not exists ${DIM_TABLE} (
       record_id text primary key,
       sku_id text not null,
@@ -221,24 +229,24 @@ async function ensureTables(client?: PoolClient) {
     )
   `);
 
-  await runner.query(`
+  await runQuery(`
     create unique index if not exists postharvest_ref_sku_id_core_scd2_current_idx
       on ${REF_TABLE} (sku_id)
       where is_current
   `);
 
-  await runner.query(`
+  await runQuery(`
     create unique index if not exists postharvest_dim_sku_profile_scd2_current_idx
       on ${DIM_TABLE} (sku_id)
       where is_current
   `);
 
-  await runner.query(`
+  await runQuery(`
     create index if not exists postharvest_dim_sku_profile_scd2_name_idx
       on ${DIM_TABLE} (lower(sku_name))
   `);
 
-  await runner.query(`
+  await runQuery(`
     create unique index if not exists postharvest_dim_sku_profile_scd2_current_name_unique_idx
       on ${DIM_TABLE} (lower(regexp_replace(trim(sku_name), '\s+', ' ', 'g')))
       where is_current = true
@@ -341,7 +349,9 @@ export async function initializePostharvestSkuMaster() {
   if (!global.__dashboardPostharvestSkuSetup) {
     global.__dashboardPostharvestSkuSetup = (async () => {
       await ensureTables();
-      await seedIfEmpty();
+      if (autoSeedEnabled()) {
+        await seedIfEmpty();
+      }
     })();
   }
 
