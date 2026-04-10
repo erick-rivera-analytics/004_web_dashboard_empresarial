@@ -2,9 +2,11 @@ import { query } from "@/lib/db";
 import { cachedAsync } from "@/lib/server-cache";
 
 // ── Fuente de datos ──────────────────────────────────────────────────────────
-const PROD_HOURS_SOURCE = "gld.mv_prod_hours_cycle_person_cur";
-const KARDEX_SOURCE = "gld.mv_camp_kardex_cycle_plants_cur";
-const CYCLE_PROFILE_SOURCE = "slv.camp_dim_cycle_profile_scd2";
+const PROD_HOURS_SOURCE     = "gld.mv_prod_hours_cycle_person_cur";
+const KARDEX_SOURCE         = "gld.mv_camp_kardex_cycle_plants_cur";   // plantas
+const FENOGRAMA_SOURCE      = "gld.mv_prod_fenograma_cur";              // stems_count
+const PRODUCTIVITY_POST_SRC = "gld.mv_prod_productivity_post_cur";     // post_weight_kg
+const CYCLE_PROFILE_SOURCE  = "slv.camp_dim_cycle_profile_scd2";
 
 // ── TTL ──────────────────────────────────────────────────────────────────────
 const HORAS_TTL_MS = 60 * 1000;
@@ -169,13 +171,28 @@ export async function getHorasDashboardData(
         from ${CYCLE_PROFILE_SOURCE}
         order by cycle_key, valid_from desc nulls last
       ),
+      -- plantas actuales desde kardex (final_plants_count = plants_current)
       kardex as (
+        select distinct on (cycle_key)
+          cycle_key,
+          coalesce(final_plants_count, 0) as plants_current
+        from ${KARDEX_SOURCE}
+        order by cycle_key, valid_from desc nulls last
+      ),
+      -- tallos totales desde fenograma
+      feno as (
         select
           cycle_key,
-          sum(coalesce(stems_count, 0))   as total_stems,
-          max(coalesce(plants_current, 0)) as plants_current,
+          sum(coalesce(stems_count, 0)) as total_stems
+        from ${FENOGRAMA_SOURCE}
+        group by cycle_key
+      ),
+      -- peso post cosecha
+      post_weight as (
+        select
+          cycle_key,
           sum(coalesce(post_weight_kg, 0)) as post_weight_kg
-        from ${KARDEX_SOURCE}
+        from ${PRODUCTIVITY_POST_SRC}
         group by cycle_key
       ),
       hours_agg as (
@@ -205,12 +222,14 @@ export async function getHorasDashboardData(
         ha.effective_hours,
         ha.units_produced,
         cp.bed_count,
-        k.total_stems,
-        k.plants_current,
-        k.post_weight_kg
+        coalesce(f.total_stems, 0)      as total_stems,
+        coalesce(k.plants_current, 0)   as plants_current,
+        coalesce(pw.post_weight_kg, 0)  as post_weight_kg
       from hours_agg ha
-      join cycle_profile cp on cp.cycle_key = ha.cycle_key
-      left join kardex k    on k.cycle_key  = ha.cycle_key
+      join  cycle_profile cp on cp.cycle_key  = ha.cycle_key
+      left join kardex     k  on k.cycle_key   = ha.cycle_key
+      left join feno       f  on f.cycle_key   = ha.cycle_key
+      left join post_weight pw on pw.cycle_key = ha.cycle_key
       order by
         harvest_year desc nulls last,
         harvest_month desc nulls last,
