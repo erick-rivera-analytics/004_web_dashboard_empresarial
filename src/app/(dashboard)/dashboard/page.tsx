@@ -15,6 +15,7 @@ import { getDatabaseConfigSummary } from "@/lib/db";
 
 export default function DashboardPage() {
   const db = getDatabaseConfigSummary();
+  const featuredViews = dashboardViews.filter((view) => view.home !== false);
 
   return (
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
@@ -36,7 +37,7 @@ export default function DashboardPage() {
 
           <div className="flex flex-wrap gap-2 pt-8">
             <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
-              {dashboardViews.length} vistas
+              {featuredViews.length} vistas
             </Badge>
             <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
               DB {db.configured ? "lista" : "pendiente"}
@@ -46,7 +47,7 @@ export default function DashboardPage() {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {dashboardViews.map((view) => {
+        {featuredViews.map((view) => {
           const Icon = view.icon;
 
           return (

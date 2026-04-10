@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   transpilePackages: [
     "recharts",
     "react-redux",
+    "react-hook-form",
     "immer",
     "@reduxjs/toolkit",
     "redux",
@@ -31,6 +32,7 @@ const nextConfig: NextConfig = {
     config.resolve.alias = {
       ...(config.resolve.alias ?? {}),
       "react-redux": path.join(projectNodeModules, "react-redux"),
+      "react-hook-form": path.join(projectNodeModules, "react-hook-form"),
       immer: path.join(projectNodeModules, "immer"),
       "@reduxjs/toolkit": path.join(projectNodeModules, "@reduxjs", "toolkit"),
       redux: path.join(projectNodeModules, "redux"),

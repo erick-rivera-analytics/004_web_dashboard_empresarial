@@ -7,6 +7,7 @@ import { ChevronRight, DatabaseZap, LogOut, PanelLeftClose, PanelLeftOpen } from
 import { usePathname } from "next/navigation";
 
 import {
+  getSidebarNodeKey,
   getInitialOpenSections,
   isPathActive,
   nodeContainsActive,
@@ -86,16 +87,19 @@ function NavSection({
   collapsed,
   openSections,
   onToggle,
+  parentKey,
 }: {
   node: SidebarNode;
   pathname: string;
   depth: number;
   collapsed: boolean;
   openSections: Set<string>;
-  onToggle: (label: string) => void;
+  onToggle: (nodeKey: string) => void;
+  parentKey: string;
 }) {
   const Icon = node.icon;
-  const isOpen = openSections.has(node.label);
+  const nodeKey = getSidebarNodeKey(node, parentKey);
+  const isOpen = openSections.has(nodeKey);
   const hasActiveChild = nodeContainsActive(node, pathname);
   const indent = depth > 0 ? depth * 12 : 0;
 
@@ -114,7 +118,7 @@ function NavSection({
     <div>
       <button
         type="button"
-        onClick={() => !collapsed && onToggle(node.label)}
+        onClick={() => !collapsed && onToggle(nodeKey)}
         title={collapsed ? node.label : undefined}
         style={!collapsed && depth > 0 ? { paddingLeft: `${indent}px` } : undefined}
         className={cn(
@@ -161,6 +165,7 @@ function NavSection({
                 collapsed={collapsed}
                 openSections={openSections}
                 onToggle={onToggle}
+                parentKey={nodeKey}
               />
             ) : (
               <NavLeaf
@@ -185,13 +190,13 @@ export function AppSidebar({ collapsed, onCollapsedChange }: AppSidebarProps) {
     () => getInitialOpenSections(sidebarTree, pathname),
   );
 
-  const toggleSection = useCallback((label: string) => {
+  const toggleSection = useCallback((nodeKey: string) => {
     setOpenSections((prev) => {
       const next = new Set(prev);
-      if (next.has(label)) {
-        next.delete(label);
+      if (next.has(nodeKey)) {
+        next.delete(nodeKey);
       } else {
-        next.add(label);
+        next.add(nodeKey);
       }
       return next;
     });
@@ -262,6 +267,7 @@ export function AppSidebar({ collapsed, onCollapsedChange }: AppSidebarProps) {
               collapsed={collapsed}
               openSections={openSections}
               onToggle={toggleSection}
+              parentKey=""
             />
           ) : (
             <NavLeaf
