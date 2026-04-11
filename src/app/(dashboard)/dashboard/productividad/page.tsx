@@ -1,18 +1,18 @@
-import { HorasExplorer } from "@/components/dashboard/horas-explorer";
+import { ProductividadExplorer } from "@/components/dashboard/productividad-explorer";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { defaultHorasFilters, getHorasDashboardData } from "@/lib/horas";
+import { defaultProductividadFilters, getProductividadDashboardData } from "@/lib/productividad";
 
 export const dynamic = "force-dynamic";
 
-async function loadHorasPageData() {
+async function loadProductividadPageData() {
   try {
     return {
-      data: await getHorasDashboardData(defaultHorasFilters),
+      data: await getProductividadDashboardData(defaultProductividadFilters),
       error: null,
     };
   } catch (error) {
@@ -26,14 +26,14 @@ async function loadHorasPageData() {
   }
 }
 
-export default async function HorasPage() {
-  const { data, error } = await loadHorasPageData();
+export default async function ProductividadPage() {
+  const { data, error } = await loadProductividadPageData();
 
   if (!data) {
     return (
       <Card className="starter-panel border-border/70 bg-card/80">
         <CardHeader>
-          <CardTitle>No se pudo cargar el dashboard de horas</CardTitle>
+          <CardTitle>No se pudo cargar el dashboard de productividad</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">{error}</p>
@@ -42,5 +42,5 @@ export default async function HorasPage() {
     );
   }
 
-  return <HorasExplorer initialData={data} />;
+  return <ProductividadExplorer initialData={data} />;
 }

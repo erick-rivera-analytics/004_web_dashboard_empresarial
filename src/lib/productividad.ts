@@ -10,10 +10,10 @@ const PRODUCTIVITY_GREEN_SRC = "gld.mv_prod_productivity_green_cur";     // gree
 const CYCLE_PROFILE_SOURCE   = "slv.camp_dim_cycle_profile_scd2";
 
 // ── TTL ──────────────────────────────────────────────────────────────────────
-const HORAS_TTL_MS = 60 * 1000;
+const PRODUCTIVIDAD_TTL_MS = 60 * 1000;
 
 // ── Query row types (snake_case, DB output) ──────────────────────────────────
-type HorasDashboardQueryRow = {
+type ProductividadQueryRow = {
   cycle_key: string;
   block: string | null;
   area: string | null;
@@ -26,6 +26,7 @@ type HorasDashboardQueryRow = {
   harvest_month: number | string | null;
   cost_area: string | null;
   sub_cost_center: string | null;
+  activity_type: string | null;
   activity_name: string | null;
   effective_hours: number | string | null;
   units_produced: number | string | null;
@@ -34,21 +35,23 @@ type HorasDashboardQueryRow = {
   total_stems: number | string | null;
   plants_current: number | string | null;
   post_weight_kg: number | string | null;
+  pct_mortality: number | string | null;
 };
 
 // ── Public types ─────────────────────────────────────────────────────────────
-export type HorasEtapa = "all" | "CAMPO" | "COSECHA";
+export type ProductividadEtapa = "all" | "CAMPO" | "COSECHA";
 
-export type HorasFilters = {
+export type ProductividadFilters = {
   year: string;
   month: string;
   spType: string;
   variety: string;
   area: string;
-  costArea: HorasEtapa;
+  status: string;
+  costArea: ProductividadEtapa;
 };
 
-export type HorasRow = {
+export type ProductividadRow = {
   cycleKey: string;
   block: string;
   area: string;
@@ -62,8 +65,10 @@ export type HorasRow = {
   costArea: string;
   etapaLabel: string;
   subCostCenter: string;
+  activityType: string;
   activityName: string;
   cycleStatus: "Planificado" | "Abierto" | "Cerrado";
+  pctMortality: number | null;
   effectiveHours: number | null;
   unitsProduced: number | null;
   bedArea: number | null;
@@ -81,19 +86,20 @@ export type HorasRow = {
   pesoTalloGramos: number | null;
 };
 
-export type HorasFilterOptions = {
+export type ProductividadFilterOptions = {
   years: string[];
   months: string[];
   spTypes: string[];
   varieties: string[];
   areas: string[];
+  statuses: string[];
 };
 
-export type HorasDashboardData = {
+export type ProductividadDashboardData = {
   generatedAt: string;
-  filters: HorasFilters;
-  options: HorasFilterOptions;
-  rows: HorasRow[];
+  filters: ProductividadFilters;
+  options: ProductividadFilterOptions;
+  rows: ProductividadRow[];
   summary: {
     totalCycles: number;
     totalEffectiveHours: number;
@@ -103,25 +109,27 @@ export type HorasDashboardData = {
 };
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
-export const defaultHorasFilters: HorasFilters = {
+export const defaultProductividadFilters: ProductividadFilters = {
   year: "all",
   month: "all",
   spType: "all",
   variety: "all",
   area: "all",
+  status: "all",
   costArea: "all",
 };
 
 // ── Normalizer ───────────────────────────────────────────────────────────────
-export function normalizeHorasFilters(
-  input: Partial<HorasFilters>,
-): HorasFilters {
+export function normalizeProductividadFilters(
+  input: Partial<ProductividadFilters>,
+): ProductividadFilters {
   return {
     year: input.year?.trim() || "all",
     month: input.month?.trim() || "all",
     spType: input.spType?.trim() || "all",
     variety: input.variety?.trim() || "all",
     area: input.area?.trim() || "all",
+    status: input.status?.trim() || "all",
     costArea: (input.costArea === "CAMPO" || input.costArea === "COSECHA")
       ? input.costArea
       : "all",
@@ -156,19 +164,19 @@ function matchesFilter(filterValue: string, candidateValue: string): boolean {
 }
 
 // ── Main data function ────────────────────────────────────────────────────────
-export async function getHorasDashboardData(
-  filters: HorasFilters,
-): Promise<HorasDashboardData> {
-  const cacheKey = `horas:dashboard:${filters.year}:${filters.month}:${filters.spType}:${filters.variety}:${filters.costArea}`;
+export async function getProductividadDashboardData(
+  filters: ProductividadFilters,
+): Promise<ProductividadDashboardData> {
+  const cacheKey = `productividad:dashboard:${filters.year}:${filters.month}:${filters.spType}:${filters.variety}:${filters.costArea}`;
 
-  return cachedAsync(cacheKey, HORAS_TTL_MS, async () => {
+  return cachedAsync(cacheKey, PRODUCTIVIDAD_TTL_MS, async () => {
     // Build WHERE clauses for cost_area filter
     const costAreaClause =
       filters.costArea !== "all"
         ? `and h.cost_area = '${filters.costArea === "CAMPO" ? "CAMPO" : "COSECHA"}'`
         : "";
 
-    const result = await query<HorasDashboardQueryRow>(
+    const result = await query<ProductividadQueryRow>(
       `
       with cycle_profile as (
         select distinct on (cycle_key)
@@ -180,7 +188,8 @@ export async function getHorasDashboardData(
           sp_date,
           harvest_start_date,
           harvest_end_date,
-          coalesce(bed_area, 0)            as bed_area
+          coalesce(bed_area, 0)            as bed_area,
+          coalesce(pct_mortality, 0)       as pct_mortality
         from ${CYCLE_PROFILE_SOURCE}
         order by cycle_key, valid_from desc nulls last
       ),
@@ -221,12 +230,13 @@ export async function getHorasDashboardData(
           h.cycle_key,
           h.cost_area,
           coalesce(nullif(trim(h.sub_cost_center), ''), 'General') as sub_cost_center,
+          coalesce(nullif(trim(h.activity_type), ''), 'General')   as activity_type,
           coalesce(nullif(trim(h.activity_name), ''), 'General')   as activity_name,
           sum(coalesce(h.effective_hours, 0))  as effective_hours,
           sum(coalesce(h.units_produced, 0))   as units_produced
         from ${PROD_HOURS_SOURCE} h
         where true ${costAreaClause}
-        group by h.cycle_key, h.cost_area, h.sub_cost_center, h.activity_name
+        group by h.cycle_key, h.cost_area, h.sub_cost_center, h.activity_type, h.activity_name
       )
       select
         ha.cycle_key,
@@ -241,10 +251,12 @@ export async function getHorasDashboardData(
         extract(month from cp.harvest_end_date)::int as harvest_month,
         ha.cost_area,
         ha.sub_cost_center,
+        ha.activity_type,
         ha.activity_name,
         ha.effective_hours,
         ha.units_produced,
         cp.bed_area,
+        cp.pct_mortality,
         coalesce(gw.green_weight_kg, 0) as green_weight_kg,
         coalesce(f.total_stems, 0)      as total_stems,
         coalesce(k.plants_current, 0)   as plants_current,
@@ -262,13 +274,14 @@ export async function getHorasDashboardData(
         ha.cycle_key asc,
         ha.cost_area asc,
         ha.sub_cost_center asc,
+        ha.activity_type asc,
         ha.activity_name asc
       `,
       [],
     );
 
     // ── Transform rows ───────────────────────────────────────────────────────
-    const allRows: HorasRow[] = result.rows.map((row) => {
+    const allRows: ProductividadRow[] = result.rows.map((row) => {
       const effectiveHours = toNumber(row.effective_hours);
       const unitsProduced = toNumber(row.units_produced);
       const bedArea = toNumber(row.bed_area);
@@ -314,8 +327,10 @@ export async function getHorasDashboardData(
         costArea,
         etapaLabel: etapaLabel(costArea),
         subCostCenter: cleanText(row.sub_cost_center),
+        activityType: cleanText(row.activity_type),
         activityName: cleanText(row.activity_name),
         cycleStatus,
+        pctMortality: toNumber(row.pct_mortality),
         effectiveHours,
         unitsProduced,
         bedArea,
@@ -343,6 +358,7 @@ export async function getHorasDashboardData(
       if (!matchesFilter(filters.spType, row.spType)) return false;
       if (!matchesFilter(filters.variety, row.variety)) return false;
       if (!matchesFilter(filters.area, row.area)) return false;
+      if (!matchesFilter(filters.status, row.cycleStatus)) return false;
       return true;
     });
 
@@ -369,6 +385,10 @@ export async function getHorasDashboardData(
       allRows.map((r) => r.area).filter(Boolean),
     )).sort((a, b) => collator.compare(a, b));
 
+    const statuses = Array.from(new Set(
+      allRows.map((r) => r.cycleStatus),
+    )).sort();
+
     // ── Summary ──────────────────────────────────────────────────────────────
     const totalEffectiveHours = filtered.reduce((s, r) => s + (r.effectiveHours ?? 0), 0);
     const totalUnitsProduced = filtered.reduce((s, r) => s + (r.unitsProduced ?? 0), 0);
@@ -386,7 +406,7 @@ export async function getHorasDashboardData(
     return {
       generatedAt: new Date().toISOString(),
       filters,
-      options: { years, months, spTypes, varieties, areas },
+      options: { years, months, spTypes, varieties, areas, statuses },
       rows: filtered,
       summary: {
         totalCycles: uniqueCycles,

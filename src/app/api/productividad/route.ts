@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { handleApiError } from "@/lib/api-error";
 import { requireAuth } from "@/lib/api-auth";
-import { getHorasDashboardData, normalizeHorasFilters } from "@/lib/horas";
+import { getProductividadDashboardData, normalizeProductividadFilters } from "@/lib/productividad";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +11,13 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const filters = normalizeHorasFilters({
+    const filters = normalizeProductividadFilters({
       year: request.nextUrl.searchParams.get("year") ?? undefined,
       month: request.nextUrl.searchParams.get("month") ?? undefined,
       spType: request.nextUrl.searchParams.get("spType") ?? undefined,
       variety: request.nextUrl.searchParams.get("variety") ?? undefined,
       area: request.nextUrl.searchParams.get("area") ?? undefined,
+      status: request.nextUrl.searchParams.get("status") ?? undefined,
       costArea: (request.nextUrl.searchParams.get("costArea") ?? undefined) as
         | "CAMPO"
         | "COSECHA"
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
         | undefined,
     });
 
-    const data = await getHorasDashboardData(filters);
+    const data = await getProductividadDashboardData(filters);
 
     return NextResponse.json(data, {
       headers: {
@@ -32,6 +33,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    return handleApiError(error, "No se pudo cargar el dashboard de horas.");
+    return handleApiError(error, "No se pudo cargar el dashboard de productividad.");
   }
 }

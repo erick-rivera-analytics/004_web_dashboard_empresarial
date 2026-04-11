@@ -29,7 +29,9 @@
       "Bash(npx tsc:*)",
       "Bash(xargs -I {} basename {} .md)",
       "Bash(done)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(\"C:\\\\Users\\\\erick.rivera\\\\nodejs\\\\node\\\\node.exe\" \"C:\\\\Users\\\\erick.rivera\\\\nodejs\\\\node\\\\node_modules\\\\typescript\\\\bin\\\\tsc\" --noEmit)",
+      "Bash(\"C:\\\\Users\\\\erick.rivera\\\\nodejs\\\\node\\\\node.exe\" \"node_modules\\\\typescript\\\\bin\\\\tsc\" --noEmit)"
     ]
   }
 }
