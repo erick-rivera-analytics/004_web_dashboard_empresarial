@@ -242,19 +242,48 @@ type SubCostCenterPersonHours = Pick<CycleLaborPersonSummary, "personId" | "pers
   effectiveHours: number;
 };
 
-function groupPeopleBySubCostCenter(sub: CycleLaborSubCostCenterSummary): SubCostCenterPersonHours[] {
-  const peopleById = new Map<string, SubCostCenterPersonHours>();
+type SubCostCenterActivityHours = {
+  activityName: string;
+  effectiveHours: number;
+  people: SubCostCenterPersonHours[];
+};
+
+function sortPersonHours(people: SubCostCenterPersonHours[]): SubCostCenterPersonHours[] {
+  return people.sort((left, right) => {
+    const leftLabel = left.personName || left.personId;
+    const rightLabel = right.personName || right.personId;
+    const nameCompare = leftLabel.localeCompare(rightLabel, "es-EC", { numeric: true, sensitivity: "base" });
+    return nameCompare !== 0 ? nameCompare : left.personId.localeCompare(right.personId, "es-EC", { numeric: true });
+  });
+}
+
+function groupActivitiesBySubCostCenter(sub: CycleLaborSubCostCenterSummary): SubCostCenterActivityHours[] {
+  const activitiesByName = new Map<string, {
+    activityName: string;
+    effectiveHours: number;
+    peopleById: Map<string, SubCostCenterPersonHours>;
+  }>();
 
   for (const activityType of sub.activityTypes) {
     for (const activity of activityType.activities) {
+      const activityName = activity.activityName || "Sin actividad";
+      const activityEntry = activitiesByName.get(activityName) ?? {
+        activityName,
+        effectiveHours: 0,
+        peopleById: new Map<string, SubCostCenterPersonHours>(),
+      };
+
+      activityEntry.effectiveHours += activity.effectiveHours;
+      activitiesByName.set(activityName, activityEntry);
+
       for (const person of activity.people) {
         const personId = person.personId;
-        const current = peopleById.get(personId);
+        const current = activityEntry.peopleById.get(personId);
         if (current) {
           current.effectiveHours += person.effectiveHours;
           current.personName = current.personName || person.personName;
         } else {
-          peopleById.set(personId, {
+          activityEntry.peopleById.set(personId, {
             personId,
             personName: person.personName,
             effectiveHours: person.effectiveHours,
@@ -264,12 +293,13 @@ function groupPeopleBySubCostCenter(sub: CycleLaborSubCostCenterSummary): SubCos
     }
   }
 
-  return Array.from(peopleById.values()).sort((left, right) => {
-    const leftLabel = left.personName || left.personId;
-    const rightLabel = right.personName || right.personId;
-    const nameCompare = leftLabel.localeCompare(rightLabel, "es-EC", { numeric: true, sensitivity: "base" });
-    return nameCompare !== 0 ? nameCompare : left.personId.localeCompare(right.personId, "es-EC", { numeric: true });
-  });
+  return Array.from(activitiesByName.values())
+    .map((activity) => ({
+      activityName: activity.activityName,
+      effectiveHours: activity.effectiveHours,
+      people: sortPersonHours(Array.from(activity.peopleById.values())),
+    }))
+    .sort((left, right) => left.activityName.localeCompare(right.activityName, "es-EC", { numeric: true, sensitivity: "base" }));
 }
 
 // ── CycleDetailRows: lazy-loaded person-level drill-down ─────────────────────
@@ -345,7 +375,7 @@ function CycleDetailRows({
             {caOpen && ca.subCostCenters.map((sub: CycleLaborSubCostCenterSummary) => {
               const subKey = `sub|${caKey}|${sub.subCostCenter}`;
               const subOpen = expanded.has(subKey);
-              const people = groupPeopleBySubCostCenter(sub);
+              const activities = groupActivitiesBySubCostCenter(sub);
               return (
                 <React.Fragment key={subKey}>
                   <tr className="cursor-pointer bg-background/30 hover:bg-muted/15" onClick={() => toggle(subKey)}>
@@ -354,7 +384,7 @@ function CycleDetailRows({
                         {subOpen ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
                         <Badge variant="outline" className="rounded px-1 py-0 text-[9px] font-normal">SUB</Badge>
                         {sub.subCostCenter}
-                        <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px] font-normal">{people.length} personas</Badge>
+                        <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px] font-normal">{activities.length} act.</Badge>
                       </span>
                     </TD>
                     <TD /><TD /><TD /><TD /><TD />
@@ -364,33 +394,57 @@ function CycleDetailRows({
                     <TD /><TD />
                   </tr>
 
-                  {subOpen && people.map((person) => (
-                    <tr key={`person|${subKey}|${person.personId}`} className="bg-background/5 hover:bg-muted/10">
-                      <TD>
-                        <button
-                          type="button"
-                          className="ml-[88px] inline-flex items-center gap-1.5 text-left text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground hover:underline underline-offset-2"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedPersonId(person.personId);
-                          }}
-                          title="Abrir ficha del personal"
-                        >
-                          <span>{person.personName || "Sin nombre"}</span>
-                          <span className="text-[10px] text-muted-foreground/45">[{person.personId}]</span>
-                        </button>
-                      </TD>
-                      <TD /><TD /><TD /><TD /><TD />
-                      <TD right className="text-[11px] text-muted-foreground/60">{fmt(hCaja(person.effectiveHours))}</TD>
-                      <TD />
-                      <TD right className="text-[11px] text-muted-foreground/60">{fmt(hCama(person.effectiveHours))}</TD>
-                      <TD /><TD />
-                    </tr>
-                  ))}
-                  {subOpen && people.length === 0 ? (
+                  {subOpen && activities.map((activity) => {
+                    const activityKey = `activity|${subKey}|${activity.activityName}`;
+                    const activityOpen = expanded.has(activityKey);
+
+                    return (
+                      <React.Fragment key={activityKey}>
+                        <tr className="cursor-pointer bg-background/15 hover:bg-muted/10" onClick={() => toggle(activityKey)}>
+                          <TD>
+                            <span className="ml-[88px] flex items-center gap-1.5 text-xs text-muted-foreground/80">
+                              {activityOpen ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
+                              {activity.activityName}
+                              <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px] font-normal">{activity.people.length} personas</Badge>
+                            </span>
+                          </TD>
+                          <TD /><TD /><TD /><TD /><TD />
+                          <TD right className="text-[11px] text-muted-foreground/70">{fmt(hCaja(activity.effectiveHours))}</TD>
+                          <TD />
+                          <TD right className="text-[11px] text-muted-foreground/70">{fmt(hCama(activity.effectiveHours))}</TD>
+                          <TD /><TD />
+                        </tr>
+
+                        {activityOpen && activity.people.map((person) => (
+                          <tr key={`person|${activityKey}|${person.personId}`} className="bg-background/5 hover:bg-muted/10">
+                            <TD>
+                              <button
+                                type="button"
+                                className="ml-[112px] inline-flex items-center gap-1.5 text-left text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground hover:underline underline-offset-2"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setSelectedPersonId(person.personId);
+                                }}
+                                title="Abrir ficha del personal"
+                              >
+                                <span>{person.personName || "Sin nombre"}</span>
+                                <span className="text-[10px] text-muted-foreground/45">[{person.personId}]</span>
+                              </button>
+                            </TD>
+                            <TD /><TD /><TD /><TD /><TD />
+                            <TD right className="text-[11px] text-muted-foreground/60">{fmt(hCaja(person.effectiveHours))}</TD>
+                            <TD />
+                            <TD right className="text-[11px] text-muted-foreground/60">{fmt(hCama(person.effectiveHours))}</TD>
+                            <TD /><TD />
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
+                  {subOpen && activities.length === 0 ? (
                     <tr className="bg-background/5">
                       <TD colSpan={11} className="pl-[88px] text-xs text-muted-foreground">
-                        No hay personal registrado para este subcentro.
+                        No hay actividades registradas para este subcentro.
                       </TD>
                     </tr>
                   ) : null}
