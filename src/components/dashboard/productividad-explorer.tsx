@@ -52,6 +52,13 @@ function buildQueryString(filters: ProductividadFilters): string {
   return params.toString();
 }
 
+// ── Month name helper ─────────────────────────────────────────────────────────
+const MONTH_NAMES: Record<string, string> = {
+  "1": "Enero", "2": "Febrero", "3": "Marzo", "4": "Abril",
+  "5": "Mayo", "6": "Junio", "7": "Julio", "8": "Agosto",
+  "9": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre",
+};
+
 // ── Formatters ────────────────────────────────────────────────────────────────
 function fmt(value: number | null, decimals = 2, suffix = ""): string {
   if (value === null) return "\u2014";
@@ -594,7 +601,22 @@ export function ProductividadExplorer({ initialData }: { initialData: Productivi
           {/* Filtros */}
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">
             <SelectField id="prod-year" label="Ano" value={filters.year} options={data.options.years} onChange={(v) => updateFilter("year", v)} />
-            <SelectField id="prod-month" label="Mes" value={filters.month} options={data.options.months} onChange={(v) => updateFilter("month", v)} />
+            {/* Mes — muestra nombre pero filtra por número */}
+            <div className="space-y-1.5">
+              <label htmlFor="prod-month" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Mes
+              </label>
+              <select
+                id="prod-month" value={filters.month}
+                onChange={(e) => updateFilter("month", e.target.value)}
+                className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="all">Todos</option>
+                {data.options.months.map((m) => (
+                  <option key={m} value={m}>{MONTH_NAMES[m] ?? m}</option>
+                ))}
+              </select>
+            </div>
             <SelectField id="prod-area" label="Area" value={filters.area} options={data.options.areas} onChange={(v) => updateFilter("area", v)} />
             <SelectField id="prod-sp-type" label="Tipo SP" value={filters.spType} options={data.options.spTypes} onChange={(v) => updateFilter("spType", v)} />
             <SelectField id="prod-variety" label="Variedad" value={filters.variety} options={data.options.varieties} onChange={(v) => updateFilter("variety", v)} />
