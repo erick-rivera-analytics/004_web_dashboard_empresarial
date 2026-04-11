@@ -1,11 +1,12 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import React, { useDeferredValue, useMemo, useState } from "react";
 import { Clock, ChevronDown, ChevronRight, LoaderCircle, RefreshCcw } from "lucide-react";
 import useSWR from "swr";
 import { toast } from "sonner";
 
 import { BlockProfileModal } from "@/components/dashboard/fenograma-block-modal";
+import { PersonHoursOverlay } from "@/components/dashboard/person-hours-overlay";
 import { useBlockProfileModal } from "@/hooks/use-block-profile-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,8 +22,6 @@ import type {
   CycleLaborHoursPayload,
   CycleLaborCostAreaSummary,
   CycleLaborSubCostCenterSummary,
-  CycleLaborActivityTypeSummary,
-  CycleLaborActivitySummary,
   CycleLaborPersonSummary,
 } from "@/lib/fenograma";
 import type {
@@ -239,6 +238,40 @@ function TD({
   );
 }
 
+type SubCostCenterPersonHours = Pick<CycleLaborPersonSummary, "personId" | "personName"> & {
+  effectiveHours: number;
+};
+
+function groupPeopleBySubCostCenter(sub: CycleLaborSubCostCenterSummary): SubCostCenterPersonHours[] {
+  const peopleById = new Map<string, SubCostCenterPersonHours>();
+
+  for (const activityType of sub.activityTypes) {
+    for (const activity of activityType.activities) {
+      for (const person of activity.people) {
+        const personId = person.personId;
+        const current = peopleById.get(personId);
+        if (current) {
+          current.effectiveHours += person.effectiveHours;
+          current.personName = current.personName || person.personName;
+        } else {
+          peopleById.set(personId, {
+            personId,
+            personName: person.personName,
+            effectiveHours: person.effectiveHours,
+          });
+        }
+      }
+    }
+  }
+
+  return Array.from(peopleById.values()).sort((left, right) => {
+    const leftLabel = left.personName || left.personId;
+    const rightLabel = right.personName || right.personId;
+    const nameCompare = leftLabel.localeCompare(rightLabel, "es-EC", { numeric: true, sensitivity: "base" });
+    return nameCompare !== 0 ? nameCompare : left.personId.localeCompare(right.personId, "es-EC", { numeric: true });
+  });
+}
+
 // ── CycleDetailRows: lazy-loaded person-level drill-down ─────────────────────
 function CycleDetailRows({
   cycleKey, cajas, camas30,
@@ -252,10 +285,15 @@ function CycleDetailRows({
   );
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   function toggle(key: string) {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
       return next;
     });
   }
@@ -288,8 +326,8 @@ function CycleDetailRows({
         const caKey = `ca|${cycleKey}|${ca.costArea}`;
         const caOpen = expanded.has(caKey);
         return (
-          <>
-            <tr key={caKey} className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggle(caKey)}>
+          <React.Fragment key={caKey}>
+            <tr className="cursor-pointer bg-muted/20 hover:bg-muted/30" onClick={() => toggle(caKey)}>
               <TD>
                 <span className="ml-10 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {caOpen ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
@@ -307,15 +345,16 @@ function CycleDetailRows({
             {caOpen && ca.subCostCenters.map((sub: CycleLaborSubCostCenterSummary) => {
               const subKey = `sub|${caKey}|${sub.subCostCenter}`;
               const subOpen = expanded.has(subKey);
+              const people = groupPeopleBySubCostCenter(sub);
               return (
-                <>
-                  <tr key={subKey} className="cursor-pointer bg-background/30 hover:bg-muted/15" onClick={() => toggle(subKey)}>
+                <React.Fragment key={subKey}>
+                  <tr className="cursor-pointer bg-background/30 hover:bg-muted/15" onClick={() => toggle(subKey)}>
                     <TD>
                       <span className="ml-16 flex items-center gap-1.5 text-xs text-muted-foreground">
                         {subOpen ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
                         <Badge variant="outline" className="rounded px-1 py-0 text-[9px] font-normal">SUB</Badge>
                         {sub.subCostCenter}
-                        <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px] font-normal">{sub.activityTypes.length} tipos</Badge>
+                        <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px] font-normal">{people.length} personas</Badge>
                       </span>
                     </TD>
                     <TD /><TD /><TD /><TD /><TD />
@@ -325,85 +364,51 @@ function CycleDetailRows({
                     <TD /><TD />
                   </tr>
 
-                  {subOpen && sub.activityTypes.map((at: CycleLaborActivityTypeSummary) => {
-                    const atKey = `at|${subKey}|${at.activityType}`;
-                    const atOpen = expanded.has(atKey);
-                    return (
-                      <>
-                        <tr key={atKey} className="cursor-pointer bg-background/20 hover:bg-muted/10" onClick={() => toggle(atKey)}>
-                          <TD>
-                            <span className="ml-[88px] flex items-center gap-1.5 text-xs text-muted-foreground/80">
-                              {atOpen ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
-                              {at.activityType}
-                              <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px] font-normal">{at.activities.length} act.</Badge>
-                            </span>
-                          </TD>
-                          <TD /><TD /><TD /><TD /><TD />
-                          <TD right className="text-[11px] text-muted-foreground/70">{fmt(hCaja(at.effectiveHours))}</TD>
-                          <TD />
-                          <TD right className="text-[11px] text-muted-foreground/70">{fmt(hCama(at.effectiveHours))}</TD>
-                          <TD /><TD />
-                        </tr>
-
-                        {atOpen && at.activities.map((act: CycleLaborActivitySummary) => {
-                          const actKey = `act|${atKey}|${act.activityId}`;
-                          const actOpen = expanded.has(actKey);
-                          return (
-                            <>
-                              <tr key={actKey} className={`bg-background/10 ${act.people.length > 0 ? "cursor-pointer hover:bg-muted/10" : ""}`} onClick={act.people.length > 0 ? () => toggle(actKey) : undefined}>
-                                <TD>
-                                  <span className="ml-[112px] flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
-                                    {act.people.length > 0 && (actOpen
-                                      ? <ChevronDown className="size-2.5 shrink-0" />
-                                      : <ChevronRight className="size-2.5 shrink-0" />)}
-                                    {act.activityName}
-                                  </span>
-                                </TD>
-                                <TD className="text-[10px] text-muted-foreground/60">{act.unitOfMeasure}</TD>
-                                <TD right className="text-[11px] text-muted-foreground/60">{fmt(act.unitsProduced, 1)}</TD>
-                                <TD right className="text-[11px] text-muted-foreground/60">{fmt(act.actualHours, 1)}</TD>
-                                <TD right className="text-[11px] text-muted-foreground/60">{fmt(act.effectiveHours, 1)}</TD>
-                                <TD />
-                                <TD right className="text-[11px] text-muted-foreground/70">{fmt(hCaja(act.effectiveHours))}</TD>
-                                <TD />
-                                <TD right className="text-[11px] text-muted-foreground/70">{fmt(hCama(act.effectiveHours))}</TD>
-                                <TD right className="text-[11px] text-muted-foreground/60">{fmt(act.productivity, 2)}</TD>
-                                <TD right className="text-[11px] text-muted-foreground/60">{fmtPct(act.rendimientoPct)}</TD>
-                              </tr>
-
-                              {/* Person rows */}
-                              {actOpen && act.people.map((p: CycleLaborPersonSummary) => (
-                                <tr key={`p|${actKey}|${p.personId}`} className="bg-background/5">
-                                  <TD>
-                                    <span className="ml-[136px] text-[11px] text-muted-foreground/60">
-                                      {p.personName || "Sin nombre"}{" "}
-                                      <span className="text-[10px] text-muted-foreground/40">[{p.personId}]</span>
-                                    </span>
-                                  </TD>
-                                  <TD className="text-[10px] text-muted-foreground/50">{p.unitOfMeasure}</TD>
-                                  <TD right className="text-[11px] text-muted-foreground/50">{fmt(p.unitsProduced, 1)}</TD>
-                                  <TD right className="text-[11px] text-muted-foreground/50">{fmt(p.actualHours, 2)}</TD>
-                                  <TD right className="text-[11px] text-muted-foreground/50">{fmt(p.effectiveHours, 2)}</TD>
-                                  <TD />
-                                  <TD />
-                                  <TD />
-                                  <TD />
-                                  <TD right className="text-[11px] text-muted-foreground/50">{fmt(p.productivity, 2)}</TD>
-                                  <TD right className="text-[11px] text-muted-foreground/50">{fmtPct(p.rendimientoPct)}</TD>
-                                </tr>
-                              ))}
-                            </>
-                          );
-                        })}
-                      </>
-                    );
-                  })}
-                </>
+                  {subOpen && people.map((person) => (
+                    <tr key={`person|${subKey}|${person.personId}`} className="bg-background/5 hover:bg-muted/10">
+                      <TD>
+                        <button
+                          type="button"
+                          className="ml-[88px] inline-flex items-center gap-1.5 text-left text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground hover:underline underline-offset-2"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedPersonId(person.personId);
+                          }}
+                          title="Abrir ficha del personal"
+                        >
+                          <span>{person.personName || "Sin nombre"}</span>
+                          <span className="text-[10px] text-muted-foreground/45">[{person.personId}]</span>
+                        </button>
+                      </TD>
+                      <TD /><TD /><TD /><TD /><TD />
+                      <TD right className="text-[11px] text-muted-foreground/60">{fmt(hCaja(person.effectiveHours))}</TD>
+                      <TD />
+                      <TD right className="text-[11px] text-muted-foreground/60">{fmt(hCama(person.effectiveHours))}</TD>
+                      <TD /><TD />
+                    </tr>
+                  ))}
+                  {subOpen && people.length === 0 ? (
+                    <tr className="bg-background/5">
+                      <TD colSpan={11} className="pl-[88px] text-xs text-muted-foreground">
+                        No hay personal registrado para este subcentro.
+                      </TD>
+                    </tr>
+                  ) : null}
+                </React.Fragment>
               );
             })}
-          </>
+          </React.Fragment>
         );
       })}
+      {selectedPersonId ? (
+        <PersonHoursOverlay
+          key={`person-hours-${cycleKey}-${selectedPersonId}`}
+          cycleKey={cycleKey}
+          personId={selectedPersonId}
+          camas30={camas30}
+          onClose={() => setSelectedPersonId(null)}
+        />
+      ) : null}
     </>
   );
 }
@@ -424,7 +429,11 @@ function ProductividadTable({
   function toggleYear(year: string) {
     setExpandedYears((prev) => {
       const next = new Set(prev);
-      next.has(year) ? next.delete(year) : next.add(year);
+      if (next.has(year)) {
+        next.delete(year);
+      } else {
+        next.add(year);
+      }
       return next;
     });
   }
@@ -432,7 +441,11 @@ function ProductividadTable({
   function toggleCycle(cycleKey: string) {
     setExpandedCycles((prev) => {
       const next = new Set(prev);
-      next.has(cycleKey) ? next.delete(cycleKey) : next.add(cycleKey);
+      if (next.has(cycleKey)) {
+        next.delete(cycleKey);
+      } else {
+        next.add(cycleKey);
+      }
       return next;
     });
   }
@@ -470,9 +483,9 @@ function ProductividadTable({
             const yearHoraCaja = yearCajas > 0 ? yg.totalEffectiveHours / yearCajas : null;
 
             return (
-              <>
+              <React.Fragment key={`year-${yg.year}`}>
                 {/* ── Year row ── */}
-                <tr key={`year-${yg.year}`} className="cursor-pointer bg-muted/40 hover:bg-muted/60" onClick={() => toggleYear(yg.year)}>
+                <tr className="cursor-pointer bg-muted/40 hover:bg-muted/60" onClick={() => toggleYear(yg.year)}>
                   <TD className="font-semibold">
                     <div className="flex items-center gap-2">
                       {yearOpen ? <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />}
@@ -489,9 +502,9 @@ function ProductividadTable({
                   const cycleOpen = expandedCycles.has(cycle.cycleKey);
 
                   return (
-                    <>
+                    <React.Fragment key={`cycle-${cycle.cycleKey}`}>
                       {/* ── Cycle row ── */}
-                      <tr key={`cycle-${cycle.cycleKey}`} className="cursor-pointer bg-background/60 hover:bg-primary/5 transition-colors" onClick={(e) => { e.stopPropagation(); toggleCycle(cycle.cycleKey); }}>
+                      <tr className="cursor-pointer bg-background/60 hover:bg-primary/5 transition-colors" onClick={(e) => { e.stopPropagation(); toggleCycle(cycle.cycleKey); }}>
                         <TD>
                           <div className="flex items-center gap-2">
                             <span className="ml-4 flex items-center gap-1.5">
@@ -523,10 +536,10 @@ function ProductividadTable({
                           camas30={cycle.camas30}
                         />
                       )}
-                    </>
+                    </React.Fragment>
                   );
                 })}
-              </>
+              </React.Fragment>
             );
           })}
         </tbody>
