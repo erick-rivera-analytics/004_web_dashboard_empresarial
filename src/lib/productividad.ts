@@ -188,16 +188,16 @@ export async function getProductividadDashboardData(
           sp_date,
           harvest_start_date,
           harvest_end_date,
-          coalesce(bed_area, 0)            as bed_area,
-          coalesce(pct_mortality, 0)       as pct_mortality
+          coalesce(bed_area, 0)            as bed_area
         from ${CYCLE_PROFILE_SOURCE}
         order by cycle_key, valid_from desc nulls last
       ),
-      -- plantas actuales desde kardex (final_plants_count = plants_current)
+      -- plantas actuales y mortalidad desde kardex
       kardex as (
         select distinct on (cycle_key)
           cycle_key,
-          coalesce(final_plants_count, 0) as plants_current
+          coalesce(final_plants_count, 0) as plants_current,
+          pct_mortality
         from ${KARDEX_SOURCE}
         order by cycle_key, valid_from desc nulls last
       ),
@@ -256,7 +256,7 @@ export async function getProductividadDashboardData(
         ha.effective_hours,
         ha.units_produced,
         cp.bed_area,
-        cp.pct_mortality,
+        k.pct_mortality,
         coalesce(gw.green_weight_kg, 0) as green_weight_kg,
         coalesce(f.total_stems, 0)      as total_stems,
         coalesce(k.plants_current, 0)   as plants_current,
