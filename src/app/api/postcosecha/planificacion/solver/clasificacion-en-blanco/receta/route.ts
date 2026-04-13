@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   try {
@@ -35,3 +35,4 @@ export async function POST(request: NextRequest) {
     return handleApiError(error, "No se pudo construir la receta del SKU.");
   }
 }
+

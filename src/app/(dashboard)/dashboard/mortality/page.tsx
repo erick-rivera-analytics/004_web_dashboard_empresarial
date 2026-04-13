@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { requirePageAccess } from "@/lib/api-auth";
 import { defaultMortalityFilters, getMortalityDashboardData } from "@/lib/mortality";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ async function loadMortalityPageData() {
 }
 
 export default async function MortalityPage() {
+  await requirePageAccess("/dashboard/mortality");
   const { data, error } = await loadMortalityPageData();
 
   if (!data) {

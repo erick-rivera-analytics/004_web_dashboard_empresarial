@@ -1,8 +1,10 @@
 import { CalendarClock } from "lucide-react";
 
 import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
+import { requirePageAccess } from "@/lib/api-auth";
 
-export default function PoscosechaProgramacionesPage() {
+export default async function PoscosechaProgramacionesPage() {
+  await requirePageAccess("/dashboard/postcosecha/planificacion/programaciones");
   return (
     <ModulePlaceholder
       badge="Gestion / Poscosecha / Planificacion"

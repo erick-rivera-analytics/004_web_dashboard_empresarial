@@ -1,5 +1,6 @@
 import { getProgramaciones } from "@/lib/programaciones";
 import { ProgramacionesExplorer } from "@/components/dashboard/programaciones-explorer";
+import { requirePageAccess } from "@/lib/api-auth";
 
 /**
  * /dashboard/programaciones
@@ -8,6 +9,7 @@ import { ProgramacionesExplorer } from "@/components/dashboard/programaciones-ex
  * explorador. El explorador usa SWR para re-fetch al navegar entre meses.
  */
 export default async function ProgramacionesPage() {
+  await requirePageAccess("/dashboard/programaciones");
   const today   = new Date();
   const year    = today.getFullYear();
   const month   = today.getMonth();

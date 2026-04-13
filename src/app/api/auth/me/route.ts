@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getCurrentUserAccess } from "@/lib/api-auth";
 
 /**
  * GET /api/auth/me
@@ -8,9 +8,9 @@ import { getSession } from "@/lib/auth";
  */
 export async function GET() {
   try {
-    const username = await getSession();
+    const access = await getCurrentUserAccess();
 
-    if (!username) {
+    if (!access) {
       return NextResponse.json(
         { error: "Not authenticated" },
         { status: 401 }
@@ -19,7 +19,12 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      username,
+      userId: access.userId,
+      username: access.username,
+      roleCode: access.roleCode,
+      isSuperadmin: access.isSuperadmin,
+      allowedResources: access.allowedResources,
+      permissionOverrides: access.permissionOverrides,
       authenticatedAt: new Date().toISOString(),
     });
   } catch (error) {

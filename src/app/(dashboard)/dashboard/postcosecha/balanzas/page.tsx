@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { requirePageAccess } from "@/lib/api-auth";
 import {
   createEmptyBalanzasDashboardData,
   defaultBalanzasFilters,
@@ -34,6 +35,7 @@ async function loadBalanzasPageData() {
 }
 
 export default async function BalanzasPage() {
+  await requirePageAccess("/dashboard/postcosecha/balanzas");
   const { data, error } = await loadBalanzasPageData();
 
   if (!data) {

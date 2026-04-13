@@ -1,6 +1,9 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+
+import { getBaseAllowedResources } from "@/lib/access-control";
+import { getUserByUsername, type User } from "@/lib/users";
 import { query } from "./db";
 
 const SECRET = process.env.SESSION_SECRET ?? "wh-dashboard-secret-key-2026";
@@ -94,6 +97,29 @@ export async function getSession(): Promise<string | null> {
   const token = jar.get(COOKIE_NAME)?.value;
   if (!token) return null;
   return verifyToken(token);
+}
+
+export async function getSessionUser(): Promise<User | null> {
+  const username = await getSession();
+  if (!username) return null;
+
+  const user = await getUserByUsername(username);
+  if (user) return user;
+
+  if (hasEnvAdminCredentials() && username === process.env.ADMIN_USERNAME) {
+    return {
+      id: 0,
+      username,
+      isActive: true,
+      roleCode: "superadmin",
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+      allowedResources: getBaseAllowedResources("superadmin"),
+      permissionOverrides: [],
+    };
+  }
+
+  return null;
 }
 
 /** Cookie name export for middleware (which can't use next/headers). */

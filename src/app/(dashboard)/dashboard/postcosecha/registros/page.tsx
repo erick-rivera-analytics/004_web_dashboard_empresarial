@@ -1,8 +1,10 @@
 import { ClipboardList } from "lucide-react";
 
 import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
+import { requirePageAccess } from "@/lib/api-auth";
 
-export default function PoscosechaRegistrosPage() {
+export default async function PoscosechaRegistrosPage() {
+  await requirePageAccess("/dashboard/postcosecha/registros");
   return (
     <ModulePlaceholder
       badge="Gestion / Poscosecha / Registros"

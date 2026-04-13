@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { requirePageAccess } from "@/lib/api-auth";
 import { defaultFenogramaFilters, getFenogramaDashboardData } from "@/lib/fenograma";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ async function loadFenogramaPageData() {
 }
 
 export default async function FenogramaPage() {
+  await requirePageAccess("/dashboard/fenograma");
   const { data, error } = await loadFenogramaPageData();
 
   if (!data) {

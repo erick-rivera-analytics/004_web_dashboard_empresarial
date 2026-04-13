@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { requirePageAccess } from "@/lib/api-auth";
 import { getClasificacionEnBlancoBootData } from "@/lib/postcosecha-clasificacion-en-blanco";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ async function loadPageData() {
 }
 
 export default async function ClasificacionEnBlancoPage() {
+  await requirePageAccess("/dashboard/postcosecha/planificacion/solver/clasificacion-en-blanco");
   const { data, error } = await loadPageData();
 
   if (!data) {

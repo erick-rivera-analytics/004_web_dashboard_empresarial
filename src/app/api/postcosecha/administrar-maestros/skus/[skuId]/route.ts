@@ -15,7 +15,7 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ skuId: string }> },
 ) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   try {
@@ -40,3 +40,4 @@ export async function PATCH(
     return handleApiError(error, "No se pudo actualizar el SKU de postcosecha.");
   }
 }
+

@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { requirePageAccess } from "@/lib/api-auth";
 import { defaultProductividadFilters, getProductividadDashboardData } from "@/lib/productividad";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ async function loadProductividadPageData() {
 }
 
 export default async function ProductividadPage() {
+  await requirePageAccess("/dashboard/productividad");
   const { data, error } = await loadProductividadPageData();
 
   if (!data) {

@@ -4,13 +4,23 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { DashboardScaleToggle } from "@/components/dashboard-scale-toggle";
-import { getPageContext, isPathActive, mobileNavigation } from "@/config/dashboard";
+import {
+  filterMobileNavigationByAccess,
+  getPageContext,
+  isPathActive,
+  mobileNavigation,
+} from "@/config/dashboard";
 import { ModeToggle } from "@/components/mode-toggle";
+import { useCurrentUserAccess } from "@/hooks/use-current-user-access";
 import { cn } from "@/lib/utils";
 
 export function SiteHeader() {
   const pathname = usePathname();
   const page = getPageContext(pathname);
+  const { data: access } = useCurrentUserAccess();
+  const visibleMobileNavigation = access
+    ? filterMobileNavigationByAccess(mobileNavigation, access.allowedResources, access.isSuperadmin)
+    : [];
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/90 backdrop-blur-xl">
@@ -29,7 +39,7 @@ export function SiteHeader() {
         </div>
 
         <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1 lg:hidden">
-          {mobileNavigation.map((item) => {
+          {visibleMobileNavigation.map((item) => {
             const Icon = item.icon;
             const active = isPathActive(pathname, item.href);
 

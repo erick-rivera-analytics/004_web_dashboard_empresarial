@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 /** Endpoint temporal de diagnóstico — borrar después de confirmar datos */
 export async function GET(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const results: Record<string, unknown> = {};
@@ -82,3 +82,4 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(results, { status: 200 });
 }
+

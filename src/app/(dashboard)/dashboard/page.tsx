@@ -5,15 +5,19 @@ import {
   Settings2,
 } from "lucide-react";
 
-import { dashboardViews } from "@/config/dashboard";
-import { Badge } from "@/components/ui/badge";
+import { filterDashboardViewsByAccess, dashboardViews } from "@/config/dashboard";
+import { getCurrentUserAccess } from "@/lib/api-auth";
 import { cn } from "@/lib/utils";
 
-export default function DashboardPage() {
-  const indicadorViews = dashboardViews.filter(
+export default async function DashboardPage() {
+  const access = await getCurrentUserAccess();
+  const visibleViews = access
+    ? filterDashboardViewsByAccess(dashboardViews, access.allowedResources, access.isSuperadmin)
+    : [];
+  const indicadorViews = visibleViews.filter(
     (view) => view.home !== false && view.homeSection !== "gestion",
   );
-  const gestionViews = dashboardViews.filter(
+  const gestionViews = visibleViews.filter(
     (view) => view.homeSection === "gestion",
   );
 

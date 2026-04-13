@@ -1,8 +1,10 @@
 import { CalendarRange } from "lucide-react";
 
 import { ModulePlaceholder } from "@/components/dashboard/module-placeholder";
+import { requirePageAccess } from "@/lib/api-auth";
 
-export default function PoscosechaPlanDeTrabajoPage() {
+export default async function PoscosechaPlanDeTrabajoPage() {
+  await requirePageAccess("/dashboard/postcosecha/planificacion/plan-de-trabajo");
   return (
     <ModulePlaceholder
       badge="Gestion / Poscosecha / Planificacion"

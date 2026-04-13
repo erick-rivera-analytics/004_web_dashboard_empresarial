@@ -7,7 +7,7 @@ import { getMortalityDashboardData, normalizeMortalityFilters } from "@/lib/mort
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   try {
@@ -29,3 +29,4 @@ export async function GET(request: NextRequest) {
     return handleApiError(error, "No se pudo cargar el dashboard de mortandades.");
   }
 }
+

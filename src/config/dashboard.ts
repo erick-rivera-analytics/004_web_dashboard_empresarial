@@ -9,7 +9,10 @@ import {
   DatabaseZap,
   GitCompareArrows,
   Map,
+  PieChart,
   Scale,
+  TrendingDown,
+  UserCircle2,
 } from "lucide-react";
 
 type DashboardView = {
@@ -19,7 +22,7 @@ type DashboardView = {
   summary: string;
   href: string;
   icon: LucideIcon;
-  category: "campo" | "postcosecha";
+  category: "campo" | "postcosecha" | "talento-humano";
   homeSection?: "indicadores" | "gestion";
   home?: boolean;
   mobile?: boolean;
@@ -93,6 +96,39 @@ export const dashboardViews: DashboardView[] = [
     category: "postcosecha",
   },
   {
+    slug: "talento-composicion-laboral",
+    title: "Composicion Laboral",
+    eyebrow: "Dashboard / Indicadores / Talento Humano",
+    summary: "Distribucion del personal activo por area, cargo, empresa y clasificacion.",
+    href: "/dashboard/talento-humano/composicion-laboral",
+    icon: PieChart,
+    category: "talento-humano",
+    home: false,
+    mobile: false,
+  },
+  {
+    slug: "talento-demografia-personal",
+    title: "Demografia Personal",
+    eyebrow: "Dashboard / Indicadores / Talento Humano",
+    summary: "Distribucion demografica del personal activo por genero, estado civil, ciudad y contrato.",
+    href: "/dashboard/talento-humano/demografia-personal",
+    icon: UserCircle2,
+    category: "talento-humano",
+    home: false,
+    mobile: false,
+  },
+  {
+    slug: "talento-rotacion-laboral",
+    title: "Rotacion Laboral",
+    eyebrow: "Dashboard / Indicadores / Talento Humano",
+    summary: "Salidas del personal y tasa de rotacion por semana desde 2024.",
+    href: "/dashboard/talento-humano/rotacion-laboral",
+    icon: TrendingDown,
+    category: "talento-humano",
+    home: false,
+    mobile: false,
+  },
+  {
     slug: "postcosecha-registros",
     title: "Registros",
     eyebrow: "Gestion / Poscosecha / Registros",
@@ -156,6 +192,22 @@ export const mobileNavigation = dashboardViews
     href: view.href,
     icon: view.icon,
   }));
+
+export function filterDashboardViewsByAccess(
+  views: DashboardView[],
+  allowedResources: string[],
+  isSuperadmin: boolean,
+) {
+  return views.filter((view) => isSuperadmin || allowedResources.includes(view.href));
+}
+
+export function filterMobileNavigationByAccess(
+  items: typeof mobileNavigation,
+  allowedResources: string[],
+  isSuperadmin: boolean,
+) {
+  return items.filter((item) => isSuperadmin || allowedResources.includes(item.href));
+}
 
 export function isPathActive(pathname: string, href: string) {
   return pathname === href;

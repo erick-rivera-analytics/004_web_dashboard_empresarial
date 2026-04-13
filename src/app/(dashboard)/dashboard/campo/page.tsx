@@ -1,5 +1,6 @@
 import { CampoExplorer } from "@/components/dashboard/campo-explorer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { requirePageAccess } from "@/lib/api-auth";
 import { getCampoDashboardData } from "@/lib/campo";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ async function loadCampoPageData() {
 }
 
 export default async function CampoPage() {
+  await requirePageAccess("/dashboard/campo");
   const { data, error } = await loadCampoPageData();
 
   if (!data) {

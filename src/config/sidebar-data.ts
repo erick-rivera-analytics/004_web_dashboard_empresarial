@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
-  BarChart3,
   BookOpen,
   Building2,
   CalendarClock,
@@ -18,19 +17,19 @@ import {
   FileText,
   Gauge,
   GitCompareArrows,
-  HelpCircle,
   Home,
   Lock,
   Map,
   PackageCheck,
+  PieChart,
   Scale,
   Settings,
-  Settings2,
-  Shield,
   Sprout,
   Target,
+  TrendingDown,
   TrendingUp,
   UserCog,
+  UserCircle2,
   Users,
 } from "lucide-react";
 
@@ -38,6 +37,7 @@ import {
 export type NavItem = {
   label: string;
   href?: string;
+  resourceKey?: string;
   icon?: LucideIcon;
   comingSoon?: boolean;
   items?: NavItem[];
@@ -84,7 +84,15 @@ export const sidebarGroups: NavGroup[] = [
             ],
           },
           { label: "Produccion", icon: Factory, comingSoon: true },
-          { label: "Talento Humano", icon: Users, comingSoon: true },
+          {
+            label: "Talento Humano",
+            icon: Users,
+            items: [
+              { label: "Composicion Laboral", href: "/dashboard/talento-humano/composicion-laboral", icon: PieChart },
+              { label: "Demografia Personal", href: "/dashboard/talento-humano/demografia-personal", icon: UserCircle2 },
+              { label: "Rotacion Laboral", href: "/dashboard/talento-humano/rotacion-laboral", icon: TrendingDown },
+            ],
+          },
           { label: "Calidad", icon: CheckSquare, comingSoon: true },
           { label: "Finanzas", icon: DollarSign, comingSoon: true },
         ],
@@ -225,4 +233,41 @@ export function getInitialOpenSections(groups: NavGroup[], pathname: string): Se
   }
 
   return open;
+}
+
+export function filterSidebarGroupsByAccess(
+  groups: NavGroup[],
+  allowedResources: string[],
+  isSuperadmin: boolean,
+): NavGroup[] {
+  function filterItems(items: NavItem[]): NavItem[] {
+    return items
+      .map((item) => {
+        if (item.items?.length) {
+          const filteredChildren = filterItems(item.items);
+          if (!filteredChildren.length) return null;
+          return { ...item, items: filteredChildren };
+        }
+
+        if (item.comingSoon || !item.href) {
+          return item;
+        }
+
+        if (item.href === "/dashboard") {
+          return item;
+        }
+
+        const resourceKey = item.resourceKey ?? item.href;
+        if (isSuperadmin || allowedResources.includes(resourceKey)) {
+          return item;
+        }
+
+        return null;
+      })
+      .filter((item): item is NavItem => item !== null);
+  }
+
+  return groups
+    .map((group) => ({ ...group, items: filterItems(group.items) }))
+    .filter((group) => group.items.length > 0);
 }

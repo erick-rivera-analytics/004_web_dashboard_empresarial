@@ -1,5 +1,6 @@
 import { ComparisonExplorer } from "@/components/dashboard/comparison-explorer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { requirePageAccess } from "@/lib/api-auth";
 import { getComparisonDashboardData } from "@/lib/comparacion";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ async function loadComparisonPageData() {
 }
 
 export default async function ComparacionPage() {
+  await requirePageAccess("/dashboard/comparacion");
   const { data, error } = await loadComparisonPageData();
 
   if (!data) {
