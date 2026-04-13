@@ -73,11 +73,11 @@ export function DashboardScaleToggle() {
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-full border border-slate-700/50 bg-slate-950/80 p-2 backdrop-blur-sm shadow-lg shadow-slate-950/40">
+    <div className="flex items-center gap-1 rounded-full border border-border bg-card p-2 backdrop-blur-sm shadow-lg shadow-black/20">
       <Button
         variant="ghost"
         size="icon"
-        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 transition-all active:scale-95"
+        className="size-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all active:scale-95"
         onClick={() => persistScale(1)}
         title="Restablecer a 100%"
       >
@@ -88,7 +88,7 @@ export function DashboardScaleToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+        className="size-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
         onClick={() => updateScale(scale - STEP)}
         disabled={scale <= MIN_SCALE}
         title="Reducir (−)"
@@ -97,11 +97,11 @@ export function DashboardScaleToggle() {
         <span className="sr-only">Reducir tamaño</span>
       </Button>
 
-      <div className="bg-slate-800/40 rounded-full px-2.5 py-0.5 border border-slate-600/30">
+      <div className="bg-muted/40 rounded-full px-2.5 py-0.5 border border-border/50">
         <span
           className={cn(
             "cursor-default select-none text-center text-xs tabular-nums transition-colors",
-            Math.abs(scale - 1) < 0.01 ? "font-bold text-slate-100" : "font-medium text-slate-300",
+            Math.abs(scale - 1) < 0.01 ? "font-bold text-foreground" : "font-medium text-muted-foreground",
           )}
           title="Escala actual del dashboard"
         >
@@ -112,7 +112,7 @@ export function DashboardScaleToggle() {
       <Button
         variant="ghost"
         size="icon"
-        className="size-8 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+        className="size-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
         onClick={() => updateScale(scale + STEP)}
         disabled={scale >= MAX_SCALE}
         title="Aumentar (+)"

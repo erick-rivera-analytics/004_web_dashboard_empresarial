@@ -178,7 +178,7 @@ function SummaryPill({
           ? "border-chart-success-bold/40 bg-chart-success-bold/10"
           : tone === "warning"
             ? "border-slate-300/60 bg-slate-500/10"
-            : "border-border/70 bg-background/76",
+            : "border-border/70 bg-background/80",
       )}
     >
       <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
@@ -355,7 +355,7 @@ function NodeDetailModal({
                 <SummaryPill label="Ultimo corte" value={formatDate(visibleSummary.latestDate)} />
               </div>
 
-              <div className="grid gap-3 rounded-[24px] border border-border/70 bg-background/72 p-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 rounded-[24px] border border-border/70 bg-background/80 p-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="space-y-2 xl:col-span-2">
                   <Label htmlFor="balanzas-detail-search">Buscar dentro del nodo</Label>
                   <Input
@@ -628,7 +628,7 @@ export function BalanzasExplorer({
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="rounded-[26px] border border-border/70 bg-background/72 p-4">
+          <div className="rounded-[24px] border border-border/70 bg-background/80 p-4">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-base font-semibold">Filtros temporales globales</p>

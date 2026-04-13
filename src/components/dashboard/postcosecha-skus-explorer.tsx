@@ -185,7 +185,7 @@ function SummaryTile({
   valueClassName?: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-border/70 bg-background/72 px-4 py-4">
+    <div className="rounded-[24px] border border-border/70 bg-background/80 px-4 py-4">
       <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
       <p className={cn("mt-2 text-2xl font-semibold", valueClassName)}>{value}</p>
       <p className="mt-2 text-sm text-muted-foreground">{hint}</p>
@@ -487,7 +487,7 @@ export function PoscosechaSkusExplorer({
                       "w-full rounded-[24px] border px-4 py-4 text-left transition-colors",
                       isSelected
                         ? "border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/20"
-                        : "border-border/70 bg-background/72 hover:border-slate-300 hover:bg-background",
+                        : "border-border/70 bg-background/80 hover:border-slate-300 hover:bg-background",
                     )}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -518,7 +518,7 @@ export function PoscosechaSkusExplorer({
                   </button>
                 );
               }) : (
-                <div className="rounded-[24px] border border-dashed border-border/70 bg-background/72 px-4 py-8 text-center text-sm text-muted-foreground">
+                <div className="rounded-[24px] border border-dashed border-border/70 bg-background/80 px-4 py-8 text-center text-sm text-muted-foreground">
                   No hay SKU que coincidan con el filtro actual.
                 </div>
               )}
@@ -692,7 +692,7 @@ export function PoscosechaSkusExplorer({
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-border/70 bg-background/72 px-4 py-4">
+              <div className="rounded-[24px] border border-border/70 bg-background/80 px-4 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-sm font-medium">Preview rapido</p>

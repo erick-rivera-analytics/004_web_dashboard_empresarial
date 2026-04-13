@@ -78,7 +78,7 @@ function MetricPill({
           : "";
 
   return (
-    <div className={`rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-left ${accentClass}`}>
+    <div className={`rounded-[24px] border border-border/70 bg-background/80 px-4 py-3 text-left ${accentClass}`}>
       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground/80">{label}</p>
       <p className="mt-2 text-lg font-semibold">{value}</p>
       {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
@@ -235,17 +235,17 @@ export function MortalityExplorer({ initialData }: { initialData: MortalityDashb
               ) : curveError ? (
                 <div className="text-sm text-destructive">{curveError.message}</div>
               ) : curveData?.points.length ? (
-                <div className="rounded-[24px] border border-border/70 bg-background/72 p-4">
+                <div className="rounded-[24px] border border-border/70 bg-background/80 p-4">
                   <MortalityCurvePanel data={curveData.points} />
                 </div>
               ) : (
-                <div className="rounded-[24px] border border-border/70 bg-background/72 p-6 text-sm text-muted-foreground">
+                <div className="rounded-[24px] border border-border/70 bg-background/80 p-6 text-sm text-muted-foreground">
                   No hay datos diarios para el corte actual.
                 </div>
               )}
             </>
           ) : (
-            <div className="rounded-[24px] border border-border/70 bg-background/72 p-6 text-sm text-muted-foreground">
+            <div className="rounded-[24px] border border-border/70 bg-background/80 p-6 text-sm text-muted-foreground">
               No hay ciclos disponibles para el filtro actual.
             </div>
           )}

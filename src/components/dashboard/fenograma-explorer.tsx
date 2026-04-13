@@ -105,7 +105,7 @@ function formatDate(value: string | null) {
 
 function MetricPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-left">
+    <div className="rounded-[24px] border border-border/70 bg-background/80 px-4 py-3 text-left">
       <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
       <p className="mt-2 text-lg font-semibold">{value}</p>
     </div>
@@ -217,7 +217,7 @@ export function FenogramaExplorer({ initialData }: { initialData: FenogramaDashb
             />
             <div className="min-w-0 space-y-2">
               <p className="text-sm font-medium leading-none">Rango visible</p>
-              <div className="rounded-2xl border border-border/70 bg-background/72 px-4 py-3 text-sm text-muted-foreground">
+              <div className="rounded-[24px] border border-border/70 bg-background/80 px-4 py-3 text-sm text-muted-foreground">
                 <p>
                   {data.summary.firstWeek ?? "-"} a {data.summary.lastWeek ?? "-"}
                 </p>

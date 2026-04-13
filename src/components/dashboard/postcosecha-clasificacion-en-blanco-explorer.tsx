@@ -105,7 +105,7 @@ function SummaryTile({
           ? "border-chart-success-bold/40 bg-chart-success-bold/10"
           : tone === "warning"
             ? "border-slate-400/40 bg-slate-400/10"
-            : "border-border/70 bg-background/76",
+            : "border-border/70 bg-background/80",
       )}
     >
       <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
