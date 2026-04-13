@@ -599,7 +599,7 @@ export function DonutChart<T extends TalentoPersonRecord>({
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => [value.toLocaleString("en-US"), "Personas"]}
+                formatter={(value) => [typeof value === "number" ? value.toLocaleString("en-US") : "0", "Personas"]}
                 contentStyle={{
                   fontSize: 11,
                   borderRadius: 10,
