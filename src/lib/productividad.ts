@@ -3,7 +3,7 @@ import { cachedAsync } from "@/lib/server-cache";
 
 // ── Fuente de datos ──────────────────────────────────────────────────────────
 const PROD_HOURS_SOURCE      = "gld.mv_prod_hours_cycle_person_cur";
-const KARDEX_SOURCE          = "gld.mv_camp_kardex_cycle_plants_cur";    // plantas
+const KARDEX_SOURCE          = "gld.mv_camp_kardex_bed_plants_cur";    // plantas por bed (tiene mortandad correcta)
 const FENOGRAMA_SOURCE       = "gld.mv_prod_fenograma_cur";               // stems_count
 const PRODUCTIVITY_POST_SRC  = "gld.mv_prod_productivity_post_cur";      // post_weight_kg
 const PRODUCTIVITY_GREEN_SRC = "gld.mv_prod_productivity_green_cur";     // green_weight_kg → cajas
@@ -192,14 +192,14 @@ export async function getProductividadDashboardData(
         from ${CYCLE_PROFILE_SOURCE}
         order by cycle_key, valid_from desc nulls last
       ),
-      -- plantas actuales y mortalidad desde kardex
+      -- plantas actuales y mortalidad desde kardex (agregado por ciclo)
       kardex as (
-        select distinct on (cycle_key)
+        select
           cycle_key,
-          coalesce(final_plants_count, 0) as plants_current,
-          pct_mortality
+          coalesce(avg(final_plants_count), 0) as plants_current,
+          max(pct_mortality) as pct_mortality
         from ${KARDEX_SOURCE}
-        order by cycle_key, valid_from desc nulls last
+        group by cycle_key
       ),
       -- tallos totales desde fenograma
       feno as (
