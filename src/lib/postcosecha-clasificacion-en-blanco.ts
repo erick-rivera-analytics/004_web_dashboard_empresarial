@@ -142,7 +142,7 @@ function ensureSolverEngineAvailable() {
 }
 
 async function runBridge<T>(
-  command: "defaults" | "solve",
+  command: "defaults" | "solve" | "recipe",
   payload?: unknown,
 ) {
   const solverPython = ensureSolverEngineAvailable();
