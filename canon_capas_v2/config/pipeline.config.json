@@ -1,0 +1,34 @@
+{
+  "sourceDir": "Capas_v2",
+  "webpQualityDefault": 95,
+  "webpQualityMin": 92,
+  "webpQualityMax": 100,
+  "downsampleFactor": 2,
+  "projections": {
+    "source": {
+      "name": "WGS84 / UTM Zone 17S",
+      "proj4": "+proj=utm +zone=17 +south +datum=WGS84 +units=m +no_defs"
+    },
+    "target": {
+      "name": "WGS84",
+      "proj4": "+proj=longlat +datum=WGS84 +no_defs"
+    }
+  },
+  "layers": [
+    {
+      "key": "ndvi",
+      "source": "NDVI.tif",
+      "output": "ndvi.webp"
+    },
+    {
+      "key": "ndre",
+      "source": "NDRE.tif",
+      "output": "ndre.webp"
+    },
+    {
+      "key": "lci",
+      "source": "LCI.tif",
+      "output": "lci.webp"
+    }
+  ]
+}

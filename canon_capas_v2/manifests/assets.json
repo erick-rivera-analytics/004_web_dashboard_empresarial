@@ -1,0 +1,246 @@
+{
+  "generatedAt": "2026-04-13T21:04:45.043Z",
+  "sourceDir": "Capas_v2",
+  "files": [
+    {
+      "path": "canon_capas_v2/processed/rasters/bounds.json",
+      "sha256": "1a7096c8ded56189dabffb15c176ac0c514997dcb4893b62cd6a915fb9bbb17a",
+      "size": 437,
+      "mtime": "2026-04-13T21:04:42.006Z"
+    },
+    {
+      "path": "canon_capas_v2/processed/rasters/lci.webp",
+      "sha256": "f49aefac743f76177704a6d63f624c76582531e8fa47996ab830b7b13fc114eb",
+      "size": 11865256,
+      "mtime": "2026-04-13T21:04:41.997Z"
+    },
+    {
+      "path": "canon_capas_v2/processed/rasters/ndre.webp",
+      "sha256": "b1e38cbe8698e55208259272ebde788b3061f9e711b60128cc3c6fde5c2f1ec5",
+      "size": 11825940,
+      "mtime": "2026-04-13T21:04:19.050Z"
+    },
+    {
+      "path": "canon_capas_v2/processed/rasters/ndvi.webp",
+      "sha256": "10ecb63270b7242f84483bdeccb979f9c1bd0cd990c944ce3e300edc3932dfa1",
+      "size": 11844854,
+      "mtime": "2026-04-13T21:03:49.743Z"
+    },
+    {
+      "path": "canon_capas_v2/processed/vectors/campo-geo.json",
+      "sha256": "315f61769a9e07559422896d31197f3fda1b60cb863c581a7eb5c67e62ce5d9e",
+      "size": 1052171,
+      "mtime": "2026-04-13T21:04:44.219Z"
+    },
+    {
+      "path": "canon_capas_v2/processed/vectors/sjp-geo.json",
+      "sha256": "5a9ce4a343add6c9d5c8ec6b1acd53070b259de5b95ccaf70972978e310469f0",
+      "size": 287232,
+      "mtime": "2026-04-13T21:04:44.335Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/LCI.ovr",
+      "sha256": "93e60b0e60dd1140cf354395dbf1a37527aad5844bcc47e8120ee578ef66b87a",
+      "size": 123057172,
+      "mtime": "2026-03-21T12:52:04.384Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/LCI.tfw",
+      "sha256": "d971fb4ebeff3f2a6dd446ae3e03fe31a9d3043faf60caad45339b8b78dfddbb",
+      "size": 90,
+      "mtime": "2026-03-21T12:52:01.219Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/LCI.tif",
+      "sha256": "f11ca078bfd08bdd2857e0b5ca2e97edcecb8d3086b058a84d1a6579bb0faa1f",
+      "size": 363239795,
+      "mtime": "2026-03-21T12:52:04.404Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/LCI.xml",
+      "sha256": "2c9d74fe4efac2936065133ed08932844b10ae90c12b4682f233cdd2939b4e0a",
+      "size": 955,
+      "mtime": "2026-03-21T12:52:03.989Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/NDRE.ovr",
+      "sha256": "135eebb6f3614a72fc5a68285e339cc904f11295d6b92364870efab172ac2898",
+      "size": 123057172,
+      "mtime": "2026-03-21T12:51:46.429Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/NDRE.tfw",
+      "sha256": "d971fb4ebeff3f2a6dd446ae3e03fe31a9d3043faf60caad45339b8b78dfddbb",
+      "size": 90,
+      "mtime": "2026-03-21T12:51:43.199Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/NDRE.tif",
+      "sha256": "6f6d10e1392ebe6bb7a17aa86099ecb87b94aac022710a4184c09d03a7fb8200",
+      "size": 363239797,
+      "mtime": "2026-03-21T12:51:46.450Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/NDRE.xml",
+      "sha256": "5535dad977f7fc9d7c2bc0542d570391d40193e36b0d7bd0b1f93e3df8f12ff1",
+      "size": 958,
+      "mtime": "2026-03-21T12:51:46.040Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/NDVI.ovr",
+      "sha256": "c05a7d9874c4411d4c25bd6b947865a83016e458c5b152bab22a06aea5653c3f",
+      "size": 123057172,
+      "mtime": "2026-03-21T12:51:33.087Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/NDVI.tfw",
+      "sha256": "d971fb4ebeff3f2a6dd446ae3e03fe31a9d3043faf60caad45339b8b78dfddbb",
+      "size": 90,
+      "mtime": "2026-03-21T12:51:29.918Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/NDVI.tif",
+      "sha256": "56a75d35b5379a8b700ed2a737974525623a9b5ec6884ec2dcc6a0705461b61d",
+      "size": 363239795,
+      "mtime": "2026-03-21T12:51:33.108Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/rasters/NDVI.xml",
+      "sha256": "699bdeccc124b5126d8575cbcbd1dc35ac91b6d5127cb7035d0a58f99e4c82c9",
+      "size": 956,
+      "mtime": "2026-03-21T12:51:32.698Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/sjp/Bloques_Camas.cpg",
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+      "size": 5,
+      "mtime": "2026-04-13T15:21:57.727Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/sjp/Bloques_Camas.dbf",
+      "sha256": "4a2a57960544ed0ae2ae04fc5a35fa5caebe2f26d1972dedf50c6a58ffb2adca",
+      "size": 155370,
+      "mtime": "2026-04-13T15:21:57.727Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/sjp/Bloques_Camas.prj",
+      "sha256": "d5c5de3bec971779a1f128faf9da32ac90902653587b053fabf52994c1c37dec",
+      "size": 409,
+      "mtime": "2026-03-25T17:57:28.515Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/sjp/Bloques_Camas.sbn",
+      "sha256": "bf656fb3521bba2791994bbd5ea6685aba32773731737b92496da41e8cb9cbe8",
+      "size": 9196,
+      "mtime": "2026-04-13T15:21:57.757Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/sjp/Bloques_Camas.sbx",
+      "sha256": "e56048c2019cb70ef6836a3fb40e6eab72afa6313b45fb3340f29018650e48fb",
+      "size": 644,
+      "mtime": "2026-04-13T15:21:57.757Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/sjp/Bloques_Camas.shp",
+      "sha256": "f50b524e2fa7616c4990b9d181c68c2678039da8f49be1a1af5957a38a8f3b76",
+      "size": 128868,
+      "mtime": "2026-04-13T15:21:57.742Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/sjp/Bloques_Camas.shp.xml",
+      "sha256": "32a2dcffe4f9c4074b3c525723e2a48fd204a5c4b7f75167db3a97afd1bc8977",
+      "size": 24132,
+      "mtime": "2026-04-13T15:21:46.727Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/sjp/Bloques_Camas.shx",
+      "sha256": "3df36ab3b9652a9632dd66cb4539e346f75f9477907cd41e6f10a6510abdabbc",
+      "size": 7668,
+      "mtime": "2026-04-13T15:21:57.742Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/vectors/Capas_Bloque.cpg",
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+      "size": 5,
+      "mtime": "2026-03-21T12:50:06.745Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/vectors/Capas_Bloque.dbf",
+      "sha256": "3db977d43014a5d9240316902b720f912198c1fa4e0b23d6af82cd65b59734dc",
+      "size": 603346,
+      "mtime": "2026-03-21T12:50:06.745Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/vectors/Capas_Bloque.prj",
+      "sha256": "d5c5de3bec971779a1f128faf9da32ac90902653587b053fabf52994c1c37dec",
+      "size": 409,
+      "mtime": "2026-03-21T12:50:06.625Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/vectors/Capas_Bloque.sbn",
+      "sha256": "7180100a1dceea6b471a43ca95baa585c353c1e9050d781f303f572f2cfeeb1d",
+      "size": 33116,
+      "mtime": "2026-03-21T12:50:06.797Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/vectors/Capas_Bloque.sbx",
+      "sha256": "fbe5e9c854695141957eba1f7653080c4a248e114cd2805e73b319237920e4b4",
+      "size": 1684,
+      "mtime": "2026-03-21T12:50:06.797Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/vectors/Capas_Bloque.shp",
+      "sha256": "9f333d4675e49239f2164f3f9bc221b14f6f08ebcb45242b61e9b8a565dc70a2",
+      "size": 466608,
+      "mtime": "2026-03-21T12:50:06.742Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/vectors/Capas_Bloque.shp.xml",
+      "sha256": "19f87d5b60b0e47ed94fa853af119d6655e7022aa0c1c5d4efa4e954a936f3dd",
+      "size": 84924,
+      "mtime": "2026-03-21T12:50:06.747Z"
+    },
+    {
+      "path": "canon_capas_v2/raw/vectors/Capas_Bloque.shx",
+      "sha256": "49e9b9763331a09b4cd5fb051e2340f6dd26bb194c94af2b8743bc7e1440a116",
+      "size": 27516,
+      "mtime": "2026-03-21T12:50:06.742Z"
+    },
+    {
+      "path": "public/data/campo-geo.json",
+      "sha256": "315f61769a9e07559422896d31197f3fda1b60cb863c581a7eb5c67e62ce5d9e",
+      "size": 1052171,
+      "mtime": "2026-04-13T21:04:44.219Z"
+    },
+    {
+      "path": "public/data/sjp-geo.json",
+      "sha256": "5a9ce4a343add6c9d5c8ec6b1acd53070b259de5b95ccaf70972978e310469f0",
+      "size": 287232,
+      "mtime": "2026-04-13T21:04:44.336Z"
+    },
+    {
+      "path": "public/rasters/bounds.json",
+      "sha256": "1a7096c8ded56189dabffb15c176ac0c514997dcb4893b62cd6a915fb9bbb17a",
+      "size": 437,
+      "mtime": "2026-04-13T21:04:42.006Z"
+    },
+    {
+      "path": "public/rasters/lci.webp",
+      "sha256": "f49aefac743f76177704a6d63f624c76582531e8fa47996ab830b7b13fc114eb",
+      "size": 11865256,
+      "mtime": "2026-04-13T21:04:41.997Z"
+    },
+    {
+      "path": "public/rasters/ndre.webp",
+      "sha256": "b1e38cbe8698e55208259272ebde788b3061f9e711b60128cc3c6fde5c2f1ec5",
+      "size": 11825940,
+      "mtime": "2026-04-13T21:04:19.053Z"
+    },
+    {
+      "path": "public/rasters/ndvi.webp",
+      "sha256": "10ecb63270b7242f84483bdeccb979f9c1bd0cd990c944ce3e300edc3932dfa1",
+      "size": 11844854,
+      "mtime": "2026-04-13T21:03:49.743Z"
+    }
+  ]
+}

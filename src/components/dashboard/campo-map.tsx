@@ -38,6 +38,7 @@ type ClickState = { latlng: L.LatLng; bloquePad: string };
 type BlockCentroid = { bloquePad: string; area: string; lat: number; lng: number };
 
 type Props = {
+  viewKey: "campo" | "sjp";
   geoData: FeatureCollection | null;
   rasterBounds: RasterBounds;
   assetsLoading: boolean;
@@ -45,9 +46,11 @@ type Props = {
   blockDataMap: Record<string, BlockDataEntry>;
   areaByBlock: Record<string, string>;
   onFicha: (bloquePad: string) => void;
-  onValves: (bloquePad: string) => void;
+  onSecondaryAction: (bloquePad: string) => void;
+  secondaryActionLabel: string;
   activeLayer: ActiveLayer;
   rasterOpacity: number;
+  showFloatingLegend?: boolean;
   className?: string;
 };
 
@@ -183,6 +186,19 @@ function getBlockStyle({
 
 function getFeatureBlock(feature: Feature | undefined) {
   return feature?.properties?.bloquePad as string | undefined;
+}
+
+function getFeatureCollectionBounds(data: FeatureCollection | null) {
+  if (!data?.features.length) {
+    return null;
+  }
+
+  try {
+    const bounds = L.geoJSON(data as GeoJsonObject).getBounds();
+    return bounds.isValid() ? bounds : null;
+  } catch {
+    return null;
+  }
 }
 
 function getRasterVisualState(zoom: number) {
@@ -456,10 +472,12 @@ function FitBounds({ data }: { data: FeatureCollection }) {
     }
 
     try {
-      const bounds = L.geoJSON(data as GeoJsonObject).getBounds();
+      const bounds = getFeatureCollectionBounds(data);
 
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [20, 20], maxZoom: 18 });
+      if (bounds?.isValid()) {
+        const minZoom = map.getBoundsZoom(bounds, false, L.point(18, 18));
+        map.setMinZoom(minZoom);
+        map.fitBounds(bounds, { padding: [18, 18], maxZoom: 18 });
         fitted.current = true;
       }
     } catch {
@@ -527,7 +545,7 @@ export function CampoRasterOverlay({
     <Pane name={paneName} style={paneStyle}>
       <ImageOverlay
         ref={overlayRef}
-        url={`/rasters/${activeLayer}.png`}
+        url={`/rasters/${activeLayer}.webp`}
         bounds={rasterImageBounds}
         opacity={clamp(rasterOpacity * visualState.opacityMultiplier, 0.35, 1)}
         interactive={false}
@@ -664,7 +682,7 @@ export function CampoRasterLegend({
       <div className="mt-3 space-y-2 text-[11px] text-muted-foreground">
         <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/70 px-3 py-2">
           <span>Fuente</span>
-          <span className="font-medium text-foreground">PNG clasificado</span>
+          <span className="font-medium text-foreground">WebP clasificado</span>
         </div>
         <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/70 px-3 py-2">
           <span>Escala numerica</span>
@@ -695,9 +713,11 @@ function getBlockEntry(blockDataMap: Record<string, BlockDataEntry>, bloquePad: 
 
 export function CampoInteractionHint({
   activeLayer,
+  mode = "campo",
   className,
 }: {
   activeLayer: ActiveLayer;
+  mode?: "campo" | "sjp";
   className?: string;
 }) {
   return (
@@ -711,16 +731,21 @@ export function CampoInteractionHint({
         {activeLayer === "none" ? "Modo operativo" : "Modo agronomico"}
       </p>
       <p className="mt-1 text-xs text-foreground">
-        Bloque {"->"} ficha o mapa de valvulas.
+        {mode === "sjp"
+          ? <>Bloque {"->"} ficha o mapa de camas.</>
+          : <>Bloque {"->"} ficha o mapa de valvulas.</>}
       </p>
       <p className="text-[11px] text-muted-foreground">
-        En submapa: valvula {"->"} ficha o mapa de camas.
+        {mode === "sjp"
+          ? <>En submapa: cama {"->"} selector de ciclo y detalle.</>
+          : <>En submapa: valvula {"->"} ficha o mapa de camas.</>}
       </p>
     </div>
   );
 }
 
 export function CampoLeafletMap({
+  viewKey,
   geoData,
   rasterBounds,
   assetsLoading,
@@ -728,9 +753,11 @@ export function CampoLeafletMap({
   blockDataMap,
   areaByBlock,
   onFicha,
-  onValves,
+  onSecondaryAction,
+  secondaryActionLabel,
   activeLayer,
   rasterOpacity,
+  showFloatingLegend = true,
   className,
 }: Props) {
   const [clickState, setClickState] = useState<ClickState | null>(null);
@@ -741,6 +768,7 @@ export function CampoLeafletMap({
     () => (geoData ? computeBlockCentroids(geoData.features, areaByBlock) : []),
     [areaByBlock, geoData],
   );
+  const navigationBounds = useMemo(() => getFeatureCollectionBounds(geoData), [geoData]);
 
   const styleFeature = useCallback(
     (feature: Feature | undefined) => {
@@ -813,6 +841,8 @@ export function CampoLeafletMap({
         zoomControl
         className="h-full w-full rounded-[26px]"
         style={{ background: "#edf4ef" }}
+        maxBounds={navigationBounds ?? undefined}
+        maxBoundsViscosity={1}
       >
         <CampoBaseTiles activeLayer={activeLayer} />
         <CampoRasterOverlay
@@ -867,7 +897,7 @@ export function CampoLeafletMap({
               </p>
               <p className="text-[11px] leading-relaxed text-slate-500 dark:text-white">
                 {activeLayer === "none"
-                  ? "Vista operativa del bloque."
+                  ? `Vista ${viewKey === "sjp" ? "SJP" : "operativa"} del bloque.`
                   : `Vista agronómica con ${RASTER_META[activeLayer].label}.`}
               </p>
               <button
@@ -884,11 +914,11 @@ export function CampoLeafletMap({
                 type="button"
                 className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                 onClick={() => {
-                  onValves(clickState.bloquePad);
+                  onSecondaryAction(clickState.bloquePad);
                   setClickState(null);
                 }}
               >
-                Mapa de válvulas
+                {secondaryActionLabel}
               </button>
             </div>
           </Popup>
@@ -897,13 +927,16 @@ export function CampoLeafletMap({
         <FitBounds data={geoData} />
       </MapContainer>
 
-      <CampoRasterLegend
-        activeLayer={activeLayer}
-        opacity={rasterOpacity}
-        className="absolute bottom-4 right-4 z-[800]"
-      />
+      {showFloatingLegend ? (
+        <CampoRasterLegend
+          activeLayer={activeLayer}
+          opacity={rasterOpacity}
+          className="absolute bottom-4 right-4 z-[800]"
+        />
+      ) : null}
       <CampoInteractionHint
         activeLayer={activeLayer}
+        mode={viewKey}
         className="absolute left-4 top-4 z-[800]"
       />
     </div>

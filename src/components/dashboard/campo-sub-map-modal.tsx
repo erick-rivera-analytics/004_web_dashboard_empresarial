@@ -171,6 +171,19 @@ function groupCentroids<K extends string>(
   );
 }
 
+function getFeatureCollectionBounds(data: FeatureCollection | null) {
+  if (!data?.features.length) {
+    return null;
+  }
+
+  try {
+    const bounds = L.geoJSON(data as GeoJsonObject).getBounds();
+    return bounds.isValid() ? bounds : null;
+  } catch {
+    return null;
+  }
+}
+
 function FitBounds({ data }: { data: FeatureCollection }) {
   const map = useMap();
   const fitted = useRef(false);
@@ -181,9 +194,9 @@ function FitBounds({ data }: { data: FeatureCollection }) {
     }
 
     try {
-      const bounds = L.geoJSON(data as GeoJsonObject).getBounds();
+      const bounds = getFeatureCollectionBounds(data);
 
-      if (bounds.isValid()) {
+      if (bounds?.isValid()) {
         map.fitBounds(bounds, { padding: [18, 18], maxZoom: 20 });
         fitted.current = true;
       }
@@ -529,9 +542,18 @@ export function CampoSubMapModal({
     const sorted = [...valveIds].sort();
     return new Map(sorted.map((id, index) => [id, VALVE_COLORS[index % VALVE_COLORS.length]]));
   }, [valveIds]);
+  const navigationBounds = useMemo(
+    () => getFeatureCollectionBounds({ type: "FeatureCollection", features }),
+    [features],
+  );
+  const valveLabel = valveId?.includes("-")
+    ? valveId.split("-").pop() ?? valveId
+    : null;
   const title = mode === "valves"
     ? `Válvulas · Bloque ${bloquePad}`
-    : `Camas · Válvula ${valveId?.split("-").pop() ?? ""} · Bloque ${bloquePad}`;
+    : valveLabel
+      ? `Camas · Válvula ${valveLabel} · Bloque ${bloquePad}`
+      : `Camas · Bloque ${bloquePad}`;
 
   return (
     <>
@@ -556,11 +578,11 @@ export function CampoSubMapModal({
               <h2 id="sub-map-title" className="mt-0.5 text-lg font-semibold">
                 {title}
               </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {mode === "valves"
-                  ? "Click en una valvula -> ficha / detalle o mapa de camas."
-                  : "Vista filtrada por la valvula seleccionada."}
-              </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {mode === "valves"
+                    ? "Click en una valvula -> ficha / detalle o mapa de camas."
+                    : "Vista filtrada para navegar camas del bloque activo."}
+                </p>
             </div>
             <div className="flex items-start gap-3">
               <CampoRasterControls
@@ -599,6 +621,8 @@ export function CampoSubMapModal({
                   zoomControl
                   className="h-full w-full rounded-[24px]"
                   style={{ background: "#edf4ef" }}
+                  maxBounds={navigationBounds ?? undefined}
+                  maxBoundsViscosity={1}
                 >
                   <CampoBaseTiles activeLayer={activeLayer} />
                   <CampoRasterOverlay
@@ -644,7 +668,7 @@ export function CampoSubMapModal({
 
           <div className="flex items-center justify-between border-t border-border/70 px-6 py-3">
             <p className="text-xs text-muted-foreground">
-              {features.length} camas · {mode === "valves" ? `${valveIds.length} válvulas` : "1 válvula"}
+              {features.length} camas · {mode === "valves" ? `${valveIds.length} válvulas` : valveLabel ? "1 válvula" : "vista directa por bloque"}
             </p>
             <Button variant="outline" size="sm" onClick={onClose}>
               Cerrar

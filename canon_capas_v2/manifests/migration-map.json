@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-04-13T21:04:47.179Z",
+  "assets": [
+    {
+      "source": "Capas_v2/NDVI.tif",
+      "staged": "canon_capas_v2/raw/rasters/NDVI.tif",
+      "processed": "canon_capas_v2/processed/rasters/ndvi.webp",
+      "published": "public/rasters/ndvi.webp"
+    },
+    {
+      "source": "Capas_v2/NDRE.tif",
+      "staged": "canon_capas_v2/raw/rasters/NDRE.tif",
+      "processed": "canon_capas_v2/processed/rasters/ndre.webp",
+      "published": "public/rasters/ndre.webp"
+    },
+    {
+      "source": "Capas_v2/LCI.tif",
+      "staged": "canon_capas_v2/raw/rasters/LCI.tif",
+      "processed": "canon_capas_v2/processed/rasters/lci.webp",
+      "published": "public/rasters/lci.webp"
+    },
+    {
+      "source": "Capas_v2/Capas_Bloque.shp",
+      "staged": "canon_capas_v2/raw/vectors/Capas_Bloque.shp",
+      "processed": "canon_capas_v2/processed/vectors/campo-geo.json",
+      "published": "public/data/campo-geo.json"
+    },
+    {
+      "source": "Capas_v2/SJP/Bloques_Camas.shp",
+      "staged": "canon_capas_v2/raw/sjp/Bloques_Camas.shp",
+      "processed": "canon_capas_v2/processed/vectors/sjp-geo.json",
+      "published": "public/data/sjp-geo.json"
+    },
+    {
+      "source": "Capas_v2/NDVI.tif + Capas_v2/NDRE.tif + Capas_v2/LCI.tif",
+      "staged": "canon_capas_v2/raw/rasters/*",
+      "processed": "canon_capas_v2/processed/rasters/bounds.json",
+      "published": "public/rasters/bounds.json"
+    }
+  ]
+}

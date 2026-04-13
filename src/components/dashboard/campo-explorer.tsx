@@ -31,12 +31,28 @@ const CampoRasterControls = dynamic(
   { ssr: false },
 );
 
+const CampoRasterLegend = dynamic(
+  () => import("@/components/dashboard/campo-map").then((module) => ({ default: module.CampoRasterLegend })),
+  { ssr: false },
+);
+
 const CampoSubMapModal = dynamic(
   () =>
     import("@/components/dashboard/campo-sub-map-modal").then((module) => ({
       default: module.CampoSubMapModal,
     })),
   { ssr: false },
+);
+
+const CampoMapInset = dynamic(
+  () =>
+    import("@/components/dashboard/campo-sjp-inset").then((module) => ({
+      default: module.CampoMapInset,
+    })),
+  {
+    ssr: false,
+    loading: () => <div className="h-[280px] w-full animate-pulse rounded-[26px] bg-muted/40 xl:min-h-[420px]" />,
+  },
 );
 
 const CampoCycleSelectorModal = dynamic(
@@ -62,11 +78,35 @@ type PendingValveNav = {
   bedId?: string;
 };
 
-type AreaLabel = {
-  name: string;
-  blockCount: number;
-  totalStems: number;
+type MapViewKey = "campo" | "sjp";
+
+type MapViewModel = {
+  key: MapViewKey;
+  title: string;
+  description: string;
+  actionLabel: string;
+  geoData: FeatureCollection | null;
+  loading: boolean;
+  error: string | null;
+  secondaryActionLabel: string;
 };
+
+async function loadGeoCollection(url: string, errorMessage: string) {
+  return fetchJson<FeatureCollection>(url, errorMessage);
+}
+
+async function loadCampoMapAssets(
+  [geoUrl, boundsUrl]: readonly [string, string],
+): Promise<CampoMapAssets> {
+  const [geoData, rasterBounds] = await Promise.all([
+    fetchJson<FeatureCollection>(geoUrl, "No se pudo cargar la geometria del mapa."),
+    fetchJson<RasterBounds>(boundsUrl, "No se pudieron cargar los limites raster.").catch(
+      () => ({} as RasterBounds),
+    ),
+  ]);
+
+  return { geoData, rasterBounds };
+}
 
 function normalizeBlockKey(value: string | null | undefined) {
   const trimmed = value?.trim() ?? "";
@@ -80,6 +120,12 @@ function normalizeBlockKey(value: string | null | undefined) {
   }
 
   return String(Number(trimmed));
+}
+
+function formatNumber(value: number) {
+  return value.toLocaleString("en-US", {
+    maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
+  });
 }
 
 function buildFeatureLookup(features: CampoMapFeature[]) {
@@ -129,52 +175,10 @@ function buildBlockLookupRecord<T>(
   return Object.fromEntries(lookup);
 }
 
-async function loadCampoMapAssets(
-  [geoUrl, boundsUrl]: readonly [string, string],
-): Promise<CampoMapAssets> {
-  const [geoData, rasterBounds] = await Promise.all([
-    fetchJson<FeatureCollection>(geoUrl, "No se pudo cargar la geometría del mapa."),
-    fetchJson<RasterBounds>(boundsUrl, "No se pudieron cargar los límites raster.").catch(
-      () => ({} as RasterBounds),
-    ),
-  ]);
-
-  return {
-    geoData,
-    rasterBounds,
-  };
-}
-
-function formatNumber(value: number) {
-  return value.toLocaleString("en-US", {
-    maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
-  });
-}
-
-function buildAreaLabels(features: CampoMapFeature[]): AreaLabel[] {
-  const grouped = new Map<string, { blockCount: number; totalStems: number }>();
-
-  for (const feature of features) {
-    const areaName = feature.row.area?.trim();
-
-    if (!areaName) {
-      continue;
-    }
-
-    const current = grouped.get(areaName) ?? { blockCount: 0, totalStems: 0 };
-    current.blockCount += 1;
-    current.totalStems += feature.row.totalStems;
-    grouped.set(areaName, current);
-  }
-
-  return Array.from(grouped.entries())
-    .map(([name, value]) => ({ name, ...value }))
-    .sort((first, second) => second.totalStems - first.totalStems);
-}
-
 export function CampoExplorer({ initialData }: { initialData: CampoDashboardData }) {
   const [activeLayer, setActiveLayer] = useState<ActiveLayer>("none");
   const [rasterOpacity, setRasterOpacity] = useState(DEFAULT_RASTER_OPACITY);
+  const [activeMapView, setActiveMapView] = useState<MapViewKey>("campo");
   const [selectedFeature, setSelectedFeature] = useState<CampoMapFeature | null>(null);
   const [subMap, setSubMap] = useState<SubMapState | null>(null);
   const [cycleSelector, setCycleSelector] = useState<{
@@ -192,12 +196,23 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
   } = useSWRImmutable(
     ["/data/campo-geo.json", "/rasters/bounds.json"] as const,
     loadCampoMapAssets,
+    { revalidateOnFocus: false },
+  );
+
+  const {
+    data: sjpGeoData,
+    error: sjpGeoError,
+    isLoading: sjpGeoLoading,
+  } = useSWRImmutable(
+    "/data/sjp-geo.json",
+    (url: string) => loadGeoCollection(url, "No se pudo cargar el mapa SJP."),
     {
       revalidateOnFocus: false,
+      shouldRetryOnError: false,
     },
   );
+
   const blockModal = useBlockProfileModal(selectedFeature?.row ?? null);
-  const areaLabels = useMemo(() => buildAreaLabels(initialData.features), [initialData.features]);
   const featureByBlock = useMemo(
     () => buildFeatureLookup(initialData.features),
     [initialData.features],
@@ -217,11 +232,54 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
       ),
     [initialData.features],
   );
+
   const mapAssetsErrorMessage = mapAssetsError instanceof Error
     ? mapAssetsError.message
     : mapAssetsError
       ? "No se pudieron cargar los assets del mapa."
       : null;
+  const sjpGeoErrorMessage = sjpGeoError instanceof Error
+    ? sjpGeoError.message
+    : sjpGeoError
+      ? "No se pudo cargar el mapa SJP."
+      : null;
+
+  const campoGeoData = mapAssets?.geoData ?? null;
+  const rasterBounds = mapAssets?.rasterBounds ?? {};
+  const viewModels = useMemo<Record<MapViewKey, MapViewModel>>(
+    () => ({
+      campo: {
+        key: "campo",
+        title: "Mapa MH",
+        description: "Vista principal con bloques y navegacion por valvulas.",
+        actionLabel: "Cambiar a MH",
+        geoData: campoGeoData,
+        loading: mapAssetsLoading,
+        error: mapAssetsErrorMessage,
+        secondaryActionLabel: "Mapa de valvulas",
+      },
+      sjp: {
+        key: "sjp",
+        title: "Mapa SJP",
+        description: "Vista SJP con bloques y camas listas para navegar.",
+        actionLabel: "Cambiar a SJP",
+        geoData: sjpGeoData ?? null,
+        loading: sjpGeoLoading || mapAssetsLoading,
+        error: sjpGeoErrorMessage ?? mapAssetsErrorMessage,
+        secondaryActionLabel: "Mapa de camas",
+      },
+    }),
+    [
+      campoGeoData,
+      mapAssetsErrorMessage,
+      mapAssetsLoading,
+      sjpGeoData,
+      sjpGeoErrorMessage,
+      sjpGeoLoading,
+    ],
+  );
+  const activeViewModel = viewModels[activeMapView];
+  const previewViewModel = viewModels[activeMapView === "campo" ? "sjp" : "campo"];
 
   useEffect(() => {
     if (!pendingValveNav || !selectedFeature) {
@@ -260,11 +318,24 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
     setSubMap({ mode: "valves", bloquePad });
   }
 
+  function handleSjpBeds(bloquePad: string) {
+    setSubMap({ mode: "beds", bloquePad, valveId: bloquePad });
+  }
+
+  function handleMapSecondaryAction(bloquePad: string) {
+    if (activeMapView === "sjp") {
+      handleSjpBeds(bloquePad);
+      return;
+    }
+
+    handleValves(bloquePad);
+  }
+
   function handleValveDetail(valveId: string, bloquePad: string) {
     setSubMap(null);
     setCycleSelector({
       bloquePad,
-      contextLabel: `Válvula ${valveId.split("-").pop()} · Bloque ${bloquePad}`,
+      contextLabel: `Valvula ${valveId.split("-").pop()} · Bloque ${bloquePad}`,
       valveId,
     });
   }
@@ -281,7 +352,11 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
   }
 
   function handleCycleSelected(cycleKey: string) {
-    const { valveId, bloquePad } = cycleSelector!;
+    if (!cycleSelector) {
+      return;
+    }
+
+    const { valveId, bloquePad } = cycleSelector;
     setSelectedFeature(getFeatureByBlock(bloquePad));
     setCycleSelector(null);
     setDirectPanelMode(true);
@@ -295,7 +370,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 space-y-2">
               <Badge variant="outline" className="rounded-full px-3 py-1">
-                Vista espacial · bloques, válvulas y camas
+                Vista espacial · bloques, valvulas y camas
               </Badge>
               <CardTitle className="text-2xl">Mapa</CardTitle>
             </div>
@@ -307,7 +382,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
                 {initialData.summary.matchedBlocks} con match
               </Badge>
               <Badge variant="outline" className="rounded-full px-3 py-1">
-                {formatNumber(initialData.summary.totalVisibleStems)} tallos visibles
+                {formatNumber(initialData.summary.totalProducibleArea)} m² producibles
               </Badge>
             </div>
           </div>
@@ -316,14 +391,14 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
         <CardContent className="space-y-4">
           <div className="rounded-[28px] border border-border/70 bg-background/72 p-4">
             <div className="flex flex-wrap items-start gap-3">
-              {areaLabels.map((label) => (
+              {initialData.areaSummaries.map((label) => (
                 <div
-                  key={label.name}
+                  key={label.area}
                   className="rounded-2xl border border-border/70 bg-card/88 px-4 py-3 shadow-sm"
                 >
-                  <p className="text-sm font-semibold">{label.name}</p>
+                  <p className="text-sm font-semibold">{label.area}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {label.blockCount} bloques · {formatNumber(label.totalStems)} tallos
+                    {label.blockCount} bloques · {formatNumber(label.producibleArea)} m² producibles
                   </p>
                 </div>
               ))}
@@ -341,42 +416,73 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
               <div className="space-y-1 text-right">
                 <p className="text-xs font-medium text-foreground">
                   {activeLayer === "none"
-                    ? "Modo operativo activo"
-                    : `Modo agronómico · ${activeLayer.toUpperCase()}`}
+                    ? `Vista activa · ${activeViewModel.title}`
+                    : `Modo agronomico · ${activeLayer.toUpperCase()} · ${activeViewModel.title}`}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Click en un bloque {"->"} ficha o mapa de valvulas. En submapa:
-                  {" "}valvula {"->"} ficha o mapa de camas.
+                  {activeMapView === "campo"
+                    ? "Click en un bloque -> ficha o mapa de valvulas. En submapa: valvula -> ficha o mapa de camas."
+                    : "Click en un bloque SJP -> ficha o mapa de camas. En submapa: cama -> selector de ciclo y detalle."}
                 </p>
               </div>
             </div>
 
-            <CampoLeafletMap
-              geoData={mapAssets?.geoData ?? null}
-              rasterBounds={mapAssets?.rasterBounds ?? {}}
-              assetsLoading={mapAssetsLoading}
-              assetsError={mapAssetsErrorMessage}
-              blockDataMap={blockDataMap}
-              areaByBlock={areaByBlock}
-              activeLayer={activeLayer}
-              rasterOpacity={rasterOpacity}
-              onFicha={handleFicha}
-              onValves={handleValves}
-              className="h-[82vh] min-h-[640px] border border-border/70"
-            />
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <CampoLeafletMap
+                key={activeMapView}
+                viewKey={activeMapView}
+                geoData={activeViewModel.geoData}
+                rasterBounds={rasterBounds}
+                assetsLoading={activeViewModel.loading}
+                assetsError={activeViewModel.error}
+                blockDataMap={blockDataMap}
+                areaByBlock={areaByBlock}
+                activeLayer={activeLayer}
+                rasterOpacity={rasterOpacity}
+                onFicha={handleFicha}
+                onSecondaryAction={handleMapSecondaryAction}
+                secondaryActionLabel={activeViewModel.secondaryActionLabel}
+                showFloatingLegend={false}
+                className="h-[82vh] min-h-[640px] border border-border/70"
+              />
+
+              <div className="self-start space-y-3">
+                <CampoMapInset
+                  key={previewViewModel.key}
+                  viewKey={previewViewModel.key}
+                  title={previewViewModel.title}
+                  description={previewViewModel.description}
+                  actionLabel={previewViewModel.actionLabel}
+                  geoData={previewViewModel.geoData}
+                  loading={previewViewModel.loading}
+                  error={previewViewModel.error}
+                  activeLayer={activeLayer}
+                  rasterBounds={rasterBounds}
+                  rasterOpacity={rasterOpacity}
+                  layerBadge={activeLayer === "none" ? "Sin capa activa" : `Capa ${activeLayer.toUpperCase()}`}
+                  onActivate={() => setActiveMapView(previewViewModel.key)}
+                  className="xl:min-h-0"
+                />
+                <CampoRasterLegend
+                  activeLayer={activeLayer}
+                  opacity={rasterOpacity}
+                  className="w-full max-w-none"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-3">
             <Card className="border-border/70 bg-background/72">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-slate-900/10 dark:bg-slate-900/20 p-3 text-slate-700 dark:text-white">
+                  <div className="rounded-full bg-slate-900/10 p-3 text-slate-700 dark:bg-slate-900/20 dark:text-white">
                     <MapPinned className="size-5" aria-hidden="true" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">Navegación</CardTitle>
+                    <CardTitle className="text-lg">Navegacion</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      Click en un bloque para ver opciones. Zoom y pan con scroll y drag.
+                      El mapa activo queda navegable y el lateral sirve para intercambiar vista.
                     </p>
                   </div>
                 </div>
@@ -386,21 +492,21 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
             <Card className="border-border/70 bg-background/72">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-slate-900/10 dark:bg-slate-900/20 p-3 text-slate-700 dark:text-white">
+                  <div className="rounded-full bg-slate-900/10 p-3 text-slate-700 dark:bg-slate-900/20 dark:text-white">
                     <Move className="size-5" aria-hidden="true" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">Áreas identificadas</CardTitle>
+                    <CardTitle className="text-lg">Areas identificadas</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      Resumen agregado de bloques renderizables del mapa actual.
+                      Resumen agregado por area productiva del mapa actual.
                     </p>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
-                {areaLabels.slice(0, 10).map((label) => (
-                  <Badge key={label.name} variant="outline" className="rounded-full px-3 py-1">
-                    {label.name}
+                {initialData.areaSummaries.slice(0, 10).map((label) => (
+                  <Badge key={label.area} variant="outline" className="rounded-full px-3 py-1">
+                    {label.area}
                   </Badge>
                 ))}
               </CardContent>
@@ -409,13 +515,13 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
             <Card className="border-border/70 bg-background/72">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-slate-900/10 dark:bg-slate-900/20 p-3 text-slate-700 dark:text-white">
+                  <div className="rounded-full bg-slate-900/10 p-3 text-slate-700 dark:bg-slate-900/20 dark:text-white">
                     <Sprout className="size-5" aria-hidden="true" />
                   </div>
                   <div>
                     <CardTitle className="text-lg">Capas del dron</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      PNG clasificado + bounds listos para Leaflet. Ajusta capa y opacidad desde
+                      WebP clasificado + bounds listos para Leaflet. Ajusta capa y opacidad desde
                       la barra superior.
                     </p>
                   </div>
@@ -434,8 +540,7 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Regenera assets con <code className="text-[11px]">node scripts/convert-rasters.mjs</code>{" "}
-                  y <code className="text-[11px]">node scripts/convert-shapefile.mjs</code>.
+                  Regenera assets con <code className="text-[11px]">npm run canon:v2:build</code>.
                 </p>
               </CardContent>
             </Card>
@@ -488,10 +593,10 @@ export function CampoExplorer({ initialData }: { initialData: CampoDashboardData
 
       {subMap && (
         <CampoSubMapModal
-          geoData={mapAssets?.geoData ?? null}
-          rasterBounds={mapAssets?.rasterBounds ?? {}}
-          assetsLoading={mapAssetsLoading}
-          assetsError={mapAssetsErrorMessage}
+          geoData={activeViewModel.geoData}
+          rasterBounds={rasterBounds}
+          assetsLoading={activeViewModel.loading}
+          assetsError={activeViewModel.error}
           bloquePad={subMap.bloquePad}
           mode={subMap.mode}
           valveId={subMap.mode === "beds" ? subMap.valveId : undefined}
