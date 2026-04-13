@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { PoscosechaClasificacionRecipeOverlay } from "@/components/dashboard/postcosecha-clasificacion-en-blanco-recipe-overlay";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +34,11 @@ import type {
   PoscosechaClasificacionAvailabilityRow,
   PoscosechaClasificacionBootData,
   PoscosechaClasificacionOrderRow,
+  PoscosechaClasificacionRecipeInput,
+  PoscosechaClasificacionRecipePayload,
+  PoscosechaClasificacionRecipeResult,
   PoscosechaClasificacionResult,
+  PoscosechaClasificacionResultOrderRow,
   PoscosechaClasificacionRunPayload,
   SolverDateKey,
 } from "@/lib/postcosecha-clasificacion-en-blanco-types";
@@ -271,6 +276,43 @@ function SimpleTableCard({
   );
 }
 
+function buildRecipeInput(
+  row: PoscosechaClasificacionResultOrderRow,
+  netStemValues: Record<string, number>,
+  availabilityRows: PoscosechaClasificacionAvailabilityRow[],
+): PoscosechaClasificacionRecipeInput | null {
+  const grades = Object.entries(netStemValues)
+    .map(([gradeLabel, value]) => {
+      const grade = Number(gradeLabel);
+      const tallosNetos = Math.max(Math.round(Number(value) || 0), 0);
+      const availabilityRow = availabilityRows.find((item) => item.grado === grade);
+
+      return {
+        grado: Number.isFinite(grade) ? grade : 0,
+        tallosNetos,
+        pesoTalloSeed: availabilityRow?.pesoTalloSeed ?? 0,
+      };
+    })
+    .filter((item) => item.grado > 0 && item.tallosNetos > 0);
+
+  if (!grades.length || row.pedidoResuelto <= 0) {
+    return null;
+  }
+
+  return {
+    sku: row.sku,
+    pedidoResuelto: Math.max(Math.round(row.pedidoResuelto), 0),
+    pesoIdealBunch: row.pesoIdealBunch,
+    pesoMinObjetivo: row.pesoMinObjetivo,
+    pesoMaxObjetivo: row.pesoMaxObjetivo,
+    tallosMin: row.tallosMin,
+    tallosMax: row.tallosMax,
+    tallosAsignadosNetos: row.tallosAsignadosNetos,
+    tallosPromedioRamo: row.tallosPromedioRamo,
+    grados: grades,
+  };
+}
+
 export function PoscosechaClasificacionEnBlancoExplorer({
   initialData,
   initialError,
@@ -283,6 +325,10 @@ export function PoscosechaClasificacionEnBlancoExplorer({
   const [search, setSearch] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
+  const [selectedRecipeSku, setSelectedRecipeSku] = useState<string | null>(null);
+  const [recipeData, setRecipeData] = useState<PoscosechaClasificacionRecipeResult | null>(null);
+  const [recipeError, setRecipeError] = useState<string | null>(null);
+  const [isRecipeLoading, setIsRecipeLoading] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const filteredOrders = useMemo(() => {
@@ -315,11 +361,30 @@ export function PoscosechaClasificacionEnBlancoExplorer({
     [availabilityDerived],
   );
 
+  const resultOrderRowsBySku = useMemo(
+    () => new Map((result?.orderRows ?? []).map((row) => [row.sku, row])),
+    [result],
+  );
+
+  const netStemValuesBySku = useMemo(
+    () => new Map((result?.netStemMatrix.rows ?? []).map((row) => [row.sku, row.values])),
+    [result],
+  );
+
   useEffect(() => {
     if (initialError) {
       toast.error(initialError);
     }
   }, [initialError]);
+
+  useEffect(() => {
+    if (!result) {
+      setSelectedRecipeSku(null);
+      setRecipeData(null);
+      setRecipeError(null);
+      setIsRecipeLoading(false);
+    }
+  }, [result]);
 
   function applyBootData(nextData: PoscosechaClasificacionBootData) {
     setBootData(nextData);
@@ -327,6 +392,13 @@ export function PoscosechaClasificacionEnBlancoExplorer({
     setAvailability(nextData.availabilityTemplate);
     setSettings(nextData.settings);
     setResult(null);
+  }
+
+  function closeRecipeOverlay() {
+    setSelectedRecipeSku(null);
+    setRecipeData(null);
+    setRecipeError(null);
+    setIsRecipeLoading(false);
   }
 
   async function reloadBase() {
@@ -435,6 +507,51 @@ export function PoscosechaClasificacionEnBlancoExplorer({
       );
     } finally {
       setIsRunning(false);
+    }
+  }
+
+  async function handleOpenRecipe(sku: string) {
+    const orderRow = resultOrderRowsBySku.get(sku);
+    const netStemValues = netStemValuesBySku.get(sku);
+
+    if (!orderRow || !netStemValues) {
+      toast.error("No se encontro el detalle del SKU para construir la receta.");
+      return;
+    }
+
+    const payload = buildRecipeInput(orderRow, netStemValues, availability);
+
+    if (!payload) {
+      toast.error("El SKU seleccionado no tiene suficiente informacion para construir la receta.");
+      return;
+    }
+
+    setSelectedRecipeSku(sku);
+    setRecipeData(null);
+    setRecipeError(null);
+    setIsRecipeLoading(true);
+
+    try {
+      const response = await fetchJson<PoscosechaClasificacionRecipePayload>(
+        "/api/postcosecha/planificacion/solver/clasificacion-en-blanco/receta",
+        "No se pudo construir la receta del SKU.",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      setRecipeData(response.data);
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : "No se pudo construir la receta del SKU.";
+      setRecipeError(message);
+    } finally {
+      setIsRecipeLoading(false);
     }
   }
 
@@ -768,7 +885,7 @@ export function PoscosechaClasificacionEnBlancoExplorer({
 
           <SimpleTableCard
             title="Resumen por pedido"
-            description="Lectura por SKU del resultado final y del estado de peso."
+            description="Lectura por SKU del resultado final y del estado de peso. Haz click en un SKU resuelto para ver su receta."
             table={(
               <div className="overflow-x-auto rounded-[24px] border border-border/70">
                 <table className="min-w-[1620px] w-full text-sm">
@@ -791,28 +908,47 @@ export function PoscosechaClasificacionEnBlancoExplorer({
                     </tr>
                   </thead>
                   <tbody>
-                    {result.orderRows.map((row) => (
-                      <tr key={row.sku} className="border-b border-border/50 last:border-b-0">
-                        <td className="px-4 py-3 font-medium">{row.sku}</td>
-                        <td className="px-4 py-3">
-                          <ResultStatusBadge status={row.estadoPeso} />
-                        </td>
-                        <td className="px-4 py-3 text-right">{formatInteger(row.pedidoTotal)}</td>
-                        <td className="px-4 py-3 text-right">{formatInteger(row.pedidoResuelto)}</td>
-                        <td className="px-4 py-3 text-right">{formatInteger(row.ajusteBunches)}</td>
-                        <td className="px-4 py-3 text-right">{formatPercent(row.cumplimientoBunches)}</td>
-                        <td className="px-4 py-3 text-right">{formatNumber(row.pesoIdealPedido)}</td>
-                        <td className="px-4 py-3 text-right">{formatNumber(row.pesoIdealResuelto)}</td>
-                        <td className="px-4 py-3 text-right">{formatNumber(row.pesoRealTotal)}</td>
-                        <td className="px-4 py-3 text-right">{formatNumber(row.pesoRealBunch)}</td>
-                        <td className="px-4 py-3 text-right">
-                          {formatNumber(row.pesoMinObjetivo)} / {formatNumber(row.pesoMaxObjetivo)}
-                        </td>
-                        <td className="px-4 py-3 text-right">{formatPercent(row.sobrepesoPct)}</td>
-                        <td className="px-4 py-3 text-right">{formatNumber(row.mallasTotales)}</td>
-                        <td className="px-4 py-3 text-right">{formatInteger(row.gradosUsados)}</td>
-                      </tr>
-                    ))}
+                    {result.orderRows.map((row) => {
+                      const canOpenRecipe = row.pedidoResuelto > 0 && netStemValuesBySku.has(row.sku);
+
+                      return (
+                        <tr key={row.sku} className="border-b border-border/50 last:border-b-0">
+                          <td className="px-4 py-3 font-medium">
+                            {canOpenRecipe ? (
+                              <button
+                                type="button"
+                                className="text-left text-foreground transition hover:text-slate-700 hover:underline"
+                                onClick={() => void handleOpenRecipe(row.sku)}
+                              >
+                                <span className="block">{row.sku}</span>
+                                <span className="block text-xs font-normal text-muted-foreground">
+                                  Ver receta
+                                </span>
+                              </button>
+                            ) : (
+                              row.sku
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <ResultStatusBadge status={row.estadoPeso} />
+                          </td>
+                          <td className="px-4 py-3 text-right">{formatInteger(row.pedidoTotal)}</td>
+                          <td className="px-4 py-3 text-right">{formatInteger(row.pedidoResuelto)}</td>
+                          <td className="px-4 py-3 text-right">{formatInteger(row.ajusteBunches)}</td>
+                          <td className="px-4 py-3 text-right">{formatPercent(row.cumplimientoBunches)}</td>
+                          <td className="px-4 py-3 text-right">{formatNumber(row.pesoIdealPedido)}</td>
+                          <td className="px-4 py-3 text-right">{formatNumber(row.pesoIdealResuelto)}</td>
+                          <td className="px-4 py-3 text-right">{formatNumber(row.pesoRealTotal)}</td>
+                          <td className="px-4 py-3 text-right">{formatNumber(row.pesoRealBunch)}</td>
+                          <td className="px-4 py-3 text-right">
+                            {formatNumber(row.pesoMinObjetivo)} / {formatNumber(row.pesoMaxObjetivo)}
+                          </td>
+                          <td className="px-4 py-3 text-right">{formatPercent(row.sobrepesoPct)}</td>
+                          <td className="px-4 py-3 text-right">{formatNumber(row.mallasTotales)}</td>
+                          <td className="px-4 py-3 text-right">{formatInteger(row.gradosUsados)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -821,7 +957,7 @@ export function PoscosechaClasificacionEnBlancoExplorer({
 
           <SimpleTableCard
             title="Tabla final en mallas"
-            description="Matriz SKU por grado que sale del solver redondeada a la vista operativa."
+            description="Matriz SKU por grado que sale del solver redondeada a la vista operativa. Tambien puedes abrir la receta desde cada SKU."
             table={(
               <div className="overflow-x-auto rounded-[24px] border border-border/70">
                 <table className="min-w-[960px] w-full text-sm">
@@ -837,17 +973,37 @@ export function PoscosechaClasificacionEnBlancoExplorer({
                     </tr>
                   </thead>
                   <tbody>
-                    {result.matrix.rows.map((row) => (
-                      <tr key={row.sku} className="border-b border-border/50 last:border-b-0">
-                        <td className="px-4 py-3 font-medium">{row.sku}</td>
-                        {result.matrix.gradeLabels.map((gradeLabel) => (
-                          <td key={`${row.sku}-${gradeLabel}`} className="px-4 py-3 text-right">
-                            {formatInteger(row.values[String(gradeLabel)] ?? 0)}
+                    {result.matrix.rows.map((row) => {
+                      const canOpenRecipe = (resultOrderRowsBySku.get(row.sku)?.pedidoResuelto ?? 0) > 0
+                        && netStemValuesBySku.has(row.sku);
+
+                      return (
+                        <tr key={row.sku} className="border-b border-border/50 last:border-b-0">
+                          <td className="px-4 py-3 font-medium">
+                            {canOpenRecipe ? (
+                              <button
+                                type="button"
+                                className="text-left text-foreground transition hover:text-slate-700 hover:underline"
+                                onClick={() => void handleOpenRecipe(row.sku)}
+                              >
+                                <span className="block">{row.sku}</span>
+                                <span className="block text-xs font-normal text-muted-foreground">
+                                  Ver receta
+                                </span>
+                              </button>
+                            ) : (
+                              row.sku
+                            )}
                           </td>
-                        ))}
-                        <td className="px-4 py-3 text-right font-semibold">{formatInteger(row.total)}</td>
-                      </tr>
-                    ))}
+                          {result.matrix.gradeLabels.map((gradeLabel) => (
+                            <td key={`${row.sku}-${gradeLabel}`} className="px-4 py-3 text-right">
+                              {formatInteger(row.values[String(gradeLabel)] ?? 0)}
+                            </td>
+                          ))}
+                          <td className="px-4 py-3 text-right font-semibold">{formatInteger(row.total)}</td>
+                        </tr>
+                      );
+                    })}
                     <tr className="bg-background/70 font-semibold">
                       <td className="px-4 py-3">TOTAL</td>
                       {result.matrix.gradeLabels.map((gradeLabel) => (
@@ -904,6 +1060,16 @@ export function PoscosechaClasificacionEnBlancoExplorer({
             )}
           />
         </>
+      ) : null}
+
+      {selectedRecipeSku ? (
+        <PoscosechaClasificacionRecipeOverlay
+          sku={selectedRecipeSku}
+          data={recipeData}
+          isLoading={isRecipeLoading}
+          error={recipeError}
+          onClose={closeRecipeOverlay}
+        />
       ) : null}
     </div>
   );

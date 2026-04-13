@@ -13,6 +13,8 @@ import type {
   PoscosechaClasificacionBootData,
   PoscosechaClasificacionOrderRow,
   PoscosechaClasificacionPrecheck,
+  PoscosechaClasificacionRecipeInput,
+  PoscosechaClasificacionRecipeResult,
   PoscosechaClasificacionResult,
   PoscosechaClasificacionRunInput,
   PoscosechaClasificacionSettings,
@@ -477,6 +479,39 @@ export async function runClasificacionEnBlancoSolver(
     orders: mapOrdersForBridge(input.orders, skuMaster),
     availability: mapAvailabilityForBridge(input.availability),
     settings,
+  });
+}
+
+export async function runClasificacionEnBlancoRecipeSolver(
+  input: PoscosechaClasificacionRecipeInput,
+): Promise<PoscosechaClasificacionRecipeResult> {
+  if (!input.sku.trim()) {
+    throw new Error("Debes indicar el SKU para construir la receta.");
+  }
+
+  if (toInteger(input.pedidoResuelto, 0) <= 0) {
+    throw new Error("El SKU seleccionado no tiene bunches resueltos.");
+  }
+
+  if (!input.grados.length) {
+    throw new Error("No hay tallos netos por grado para construir la receta.");
+  }
+
+  return runBridge<PoscosechaClasificacionRecipeResult>("recipe", {
+    sku: input.sku,
+    pedidoResuelto: Math.max(toInteger(input.pedidoResuelto, 0), 0),
+    pesoIdealBunch: Math.max(toNumber(input.pesoIdealBunch, 0), 0),
+    pesoMinObjetivo: Math.max(toNumber(input.pesoMinObjetivo, 0), 0),
+    pesoMaxObjetivo: Math.max(toNumber(input.pesoMaxObjetivo, 0), 0),
+    tallosMin: Math.max(toInteger(input.tallosMin, 0), 0),
+    tallosMax: Math.max(toInteger(input.tallosMax, 0), 0),
+    tallosAsignadosNetos: Math.max(toInteger(input.tallosAsignadosNetos, 0), 0),
+    tallosPromedioRamo: Math.max(toNumber(input.tallosPromedioRamo, 0), 0),
+    grados: input.grados.map((row) => ({
+      grado: Math.max(toInteger(row.grado, 0), 0),
+      tallosNetos: Math.max(toInteger(row.tallosNetos, 0), 0),
+      pesoTalloSeed: Math.max(toNumber(row.pesoTalloSeed, 0), 0),
+    })),
   });
 }
 

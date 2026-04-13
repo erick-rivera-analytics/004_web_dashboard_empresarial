@@ -76,10 +76,14 @@ export type PoscosechaClasificacionResultOrderRow = {
   pedidoResuelto: number;
   ajusteBunches: number;
   cumplimientoBunches: number;
+  pesoIdealBunch: number;
   pesoIdealPedido: number;
   pesoIdealResuelto: number;
   pesoRealTotal: number;
   pesoRealBunch: number;
+  tallosMin: number;
+  tallosMax: number;
+  tallosPromedioRamo: number;
   pesoMinObjetivo: number;
   pesoMaxObjetivo: number;
   sobrepesoPct: number;
@@ -126,6 +130,7 @@ export type PoscosechaClasificacionResult = {
   orderRows: PoscosechaClasificacionResultOrderRow[];
   availabilityRows: PoscosechaClasificacionResultAvailabilityRow[];
   matrix: PoscosechaClasificacionMatrix;
+  netStemMatrix: PoscosechaClasificacionMatrix;
 };
 
 export type PoscosechaClasificacionRunInput = {
@@ -136,4 +141,71 @@ export type PoscosechaClasificacionRunInput = {
 
 export type PoscosechaClasificacionRunPayload = {
   data: PoscosechaClasificacionResult;
+};
+
+export type PoscosechaClasificacionRecipeGradeInput = {
+  grado: number;
+  tallosNetos: number;
+  pesoTalloSeed: number;
+};
+
+export type PoscosechaClasificacionRecipeInput = {
+  sku: string;
+  pedidoResuelto: number;
+  pesoIdealBunch: number;
+  pesoMinObjetivo: number;
+  pesoMaxObjetivo: number;
+  tallosMin: number;
+  tallosMax: number;
+  tallosAsignadosNetos: number;
+  tallosPromedioRamo: number;
+  grados: PoscosechaClasificacionRecipeGradeInput[];
+};
+
+export type PoscosechaClasificacionRecipeCompositionRow = {
+  grado: number;
+  tallos: number;
+  pesoTalloSeed: number;
+  pesoTotal: number;
+};
+
+export type PoscosechaClasificacionRecipeRow = {
+  recetaId: string;
+  cantidad: number;
+  tallosPorBunch: number;
+  pesoPorBunch: number;
+  difIdeal: number;
+  estadoPeso: string;
+  composicion: PoscosechaClasificacionRecipeCompositionRow[];
+};
+
+export type PoscosechaClasificacionRecipeGradeSummaryRow = {
+  grado: number;
+  tallosObjetivo: number;
+  tallosAsignados: number;
+  pesoTalloSeed: number;
+  pesoTotal: number;
+};
+
+export type PoscosechaClasificacionRecipeSummary = {
+  sku: string;
+  bunchesObjetivo: number;
+  bunchesResueltos: number;
+  recetasUsadas: number;
+  tallosTotales: number;
+  pesoIdealBunch: number;
+  pesoPromedioReal: number;
+  penalidadRango: number;
+  desvioAbsolutoTotal: number;
+  status: string;
+};
+
+export type PoscosechaClasificacionRecipeResult = {
+  summary: PoscosechaClasificacionRecipeSummary;
+  rows: PoscosechaClasificacionRecipeRow[];
+  gradeTotals: PoscosechaClasificacionRecipeGradeSummaryRow[];
+};
+
+export type PoscosechaClasificacionRecipePayload = {
+  data: PoscosechaClasificacionRecipeResult;
 };
