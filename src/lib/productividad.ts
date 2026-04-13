@@ -3,7 +3,7 @@ import { cachedAsync } from "@/lib/server-cache";
 
 // ── Fuente de datos ──────────────────────────────────────────────────────────
 const PROD_HOURS_SOURCE      = "gld.mv_prod_hours_cycle_person_cur";
-const KARDEX_SOURCE          = "gld.mv_camp_kardex_bed_plants_cur";    // plantas por bed (tiene mortandad correcta)
+const KARDEX_CYCLE_SOURCE    = "gld.mv_camp_kardex_cycle_plants_cur";
 const FENOGRAMA_SOURCE       = "gld.mv_prod_fenograma_cur";               // stems_count
 const PRODUCTIVITY_POST_SRC  = "gld.mv_prod_productivity_post_cur";      // post_weight_kg
 const PRODUCTIVITY_GREEN_SRC = "gld.mv_prod_productivity_green_cur";     // green_weight_kg → cajas
@@ -19,9 +19,9 @@ type ProductividadQueryRow = {
   area: string | null;
   variety: string | null;
   sp_type: string | null;
-  sp_date: string | null;
-  harvest_start_date: string | null;
-  harvest_end_date: string | null;
+  sp_date: string | Date | null;
+  harvest_start_date: string | Date | null;
+  harvest_end_date: string | Date | null;
   harvest_year: number | string | null;
   harvest_month: number | string | null;
   cost_area: string | null;
@@ -143,6 +143,83 @@ function toNumber(value: string | number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function roundValue(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function toPercentRatio(value: string | number | null | undefined) {
+  const numericValue = toNumber(value);
+
+  if (numericValue === null) {
+    return null;
+  }
+
+  return Math.abs(numericValue) > 1.5 ? numericValue / 100 : numericValue;
+}
+
+function toPercent(value: string | number | null | undefined) {
+  const numericValue = toPercentRatio(value);
+  return numericValue === null ? null : roundValue(numericValue * 100);
+}
+
+function normalizeDateValue(value: string | Date | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      return null;
+    }
+
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  if (typeof value === "string") {
+    return value.trim() || null;
+  }
+
+  return null;
+}
+
+function parseDateOnly(value: string | Date | null | undefined): Date | null {
+  const normalizedValue = normalizeDateValue(value);
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const [year, month, day] = normalizedValue.split("-").map(Number);
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  return new Date(year, month - 1, day);
+}
+
+function formatDateValue(value: string | Date | null | undefined): string | null {
+  return normalizeDateValue(value);
+}
+
+function parseYearValue(value: string | number | Date | null | undefined): number | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.getFullYear();
+  }
+
+  return toNumber(value);
+}
+
+function parseMonthValue(value: string | number | Date | null | undefined): number | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.getMonth() + 1;
+  }
+
+  return toNumber(value);
+}
+
 function cleanText(value: string | null | undefined): string {
   return value?.trim() || "";
 }
@@ -167,7 +244,7 @@ function matchesFilter(filterValue: string, candidateValue: string): boolean {
 export async function getProductividadDashboardData(
   filters: ProductividadFilters,
 ): Promise<ProductividadDashboardData> {
-  const cacheKey = `productividad:dashboard:${filters.year}:${filters.month}:${filters.spType}:${filters.variety}:${filters.costArea}`;
+  const cacheKey = `productividad:dashboard:${filters.year}:${filters.month}:${filters.spType}:${filters.variety}:${filters.area}:${filters.status}:${filters.costArea}`;
 
   return cachedAsync(cacheKey, PRODUCTIVIDAD_TTL_MS, async () => {
     // Build WHERE clauses for cost_area filter
@@ -194,12 +271,12 @@ export async function getProductividadDashboardData(
       ),
       -- plantas actuales y mortalidad desde kardex (agregado por ciclo)
       kardex as (
-        select
+        select distinct on (cycle_key)
           cycle_key,
-          coalesce(avg(final_plants_count), 0) as plants_current,
-          max(pct_mortality) as pct_mortality
-        from ${KARDEX_SOURCE}
-        group by cycle_key
+          coalesce(final_plants_count, 0) as plants_current,
+          pct_mortality
+        from ${KARDEX_CYCLE_SOURCE}
+        order by cycle_key, valid_from desc nulls last
       ),
       -- tallos totales desde fenograma
       feno as (
@@ -300,14 +377,15 @@ export async function getProductividadDashboardData(
       // Cycle status
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const startDate = row.harvest_start_date ? new Date(row.harvest_start_date) : null;
-      const endDate = row.harvest_end_date ? new Date(row.harvest_end_date) : null;
+      const spDate = parseDateOnly(row.sp_date);
+      const startDate = parseDateOnly(row.harvest_start_date);
+      const endDate = parseDateOnly(row.harvest_end_date);
+      const cycleEndDate = endDate ?? startDate ?? spDate;
       let cycleStatus: "Planificado" | "Abierto" | "Cerrado";
-      if (!startDate) {
+
+      if (spDate && spDate >= today) {
         cycleStatus = "Planificado";
-      } else if (today < startDate) {
-        cycleStatus = "Planificado";
-      } else if (endDate && today > endDate) {
+      } else if (cycleEndDate && cycleEndDate < today) {
         cycleStatus = "Cerrado";
       } else {
         cycleStatus = "Abierto";
@@ -319,18 +397,18 @@ export async function getProductividadDashboardData(
         area: cleanText(row.area),
         variety: cleanText(row.variety),
         spType: cleanText(row.sp_type),
-        spDate: row.sp_date ?? null,
-        harvestStartDate: row.harvest_start_date ?? null,
-        harvestEndDate: row.harvest_end_date ?? null,
-        harvestYear: toNumber(row.harvest_year),
-        harvestMonth: toNumber(row.harvest_month),
+        spDate: formatDateValue(row.sp_date),
+        harvestStartDate: formatDateValue(row.harvest_start_date),
+        harvestEndDate: formatDateValue(row.harvest_end_date),
+        harvestYear: parseYearValue(row.harvest_year),
+        harvestMonth: parseMonthValue(row.harvest_month),
         costArea,
         etapaLabel: etapaLabel(costArea),
         subCostCenter: cleanText(row.sub_cost_center),
         activityType: cleanText(row.activity_type),
         activityName: cleanText(row.activity_name),
         cycleStatus,
-        pctMortality: toNumber(row.pct_mortality),
+        pctMortality: toPercent(row.pct_mortality),
         effectiveHours,
         unitsProduced,
         bedArea,
