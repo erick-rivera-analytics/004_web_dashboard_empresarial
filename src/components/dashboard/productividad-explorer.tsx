@@ -66,7 +66,7 @@ function fmt(value: number | null, decimals = 2, suffix = ""): string {
 
 function fmtPct(value: number | null): string {
   if (value === null) return "\u2014";
-  return value.toLocaleString("es-EC", { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + "%";
+  return (value).toLocaleString("es-EC", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) + "%";
 }
 
 // ── BlockModalRow builder ─────────────────────────────────────────────────────
