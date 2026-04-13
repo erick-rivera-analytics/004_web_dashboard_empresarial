@@ -256,7 +256,7 @@ export async function getProductividadDashboardData(
         ha.effective_hours,
         ha.units_produced,
         cp.bed_area,
-        k.pct_mortality,
+        coalesce(k.pct_mortality, 0) as pct_mortality,
         coalesce(gw.green_weight_kg, 0) as green_weight_kg,
         coalesce(f.total_stems, 0)      as total_stems,
         coalesce(k.plants_current, 0)   as plants_current,
