@@ -11,6 +11,8 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
+      POSTHARVEST_SOLVER_PYTHON: /usr/bin/python3
+      POSTHARVEST_CBC_PATH: /usr/bin/cbc
     ports:
       - "3000:3000"
     networks:

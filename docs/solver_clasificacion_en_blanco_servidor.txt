@@ -355,3 +355,37 @@ La solucion correcta para servidor fue:
 - usar PostgreSQL como fuente real del maestro SKU
 
 Con esto el solver queda portable y desplegable en otro entorno sin necesidad de montar carpetas externas manualmente.
+
+
+Anexo - Error de CBC en servidor
+--------------------------------
+Si aparece un error como este:
+
+- `Pulp: Error while trying to execute .../site-packages/pulp/.../cbc`
+
+significa que PuLP esta intentando usar su binario embebido de CBC.
+
+Ese caso es comun cuando:
+- la imagen usa Alpine
+- o el binario embebido no es compatible con el runtime del contenedor
+
+Para evitarlo, esta solucion deja preparado:
+
+1. uso de un `cbc` del sistema
+2. variable:
+   - `POSTHARVEST_CBC_PATH=/usr/bin/cbc`
+3. cambio de imagen base a Debian slim
+4. instalacion de:
+   - `coinor-cbc`
+
+La logica nueva del motor intenta:
+
+1. `POSTHARVEST_CBC_PATH`
+2. `which cbc`
+3. fallback al binario embebido de PuLP solo si no encuentra nada mejor
+
+Recomendacion productiva:
+- no confiar en el binario embebido de PuLP dentro de Docker
+- usar siempre un `cbc` del sistema
+- definir tambien:
+  - `POSTHARVEST_SOLVER_PYTHON=/usr/bin/python3`

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
+import shutil
 from typing import Any
 
 import numpy as np
@@ -337,6 +339,25 @@ def objective_fix_tolerance(opt_value: float) -> float:
     return max(OBJECTIVE_TOLERANCE, abs(float(opt_value)) * 1e-6)
 
 
+def is_truthy(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def build_cbc_solver(time_limit: float | None = None) -> pulp.LpSolver:
+    solver_path = os.environ.get("POSTHARVEST_CBC_PATH", "").strip()
+    if not solver_path:
+        solver_path = shutil.which("cbc") or ""
+
+    msg_enabled = is_truthy(os.environ.get("POSTHARVEST_SOLVER_MSG"))
+
+    if solver_path:
+        return pulp.COIN_CMD(path=solver_path, msg=msg_enabled, timeLimit=time_limit)
+
+    return pulp.PULP_CBC_CMD(msg=msg_enabled, timeLimit=time_limit)
+
+
 def status_name(status_code: int) -> str:
     return pulp.LpStatus.get(status_code, str(status_code))
 
@@ -385,7 +406,7 @@ def solve_pipeline(
         if float(availability.loc[grade_position, "tallos_netos"]) > 0.5
     ]
 
-    stage1_solver = pulp.PULP_CBC_CMD(msg=False, timeLimit=STAGE1_TIME_LIMIT_SECONDS)
+    stage1_solver = build_cbc_solver(STAGE1_TIME_LIMIT_SECONDS)
     stage1_problem = pulp.LpProblem("solver_poscosecha_stage1", pulp.LpMaximize)
     stage1_b = {
         order_position: pulp.LpVariable(
@@ -496,10 +517,14 @@ def solve_pipeline(
         order_position for order_position in range(n_orders) if int(fulfilled_bunches[order_position]) > 0
     ]
     stage2_status_pref = "No aplica"
+    stage2_status_overweight = "No aplica"
+    stage2_status_ideal = "No aplica"
     stage2_status_extra = "No aplica"
     stage2_status_total = "No aplica"
     stage2_status_weight = "No aplica"
     preferred_violation_opt = 0.0
+    overweight_opt = 0.0
+    ideal_deviation_opt = 0.0
     extra_grades_opt = 0.0
     total_grades_opt = 0.0
 
@@ -510,7 +535,7 @@ def solve_pipeline(
     extra_grades_values = np.zeros(n_orders, dtype=float)
 
     if active_order_positions:
-        stage2_solver = pulp.PULP_CBC_CMD(msg=False, timeLimit=STAGE2_TIME_LIMIT_SECONDS)
+        stage2_solver = build_cbc_solver(STAGE2_TIME_LIMIT_SECONDS)
         stage2_problem = pulp.LpProblem("solver_poscosecha_stage2", pulp.LpMinimize)
         stage2_x = {
             (order_position, grade_position): pulp.LpVariable(
@@ -547,6 +572,14 @@ def solve_pipeline(
             order_position: pulp.LpVariable(f"stage2_slack_high_{order_position}", lowBound=0)
             for order_position in active_order_positions
         }
+        stage2_over_ideal = {
+            order_position: pulp.LpVariable(f"stage2_over_ideal_{order_position}", lowBound=0)
+            for order_position in active_order_positions
+        }
+        stage2_under_ideal = {
+            order_position: pulp.LpVariable(f"stage2_under_ideal_{order_position}", lowBound=0)
+            for order_position in active_order_positions
+        }
         stage2_extra_grades = {
             order_position: pulp.LpVariable(f"stage2_extra_grades_{order_position}", lowBound=0)
             for order_position in active_order_positions
@@ -577,6 +610,16 @@ def solve_pipeline(
                 - float(orders.loc[order_position, "peso_max_objetivo"]) * fixed_bunches
             ), f"stage2_soft_high_{order_position}"
             stage2_problem += (
+                stage2_over_ideal[order_position]
+                >= stage2_weights[order_position]
+                - float(orders.loc[order_position, "peso_ideal_bunch"]) * fixed_bunches
+            ), f"stage2_over_ideal_{order_position}"
+            stage2_problem += (
+                stage2_under_ideal[order_position]
+                >= float(orders.loc[order_position, "peso_ideal_bunch"]) * fixed_bunches
+                - stage2_weights[order_position]
+            ), f"stage2_under_ideal_{order_position}"
+            stage2_problem += (
                 stage2_extra_grades[order_position]
                 >= pulp.lpSum(stage2_u[order_position, grade_position] for grade_position in active_grade_positions)
                 - float(orders.loc[order_position, "max_grados_objetivo"])
@@ -596,6 +639,14 @@ def solve_pipeline(
 
         preferred_violation_expr = pulp.lpSum(
             stage2_slack_low[order_position] + stage2_slack_high[order_position]
+            for order_position in active_order_positions
+        )
+        overweight_expr = pulp.lpSum(
+            stage2_over_ideal[order_position]
+            for order_position in active_order_positions
+        )
+        ideal_deviation_expr = pulp.lpSum(
+            stage2_over_ideal[order_position] + stage2_under_ideal[order_position]
             for order_position in active_order_positions
         )
         extra_grades_expr = pulp.lpSum(stage2_extra_grades[order_position] for order_position in active_order_positions)
@@ -618,6 +669,32 @@ def solve_pipeline(
         stage2_problem += (
             preferred_violation_expr <= preferred_violation_opt + objective_fix_tolerance(preferred_violation_opt)
         ), "stage2_fix_preferred_violation"
+
+        stage2_problem.setObjective(overweight_expr)
+        stage2_status_overweight = solve_or_raise(
+            stage2_problem,
+            stage2_solver,
+            "No se pudo minimizar el sobrepeso real respecto al ideal",
+            integer_vars=list(stage2_u.values()),
+            allow_feasible_incumbent=True,
+        )
+        overweight_opt = float(pulp.value(overweight_expr) or 0.0)
+        stage2_problem += (
+            overweight_expr <= overweight_opt + objective_fix_tolerance(overweight_opt)
+        ), "stage2_fix_overweight"
+
+        stage2_problem.setObjective(ideal_deviation_expr)
+        stage2_status_ideal = solve_or_raise(
+            stage2_problem,
+            stage2_solver,
+            "No se pudo minimizar la desviacion total respecto al ideal",
+            integer_vars=list(stage2_u.values()),
+            allow_feasible_incumbent=True,
+        )
+        ideal_deviation_opt = float(pulp.value(ideal_deviation_expr) or 0.0)
+        stage2_problem += (
+            ideal_deviation_expr <= ideal_deviation_opt + objective_fix_tolerance(ideal_deviation_opt)
+        ), "stage2_fix_ideal_deviation"
 
         stage2_problem.setObjective(extra_grades_expr)
         stage2_status_extra = solve_or_raise(
@@ -657,7 +734,7 @@ def solve_pipeline(
         stage2_problem.setObjective(actual_weight_expr)
         stage2_status_weight = solve_or_raise(
             stage2_problem,
-            pulp.PULP_CBC_CMD(msg=False),
+            build_cbc_solver(),
             "No se pudo minimizar el peso final real",
         )
 
@@ -831,6 +908,8 @@ def solve_pipeline(
             for status in (
                 stage1_status,
                 stage2_status_pref,
+                stage2_status_overweight,
+                stage2_status_ideal,
                 stage2_status_extra,
                 stage2_status_total,
                 stage2_status_weight,
@@ -839,10 +918,14 @@ def solve_pipeline(
         else "Feasible con time limit",
         "fulfilled_ideal_opt": fulfilled_ideal_opt,
         "preferred_violation_opt": preferred_violation_opt,
+        "overweight_opt": overweight_opt,
+        "ideal_deviation_opt": ideal_deviation_opt,
         "extra_grades_opt": extra_grades_opt,
         "total_grades_opt": total_grades_opt,
         "stage1_status": stage1_status,
         "stage2_status_pref": stage2_status_pref,
+        "stage2_status_overweight": stage2_status_overweight,
+        "stage2_status_ideal": stage2_status_ideal,
         "stage2_status_extra": stage2_status_extra,
         "stage2_status_total": stage2_status_total,
         "stage2_status_weight": stage2_status_weight,

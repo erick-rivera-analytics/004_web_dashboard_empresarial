@@ -175,3 +175,87 @@ Convencion para siguientes cambios:
   - detalle por archivo
   - validaciones realizadas
   - impacto final
+
+## 2026-04-14 - Compatibilidad de CBC en servidor para solver de postcosecha
+
+Contexto:
+- En servidor aparecio el error:
+  - `Pulp: Error while trying to execute .../solverdir/cbc/linux/i64/cbc`
+- Eso indica que PuLP estaba intentando usar su binario embebido de CBC.
+- En contenedor, el proyecto venia usando `node:20-alpine`, y ese binario embebido suele fallar por compatibilidad de runtime.
+
+Objetivo:
+- Hacer que el solver use un `cbc` nativo del sistema en servidor.
+- Evitar depender del ejecutable embebido de PuLP dentro del wheel.
+
+Archivos modificados:
+- `scripts/postharvest_solver_engine.py`
+- `Dockerfile`
+- `docker-compose.yml`
+
+Detalle por archivo:
+
+### `scripts/postharvest_solver_engine.py`
+
+Accion:
+- Se agrego una fabrica `build_cbc_solver()`.
+
+Comportamiento:
+- primero intenta `POSTHARVEST_CBC_PATH`
+- luego intenta `shutil.which("cbc")`
+- si encuentra un binario del sistema, usa:
+  - `pulp.COIN_CMD(path=solver_path, ...)`
+- si no encuentra un binario del sistema, recien ahi cae al:
+  - `pulp.PULP_CBC_CMD(...)`
+
+Variables nuevas soportadas:
+- `POSTHARVEST_CBC_PATH`
+- `POSTHARVEST_SOLVER_MSG`
+
+Impacto:
+- en servidor podemos obligar al solver a usar `/usr/bin/cbc`
+- evitamos el fallo del binario embebido de PuLP
+
+### `Dockerfile`
+
+Accion:
+- Se cambio la imagen base de:
+  - `node:20-alpine`
+  a:
+  - `node:20-bookworm-slim`
+
+Motivo:
+- Alpine era una base fragil para el binario embebido de CBC y para el stack Python del solver.
+- Debian slim es mas estable para `coinor-cbc`, `python3` y `pip`.
+
+Cambios:
+- instalacion de:
+  - `python3`
+  - `python3-pip`
+  - `coinor-cbc`
+- copia de:
+  - `scripts/`
+- instalacion de paquetes Python:
+  - `numpy`
+  - `pandas`
+  - `pulp`
+
+Impacto:
+- el runtime productivo ya tiene Python y CBC del sistema
+- el solver puede ejecutar sin depender del binario embebido de PuLP
+
+### `docker-compose.yml`
+
+Accion:
+- Se agregaron variables explicitas:
+  - `POSTHARVEST_SOLVER_PYTHON=/usr/bin/python3`
+  - `POSTHARVEST_CBC_PATH=/usr/bin/cbc`
+
+Impacto:
+- la resolucion del solver queda deterministica en contenedor
+
+Resultado esperado:
+- el servidor ya no deberia intentar usar:
+  - `.../site-packages/pulp/.../solverdir/cbc/linux/i64/cbc`
+- y deberia usar:
+  - `/usr/bin/cbc`
