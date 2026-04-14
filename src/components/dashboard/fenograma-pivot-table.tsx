@@ -465,7 +465,7 @@ export const FenogramaPivotTable = memo(function FenogramaPivotTable({
         </div>
 
         <div className="relative">
-        <div className="max-h-[min(74vh,820px)] w-full overflow-auto rounded-[24px] border border-border/70" role="region" aria-label="Tabla fenograma pivot" tabIndex={0}>
+        <div className="max-h-[min(74vh,820px)] w-full overflow-auto show-scrollbar rounded-[24px] border border-border/70" role="region" aria-label="Tabla fenograma pivot" tabIndex={0}>
           <table className="min-w-full w-max border-separate border-spacing-0 text-sm">
             <thead className="sticky top-0 z-30 bg-card/95 backdrop-blur">
               <tr>

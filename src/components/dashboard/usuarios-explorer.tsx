@@ -26,6 +26,7 @@ import { fetchJson } from "@/lib/fetch-json";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollFadeTable } from "@/components/ui/scroll-fade-table";
 import { cn } from "@/lib/utils";
 import type { User } from "@/lib/users";
 
@@ -170,7 +171,7 @@ export function UsuariosExplorer() {
               No hay usuarios registrados.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <ScrollFadeTable>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border/60">
@@ -256,7 +257,7 @@ export function UsuariosExplorer() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </ScrollFadeTable>
           )}
         </CardContent>
       </Card>

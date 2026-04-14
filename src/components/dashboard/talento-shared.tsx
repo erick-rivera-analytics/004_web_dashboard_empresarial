@@ -16,6 +16,7 @@ import {
 } from "recharts";
 
 import { PersonInfoOverlay } from "@/components/dashboard/person-info-overlay";
+import { ScrollFadeTable } from "@/components/ui/scroll-fade-table";
 import { formatWeekLabel, generateAvailableWeeks } from "@/lib/talento-humano-utils";
 import type { TalentoFilters, TalentoPersonRecord } from "@/lib/talento-humano";
 
@@ -213,7 +214,7 @@ export function CompositionTable({
   return (
     <div className="rounded-[24px] border border-border/70 bg-card/80 p-5">
       <p className="mb-4 text-sm font-semibold">{title}</p>
-      <div className="overflow-x-auto">
+      <ScrollFadeTable>
         <table className="min-w-[1180px] w-full border-collapse text-xs">
           <thead>
             <tr className="border-b border-border/70">
@@ -242,7 +243,7 @@ export function CompositionTable({
             <CompositionTableRow row={totalRow} total onClick={() => onSelect(totalRow)} />
           </tbody>
         </table>
-      </div>
+      </ScrollFadeTable>
     </div>
   );
 }

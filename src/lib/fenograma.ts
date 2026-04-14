@@ -721,6 +721,12 @@ function cleanText(value: string | null) {
   return value?.trim() ?? "";
 }
 
+function normalizeAreaDisplayName(value: string | null | undefined): string {
+  const cleaned = value?.trim() ?? "";
+  if (cleaned === "A-4") return "SJP";
+  return cleaned;
+}
+
 function parseBoolean(value: string | boolean | undefined, fallback: boolean) {
   if (typeof value === "boolean") {
     return value;
@@ -1739,7 +1745,7 @@ export async function getCycleProfilesByBlock(
       greenhouse: Boolean(row.greenhouse),
       parentBlock: cleanText(row.parent_block),
       blockId: cleanText(row.block_id),
-      areaId: cleanText(row.area_id),
+      areaId: normalizeAreaDisplayName(row.area_id),
       soilType: cleanText(row.soil_type),
       pruningDate: row.sp_date ?? null,
       status: cleanText(row.status),

@@ -10,6 +10,7 @@ import { PersonHoursOverlay } from "@/components/dashboard/person-hours-overlay"
 import { useBlockProfileModal } from "@/hooks/use-block-profile-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ScrollFadeTable } from "@/components/ui/scroll-fade-table";
 import {
   Card,
   CardContent,
@@ -513,7 +514,7 @@ function ProductividadTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-[24px] border border-border/60">
+    <ScrollFadeTable className="rounded-[24px] border border-border/60">
       <table className="min-w-[1200px] w-full text-sm">
         <thead className="sticky top-0 z-10">
           <tr>
@@ -598,7 +599,7 @@ function ProductividadTable({
           })}
         </tbody>
       </table>
-    </div>
+    </ScrollFadeTable>
   );
 }
 
