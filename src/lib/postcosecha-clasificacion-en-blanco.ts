@@ -58,9 +58,10 @@ const BRIDGE_SCRIPT_PATH = resolve(
   "solver_clasificacion_en_blanco_bridge.py",
 );
 
-const DEFAULT_SOLVER_ROOT = resolve(process.cwd(), "..", "solver_poscosecha");
-const DEFAULT_SOLVER_PYTHON = resolve(
-  DEFAULT_SOLVER_ROOT,
+const LEGACY_SOLVER_PYTHON = resolve(
+  process.cwd(),
+  "..",
+  "solver_poscosecha",
   "venv",
   "Scripts",
   "python.exe",
@@ -128,17 +129,33 @@ function buildFallbackDefaults() {
 }
 
 function ensureSolverEngineAvailable() {
-  const solverPython = process.env.POSTHARVEST_SOLVER_PYTHON ?? DEFAULT_SOLVER_PYTHON;
-
   if (!existsSync(BRIDGE_SCRIPT_PATH)) {
     throw new Error("No se encontro el puente local del solver de clasificacion en blanco.");
   }
 
-  if (!existsSync(solverPython)) {
-    throw new Error("No se encontro el interprete Python del solver de postcosecha.");
+  const envPython = process.env.POSTHARVEST_SOLVER_PYTHON?.trim() ?? "";
+  const localCandidates = [
+    envPython,
+    resolve(process.cwd(), ".venv", "Scripts", "python.exe"),
+    resolve(process.cwd(), ".venv", "bin", "python"),
+    resolve(process.cwd(), "venv", "Scripts", "python.exe"),
+    resolve(process.cwd(), "venv", "bin", "python"),
+    LEGACY_SOLVER_PYTHON,
+    "python",
+    "python3",
+  ].filter(Boolean);
+
+  for (const candidate of localCandidates) {
+    const looksLikePath = candidate.includes("\\") || candidate.includes("/");
+
+    if (!looksLikePath || existsSync(candidate)) {
+      return candidate;
+    }
   }
 
-  return solverPython;
+  throw new Error(
+    "No se encontro un interprete Python compatible para el solver de postcosecha.",
+  );
 }
 
 async function runBridge<T>(
@@ -150,10 +167,7 @@ async function runBridge<T>(
   return new Promise<T>((resolvePromise, rejectPromise) => {
     const child = spawn(solverPython, [BRIDGE_SCRIPT_PATH, command], {
       cwd: process.cwd(),
-      env: {
-        ...process.env,
-        POSTHARVEST_SOLVER_ROOT: process.env.POSTHARVEST_SOLVER_ROOT ?? DEFAULT_SOLVER_ROOT,
-      },
+      env: process.env,
       stdio: ["pipe", "pipe", "pipe"],
     });
 

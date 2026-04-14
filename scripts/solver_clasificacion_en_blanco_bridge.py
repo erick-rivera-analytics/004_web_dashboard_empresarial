@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -12,25 +11,36 @@ import pulp
 
 
 DASHBOARD_ROOT = Path(__file__).resolve().parent.parent
-SOLVER_ROOT = Path(
-    os.environ.get(
-        "POSTHARVEST_SOLVER_ROOT",
-        str(DASHBOARD_ROOT.parent / "solver_poscosecha"),
-    )
-).resolve()
 
-if str(SOLVER_ROOT) not in sys.path:
-    sys.path.insert(0, str(SOLVER_ROOT))
+ENGINE_ROOT = Path(__file__).resolve().parent
+
+if str(ENGINE_ROOT) not in sys.path:
+    sys.path.insert(0, str(ENGINE_ROOT))
 
 try:
-    from solver_logic import DATE_COLUMNS, excel_round, load_workbook_defaults, solve_pipeline
+    from postharvest_solver_engine import DATE_COLUMNS, excel_round, solve_pipeline
 except Exception as exc:  # pragma: no cover - runtime bridge
     raise RuntimeError(
-        f"No se pudo importar el motor de solver desde {SOLVER_ROOT}: {exc}"
+        f"No se pudo importar el motor local del solver desde {ENGINE_ROOT}: {exc}"
     ) from exc
 
 
 RECIPE_OBJECTIVE_TOLERANCE = 1e-6
+DEFAULT_AVAILABILITY_TEMPLATE = [
+    {"grado": 15, "peso_tallo_seed": 15.0},
+    {"grado": 20, "peso_tallo_seed": 20.0},
+    {"grado": 25, "peso_tallo_seed": 28.62},
+    {"grado": 30, "peso_tallo_seed": 31.15},
+    {"grado": 35, "peso_tallo_seed": 35.27},
+    {"grado": 40, "peso_tallo_seed": 40.25},
+    {"grado": 45, "peso_tallo_seed": 46.91},
+    {"grado": 50, "peso_tallo_seed": 51.21},
+    {"grado": 55, "peso_tallo_seed": 56.89},
+    {"grado": 60, "peso_tallo_seed": 63.08},
+    {"grado": 65, "peso_tallo_seed": 65.65},
+    {"grado": 70, "peso_tallo_seed": 71.36},
+    {"grado": 75, "peso_tallo_seed": 77.38},
+]
 
 
 def read_payload() -> dict[str, Any]:
@@ -65,22 +75,13 @@ def dataframe_records(df: pd.DataFrame) -> list[dict[str, Any]]:
 
 
 def build_defaults_payload() -> dict[str, Any]:
-    defaults = load_workbook_defaults()
-    availability_template = defaults.availability[["grado", "peso_tallo_seed"]].copy()
-
     return {
         "settings": {
-            "desperdicio": float(defaults.settings.get("desperdicio", 0.13)),
+            "desperdicio": 0.13,
         },
-        "availability_template": [
-            {
-                "grado": int(row["grado"]),
-                "peso_tallo_seed": float(row["peso_tallo_seed"]),
-            }
-            for _, row in availability_template.iterrows()
-        ],
-        "workbook_path": str(defaults.workbook_path),
-        "master_path": str(defaults.master_path),
+        "availability_template": DEFAULT_AVAILABILITY_TEMPLATE,
+        "workbook_path": None,
+        "master_path": None,
     }
 
 

@@ -1,0 +1,357 @@
+SOLUCION DEL SOLVER DE CLASIFICACION EN BLANCO PARA SERVIDOR
+============================================================
+
+Fecha:
+- 2026-04-14
+
+Problema original
+-----------------
+En servidor, el solver estaba fallando con este error:
+
+- ModuleNotFoundError: No module named 'solver_logic'
+
+La causa real era que el bridge Python:
+
+- `scripts/solver_clasificacion_en_blanco_bridge.py`
+
+intentaba importar el motor desde una carpeta externa al repo:
+
+- `/app/solver_poscosecha/solver_logic.py`
+
+Eso hacia que el despliegue dependiera de:
+
+1. una carpeta externa no incluida en la imagen
+2. un workbook `.xlsm`
+3. una semilla generada desde Excel
+
+La meta del arreglo fue dejar el solver autonomo dentro del repo `dashboard`, sin depender del Excel ni de una ruta externa.
+
+
+Cambios realizados
+------------------
+1. Se copio el motor Python al propio proyecto:
+- `scripts/postharvest_solver_engine.py`
+
+2. Se modifico el bridge:
+- `scripts/solver_clasificacion_en_blanco_bridge.py`
+
+3. Se modifico el launcher del backend:
+- `src/lib/postcosecha-clasificacion-en-blanco.ts`
+
+4. Se ajusto el helper:
+- `src/lib/utils.ts`
+
+
+Que se cambio exactamente
+-------------------------
+1. Motor local al repo
+
+Antes:
+- el bridge hacia `from solver_logic import ...`
+- y buscaba eso en `POSTHARVEST_SOLVER_ROOT` o en `../solver_poscosecha`
+
+Ahora:
+- el bridge importa desde:
+  - `scripts/postharvest_solver_engine.py`
+
+Eso significa que el solver ya vive dentro del repo y puede viajar con la imagen Docker.
+
+
+2. Se elimino la dependencia funcional del Excel para el boot
+
+Antes:
+- el comando `defaults` del bridge llamaba `load_workbook_defaults()`
+- eso dependia de `openpyxl`
+- y dependia de un `.xlsm`
+
+Ahora:
+- el comando `defaults` devuelve semillas locales fijas para:
+  - `desperdicio`
+  - `availability_template`
+- y reporta:
+  - `workbook_path = null`
+  - `master_path = null`
+
+Con esto el visualizador puede arrancar sin workbook.
+
+
+3. El motor sigue resolviendo con PuLP, pero ya no depende de una carpeta externa
+
+La parte de `solve` y `recipe` sigue corriendo en Python con:
+- `numpy`
+- `pandas`
+- `pulp`
+
+Pero ahora el codigo que ejecuta el solver esta dentro de:
+- `scripts/postharvest_solver_engine.py`
+
+
+4. Resolucion de Python mas portable
+
+En:
+- `src/lib/postcosecha-clasificacion-en-blanco.ts`
+
+se cambio la busqueda del interprete Python.
+
+Antes:
+- estaba amarrado a:
+  - `../solver_poscosecha/venv/Scripts/python.exe`
+
+Ahora:
+- intenta en este orden:
+  - `POSTHARVEST_SOLVER_PYTHON`
+  - `.venv/Scripts/python.exe`
+  - `.venv/bin/python`
+  - `venv/Scripts/python.exe`
+  - `venv/bin/python`
+  - el path legacy
+  - `python`
+  - `python3`
+
+Eso permite que en servidor podamos definir un Python explicito por variable de entorno.
+
+
+5. Ajuste extra para destrabar el runtime local
+
+Se cambio:
+- `src/lib/utils.ts`
+
+de:
+- `twMerge(clsx(inputs))`
+
+a:
+- `clsx(inputs)`
+
+porque `tailwind-merge` estaba generando un error de resolucion en el entorno de Next/Webpack.
+
+Este cambio no afecta la logica del solver, pero si permitio volver a levantar el dashboard y validar el modulo.
+
+
+Validacion realizada
+--------------------
+Se valido localmente:
+
+- `GET /login` = 200
+- `GET /dashboard/postcosecha/planificacion/solver/clasificacion-en-blanco` = 200
+- `GET /api/postcosecha/planificacion/solver/clasificacion-en-blanco` = 200
+- `POST /api/postcosecha/planificacion/solver/clasificacion-en-blanco` = 200
+
+Tambien se valido el bridge directo:
+
+- `defaults` responde sin workbook
+- `solve` responde usando el motor local del repo
+
+
+Que debe llevar el Dockerfile
+-----------------------------
+La imagen final necesita:
+
+1. Node para Next.js
+2. Python 3
+3. pip
+4. dependencias Python del solver
+
+Recomendacion:
+- no depender de un `venv` externo
+- instalar Python en la imagen
+- instalar los paquetes Python dentro de la imagen
+
+Dockerfile sugerido
+-------------------
+Tomar el Dockerfile actual y agregar Python en `base` y copiar el motor en el build normal.
+
+Ejemplo:
+
+```dockerfile
+FROM node:20-alpine AS base
+
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN apk add --no-cache \
+    libc6-compat \
+    python3 \
+    py3-pip
+
+WORKDIR /app
+
+FROM base AS deps
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+FROM base AS builder
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+RUN mkdir -p public
+RUN npm run build
+
+FROM node:20-alpine AS runner
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+WORKDIR /app
+
+RUN apk add --no-cache \
+    libc6-compat \
+    python3 \
+    py3-pip \
+  && addgroup -g 1001 -S nodejs \
+  && adduser -S nextjs -u 1001 -G nodejs
+
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    numpy \
+    pandas \
+    pulp
+
+USER nextjs
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]
+```
+
+Notas:
+- en Alpine, `python3` apunta normalmente al ejecutable correcto
+- con esto no hace falta copiar `solver_poscosecha`
+- tampoco hace falta copiar el `.xlsm`
+
+
+Que debe llevar docker-compose.yml
+----------------------------------
+El compose debe:
+
+1. usar `.env`
+2. exponer el puerto
+3. definir `POSTHARVEST_SOLVER_PYTHON`
+4. mantener las variables de base de datos
+
+Ejemplo sugerido:
+
+```yaml
+services:
+  web_dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: atlas_web_dashboard
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      POSTHARVEST_SOLVER_PYTHON: /usr/bin/python3
+    ports:
+      - "3000:3000"
+    networks:
+      - atlas_dashboard_net
+
+networks:
+  atlas_dashboard_net:
+    name: atlas_dashboard_net
+    driver: bridge
+```
+
+Nota:
+- `POSTHARVEST_SOLVER_ROOT` ya no es necesario para esta solucion
+
+
+Que debe llevar el .env
+-----------------------
+Variables recomendadas:
+
+```env
+NODE_ENV=production
+PORT=3000
+HOSTNAME=0.0.0.0
+
+DATABASE_URL=
+DATABASE_HOST=10.0.2.70
+DATABASE_PORT=5432
+DATABASE_NAME=datalakehouse
+DATABASE_USER=db_admin
+DATABASE_PASSWORD=TU_PASSWORD
+DATABASE_SSL=false
+DATABASE_SSL_REJECT_UNAUTHORIZED=false
+
+POSTHARVEST_SOLVER_PYTHON=/usr/bin/python3
+POSTHARVEST_AUTO_SEED=false
+DATABASE_POOL_MAX=10
+DATABASE_IDLE_TIMEOUT_MS=30000
+SLOW_QUERY_THRESHOLD_MS=500
+```
+
+Notas:
+- `POSTHARVEST_SOLVER_PYTHON` es la variable importante para el solver
+- `POSTHARVEST_SOLVER_ROOT` ya no hace falta
+- `POSTHARVEST_AUTO_SEED=false` es lo recomendable porque el maestro SKU ya sale de PostgreSQL
+
+
+Migracion sana recomendada
+--------------------------
+1. Confirmar que estos archivos entren al repo:
+- `scripts/postharvest_solver_engine.py`
+- `scripts/solver_clasificacion_en_blanco_bridge.py`
+- `src/lib/postcosecha-clasificacion-en-blanco.ts`
+- `src/lib/utils.ts`
+
+2. Ajustar Dockerfile para incluir:
+- `python3`
+- `pip`
+- `numpy`
+- `pandas`
+- `pulp`
+
+3. Ajustar `docker-compose.yml` para incluir:
+- `POSTHARVEST_SOLVER_PYTHON=/usr/bin/python3`
+
+4. Confirmar que `.env` productivo tenga:
+- credenciales de PostgreSQL
+- `POSTHARVEST_SOLVER_PYTHON`
+
+5. Reconstruir imagen:
+- `docker compose build --no-cache`
+
+6. Levantar contenedor:
+- `docker compose up -d`
+
+7. Validar rutas:
+- `/login`
+- `/dashboard/postcosecha/planificacion/solver/clasificacion-en-blanco`
+- `GET /api/postcosecha/planificacion/solver/clasificacion-en-blanco`
+- `POST /api/postcosecha/planificacion/solver/clasificacion-en-blanco`
+
+
+Riesgos o puntos a cuidar
+-------------------------
+1. Si la imagen no tiene Python o `pulp`, el solver seguira fallando.
+
+2. Si el servidor usa un `Dockerfile` distinto al del repo local, hay que replicar estos cambios ahi tambien.
+
+3. Si se quisiera volver a usar un workbook como semilla, eso ya seria una decision nueva; hoy la solucion esta intencionalmente desacoplada del Excel.
+
+4. El maestro SKU sigue viniendo de PostgreSQL, asi que si esa tabla no tiene datos vigentes, la pantalla cargara pero no podra resolver SKU reales.
+
+
+Resumen ejecutivo
+-----------------
+La solucion correcta para servidor fue:
+
+- mover el motor del solver al repo
+- dejar de depender de `solver_poscosecha/solver_logic.py`
+- dejar de depender del `.xlsm` para el boot
+- ejecutar Python desde la propia imagen Docker
+- usar PostgreSQL como fuente real del maestro SKU
+
+Con esto el solver queda portable y desplegable en otro entorno sin necesidad de montar carpetas externas manualmente.
