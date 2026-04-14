@@ -104,6 +104,7 @@ export type ProductividadDashboardData = {
     totalCycles: number;
     totalEffectiveHours: number;
     totalUnitsProduced: number;
+    totalCajas: number;
     weightedHoraCaja: number | null;
   };
 };
@@ -472,12 +473,12 @@ export async function getProductividadDashboardData(
     const totalUnitsProduced = filtered.reduce((s, r) => s + (r.unitsProduced ?? 0), 0);
     const uniqueCycles = new Set(filtered.map((r) => r.cycleKey)).size;
 
-    // Hora/Caja ponderada: sum(horas) / sum(cajas únicas por ciclo)
+    // Cajas por ciclo: tomar el máximo por ciclo (green_weight_kg igual en todas las filas del ciclo)
     const uniqueCyclesCajas = new Map<string, number>();
     for (const row of filtered) {
-      if (!uniqueCyclesCajas.has(row.cycleKey)) {
-        uniqueCyclesCajas.set(row.cycleKey, row.cajas ?? 0);
-      }
+      const prev = uniqueCyclesCajas.get(row.cycleKey) ?? 0;
+      const cur = row.cajas ?? 0;
+      if (cur > prev) uniqueCyclesCajas.set(row.cycleKey, cur);
     }
     const totalCajas = Array.from(uniqueCyclesCajas.values()).reduce((s, c) => s + c, 0);
 
@@ -490,6 +491,7 @@ export async function getProductividadDashboardData(
         totalCycles: uniqueCycles,
         totalEffectiveHours,
         totalUnitsProduced,
+        totalCajas,
         weightedHoraCaja: totalCajas > 0 ? totalEffectiveHours / totalCajas : null,
       },
     };

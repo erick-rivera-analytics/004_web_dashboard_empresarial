@@ -198,7 +198,7 @@ function SelectField({
       </label>
       <select
         id={id} value={value} onChange={(e) => onChange(e.target.value)}
-        className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
       >
         <option value="all">Todos</option>
         {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
@@ -210,9 +210,9 @@ function SelectField({
 // ── MetricPill ────────────────────────────────────────────────────────────────
 function MetricPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[24px] border border-border/70 bg-background/80 px-4 py-3 text-left">
-      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground/80">{label}</p>
-      <p className="mt-2 text-lg font-semibold">{value}</p>
+    <div className="rounded-[24px] border border-border/70 bg-card px-5 py-4 text-left">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">{label}</p>
+      <p className="mt-1.5 text-2xl font-bold tracking-tight tabular-nums">{value}</p>
     </div>
   );
 }
@@ -677,7 +677,7 @@ export function ProductividadExplorer({ initialData }: { initialData: Productivi
               <select
                 id="prod-month" value={filters.month}
                 onChange={(e) => updateFilter("month", e.target.value)}
-                className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
               >
                 <option value="all">Todos</option>
                 {data.options.months.map((m) => (
@@ -697,7 +697,7 @@ export function ProductividadExplorer({ initialData }: { initialData: Productivi
               <select
                 id="prod-etapa" value={filters.costArea}
                 onChange={(e) => updateFilter("costArea", e.target.value as ProductividadEtapa)}
-                className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
               >
                 {etapaOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
@@ -712,10 +712,10 @@ export function ProductividadExplorer({ initialData }: { initialData: Productivi
 
           {/* Summary tiles */}
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MetricPill label="Ciclos" value={String(data.summary.totalCycles)} />
+            <MetricPill label="Ciclos" value={data.summary.totalCycles.toLocaleString("en-US")} />
             <MetricPill label="Horas efectivas" value={fmt(data.summary.totalEffectiveHours, 1, " h")} />
-            <MetricPill label="Unidades producidas" value={fmt(data.summary.totalUnitsProduced, 0)} />
-            <MetricPill label="Hora / Caja promedio" value={fmt(data.summary.weightedHoraCaja, 2, " h")} />
+            <MetricPill label="Cajas" value={Math.round(data.summary.totalCajas).toLocaleString("en-US")} />
+            <MetricPill label="Hora / Caja" value={fmt(data.summary.weightedHoraCaja, 2, " h")} />
           </div>
 
           {/* Loading / Error state */}

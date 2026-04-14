@@ -58,3 +58,8 @@ next-env.d.ts
 
 # Project vault (local docs)
 project_vault/
+
+canon_capas_v2/
+capas_v2/
+*.tif
+*.ovr
