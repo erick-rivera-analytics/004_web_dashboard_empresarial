@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
+import itertools
 import os
 from pathlib import Path
 import shutil
@@ -333,6 +335,78 @@ STAGE2_TIME_LIMIT_SECONDS = 5
 OBJECTIVE_TOLERANCE = 1e-4
 INTEGRAL_TOLERANCE = 1e-5
 WEIGHT_TOLERANCE = 1e-2
+MACRO_WEIGHT_MIN_RATIO = 0.97
+MACRO_WEIGHT_MAX_RATIO = 1.01
+
+
+def sku_allows_euro_stem_flex(sku: Any) -> bool:
+    label = normalize_label(sku).upper()
+    if not label:
+        return False
+    if "5X5" in label or "EX" in label:
+        return False
+    return "750X" in label or "1000X" in label
+
+
+def stem_shortfall_flex_per_bunch(sku: Any) -> float:
+    return 2.0 if sku_allows_euro_stem_flex(sku) else 0.0
+
+
+def stem_overrun_flex_per_bunch(sku: Any) -> float:
+    return 0.0
+
+
+def dynamic_weight_bounds(ideal_bunch_weight: float) -> tuple[float, float]:
+    ideal = max(float(ideal_bunch_weight), 0.0)
+    lower_abs = max(ideal * 0.03, 8.0)
+    upper_abs = max(ideal * 0.03, 5.0)
+    return max(ideal - lower_abs, 0.0), ideal + upper_abs
+
+
+@lru_cache(maxsize=None)
+def _integer_compositions(total: int, parts: int) -> tuple[tuple[int, ...], ...]:
+    if parts == 1:
+        return ((total,),)
+    rows: list[tuple[int, ...]] = []
+    for value in range(total + 1):
+        for tail in _integer_compositions(total - value, parts - 1):
+            rows.append((value, *tail))
+    return tuple(rows)
+
+
+@lru_cache(maxsize=None)
+def best_recipe_signature(
+    sku: str,
+    ideal_bunch_weight: float,
+    tallos_min: int,
+    tallos_max: int,
+    max_grados_objetivo: int,
+    grade_weight_items: tuple[tuple[int, float], ...],
+) -> tuple[float, float]:
+    lower_weight, upper_weight = dynamic_weight_bounds(ideal_bunch_weight)
+    min_stems = max(int(tallos_min - stem_shortfall_flex_per_bunch(sku)), 1)
+    max_stems = max(int(tallos_max + stem_overrun_flex_per_bunch(sku)), min_stems)
+    max_positive_grades = max(int(max_grados_objetivo), 1) + 1
+    weights = tuple(float(weight) for _, weight in grade_weight_items)
+    best_choice: tuple[float, float, int] | None = None
+
+    for stems_total in range(min_stems, max_stems + 1):
+        for grade_count in range(1, min(max_positive_grades, len(weights)) + 1):
+            for subset_indexes in itertools.combinations(range(len(weights)), grade_count):
+                subset_weights = tuple(weights[index] for index in subset_indexes)
+                for counts in _integer_compositions(stems_total, grade_count):
+                    if not any(counts):
+                        continue
+                    weight_total = float(sum(count * weight for count, weight in zip(counts, subset_weights)))
+                    range_penalty = max(lower_weight - weight_total, 0.0) + max(weight_total - upper_weight, 0.0)
+                    deviation_abs = abs(weight_total - float(ideal_bunch_weight))
+                    choice = (range_penalty, deviation_abs, stems_total)
+                    if best_choice is None or choice < best_choice:
+                        best_choice = choice
+
+    if best_choice is None:
+        return float(tallos_min), float(ideal_bunch_weight)
+    return float(best_choice[2]), float(ideal_bunch_weight)
 
 
 def objective_fix_tolerance(opt_value: float) -> float:
@@ -430,6 +504,32 @@ def solve_pipeline(
         order_position: pulp.LpVariable(f"stage1_stems_{order_position}", lowBound=0)
         for order_position in range(n_orders)
     }
+    stage1_stem_shortfall = {
+        order_position: pulp.LpVariable(f"stage1_stem_shortfall_{order_position}", lowBound=0)
+        for order_position in range(n_orders)
+    }
+    stage1_stem_overrun = {
+        order_position: pulp.LpVariable(f"stage1_stem_overrun_{order_position}", lowBound=0)
+        for order_position in range(n_orders)
+    }
+    stage1_weights = {
+        order_position: pulp.LpVariable(f"stage1_weight_{order_position}", lowBound=0)
+        for order_position in range(n_orders)
+    }
+    stage1_recipe_stem_gap = {
+        order_position: pulp.LpVariable(f"stage1_recipe_stem_gap_{order_position}", lowBound=0)
+        for order_position in range(n_orders)
+    }
+    stage1_macro_low = pulp.LpVariable("stage1_macro_low", lowBound=0)
+    stage1_macro_high = pulp.LpVariable("stage1_macro_high", lowBound=0)
+    stage1_over_ideal = {
+        order_position: pulp.LpVariable(f"stage1_over_ideal_{order_position}", lowBound=0)
+        for order_position in range(n_orders)
+    }
+    stage1_under_ideal = {
+        order_position: pulp.LpVariable(f"stage1_under_ideal_{order_position}", lowBound=0)
+        for order_position in range(n_orders)
+    }
     stage1_fulfilled_by_date = {
         (order_position, date_position): pulp.LpVariable(
             f"stage1_fulfilled_{order_position}_{date_position}",
@@ -442,6 +542,22 @@ def solve_pipeline(
     }
 
     for order_position in range(n_orders):
+        order_shortfall_flex = stem_shortfall_flex_per_bunch(orders.loc[order_position, SKU_COLUMN])
+        order_overrun_flex = stem_overrun_flex_per_bunch(orders.loc[order_position, SKU_COLUMN])
+        preferred_recipe_stems, _ = best_recipe_signature(
+            normalize_label(orders.loc[order_position, SKU_COLUMN]),
+            float(orders.loc[order_position, "peso_ideal_bunch"]),
+            int(orders.loc[order_position, "tallos_min"]),
+            int(orders.loc[order_position, "tallos_max"]),
+            int(orders.loc[order_position, "max_grados_objetivo"]),
+            tuple(
+                (
+                    int(availability.loc[grade_position, "grado"]),
+                    float(availability.loc[grade_position, "peso_tallo_seed"]),
+                )
+                for grade_position in active_grade_positions
+            ),
+        )
         stage1_problem += (
             pulp.lpSum(
                 stage1_fulfilled_by_date[order_position, date_position]
@@ -452,12 +568,44 @@ def solve_pipeline(
         stage1_problem += stage1_stems[order_position] == pulp.lpSum(
             stage1_x[order_position, grade_position] for grade_position in active_grade_positions
         ), f"stage1_stems_balance_{order_position}"
+        stage1_problem += stage1_weights[order_position] == pulp.lpSum(
+            stage1_x[order_position, grade_position] * float(availability.loc[grade_position, "peso_tallo_seed"])
+            for grade_position in active_grade_positions
+        ), f"stage1_weight_balance_{order_position}"
         stage1_problem += (
-            stage1_stems[order_position] >= float(orders.loc[order_position, "tallos_min"]) * stage1_b[order_position]
-        ), f"stage1_min_stems_{order_position}"
+            stage1_stems[order_position] + stage1_stem_shortfall[order_position]
+            >= float(orders.loc[order_position, "tallos_min"]) * stage1_b[order_position]
+        ), f"stage1_min_stems_soft_{order_position}"
         stage1_problem += (
-            stage1_stems[order_position] <= float(orders.loc[order_position, "tallos_max"]) * stage1_b[order_position]
-        ), f"stage1_max_stems_{order_position}"
+            stage1_stems[order_position] - stage1_stem_overrun[order_position]
+            <= float(orders.loc[order_position, "tallos_max"]) * stage1_b[order_position]
+        ), f"stage1_max_stems_soft_{order_position}"
+        stage1_problem += (
+            stage1_stem_shortfall[order_position]
+            <= order_shortfall_flex * stage1_b[order_position]
+        ), f"stage1_min_stems_soft_cap_{order_position}"
+        stage1_problem += (
+            stage1_stem_overrun[order_position]
+            <= order_overrun_flex * stage1_b[order_position]
+        ), f"stage1_max_stems_soft_cap_{order_position}"
+        stage1_problem += (
+            stage1_recipe_stem_gap[order_position]
+            >= stage1_stems[order_position] - preferred_recipe_stems * stage1_b[order_position]
+        ), f"stage1_recipe_gap_high_{order_position}"
+        stage1_problem += (
+            stage1_recipe_stem_gap[order_position]
+            >= preferred_recipe_stems * stage1_b[order_position] - stage1_stems[order_position]
+        ), f"stage1_recipe_gap_low_{order_position}"
+        stage1_problem += (
+            stage1_over_ideal[order_position]
+            >= stage1_weights[order_position]
+            - float(orders.loc[order_position, "peso_ideal_bunch"]) * stage1_b[order_position]
+        ), f"stage1_over_ideal_balance_{order_position}"
+        stage1_problem += (
+            stage1_under_ideal[order_position]
+            >= float(orders.loc[order_position, "peso_ideal_bunch"]) * stage1_b[order_position]
+            - stage1_weights[order_position]
+        ), f"stage1_under_ideal_balance_{order_position}"
 
     for grade_position in active_grade_positions:
         stage1_problem += (
@@ -467,6 +615,16 @@ def solve_pipeline(
 
     stage1_priority_statuses: dict[str, str] = {}
     stage1_priority_optima: dict[str, float] = {}
+    stage1_status_macro = "No aplica"
+    stage1_status_recipe = "No aplica"
+    stage1_status_overweight = "No aplica"
+    stage1_status_ideal = "No aplica"
+    stage1_status_stems = "No aplica"
+    stage1_macro_violation_opt = 0.0
+    stage1_recipe_gap_opt = 0.0
+    stage1_overweight_opt = 0.0
+    stage1_ideal_deviation_opt = 0.0
+    stage1_stem_violation_opt = 0.0
     for date_position, date_column in enumerate(DATE_COLUMNS):
         priority_expr = pulp.lpSum(
             stage1_fulfilled_by_date[order_position, date_position]
@@ -485,10 +643,93 @@ def solve_pipeline(
             priority_expr >= stage1_priority_optima[date_column] - objective_fix_tolerance(stage1_priority_optima[date_column])
         ), f"stage1_fix_priority_{date_column}"
 
+    total_stage1_weight_expr = pulp.lpSum(stage1_weights[order_position] for order_position in range(n_orders))
     fulfilled_ideal_expr = pulp.lpSum(
         stage1_b[order_position] * float(orders.loc[order_position, "peso_ideal_bunch"])
         for order_position in range(n_orders)
     )
+    stage1_problem += (
+        stage1_macro_low >= MACRO_WEIGHT_MIN_RATIO * fulfilled_ideal_expr - total_stage1_weight_expr
+    ), "stage1_macro_low_balance"
+    stage1_problem += (
+        stage1_macro_high >= total_stage1_weight_expr - MACRO_WEIGHT_MAX_RATIO * fulfilled_ideal_expr
+    ), "stage1_macro_high_balance"
+    stage1_macro_violation_expr = stage1_macro_low + stage1_macro_high
+    stage1_problem.setObjective(-stage1_macro_violation_expr)
+    stage1_status_macro = solve_or_raise(
+        stage1_problem,
+        stage1_solver,
+        "No se pudo minimizar la desviacion macro de peso por prioridad",
+        integer_vars=list(stage1_b.values()) + list(stage1_fulfilled_by_date.values()),
+        allow_feasible_incumbent=True,
+    )
+    stage1_macro_violation_opt = float(pulp.value(stage1_macro_violation_expr) or 0.0)
+    stage1_problem += (
+        stage1_macro_violation_expr <= stage1_macro_violation_opt + objective_fix_tolerance(stage1_macro_violation_opt)
+    ), "stage1_fix_macro_violation"
+
+    stage1_recipe_gap_expr = pulp.lpSum(stage1_recipe_stem_gap[order_position] for order_position in range(n_orders))
+    stage1_problem.setObjective(-stage1_recipe_gap_expr)
+    stage1_status_recipe = solve_or_raise(
+        stage1_problem,
+        stage1_solver,
+        "No se pudo minimizar la desviacion temprana de receta por prioridad",
+        integer_vars=list(stage1_b.values()) + list(stage1_fulfilled_by_date.values()),
+        allow_feasible_incumbent=True,
+    )
+    stage1_recipe_gap_opt = float(pulp.value(stage1_recipe_gap_expr) or 0.0)
+    stage1_problem += (
+        stage1_recipe_gap_expr <= stage1_recipe_gap_opt + objective_fix_tolerance(stage1_recipe_gap_opt)
+    ), "stage1_fix_recipe_gap"
+
+    stage1_overweight_expr = pulp.lpSum(stage1_over_ideal[order_position] for order_position in range(n_orders))
+    stage1_problem.setObjective(-stage1_overweight_expr)
+    stage1_status_overweight = solve_or_raise(
+        stage1_problem,
+        stage1_solver,
+        "No se pudo minimizar el sobrepeso estimado por prioridad",
+        integer_vars=list(stage1_b.values()) + list(stage1_fulfilled_by_date.values()),
+        allow_feasible_incumbent=True,
+    )
+    stage1_overweight_opt = float(pulp.value(stage1_overweight_expr) or 0.0)
+    stage1_problem += (
+        stage1_overweight_expr <= stage1_overweight_opt + objective_fix_tolerance(stage1_overweight_opt)
+    ), "stage1_fix_overweight"
+
+    stage1_ideal_deviation_expr = pulp.lpSum(
+        stage1_over_ideal[order_position] + stage1_under_ideal[order_position]
+        for order_position in range(n_orders)
+    )
+    stage1_problem.setObjective(-stage1_ideal_deviation_expr)
+    stage1_status_ideal = solve_or_raise(
+        stage1_problem,
+        stage1_solver,
+        "No se pudo minimizar la desviacion estimada respecto al ideal",
+        integer_vars=list(stage1_b.values()) + list(stage1_fulfilled_by_date.values()),
+        allow_feasible_incumbent=True,
+    )
+    stage1_ideal_deviation_opt = float(pulp.value(stage1_ideal_deviation_expr) or 0.0)
+    stage1_problem += (
+        stage1_ideal_deviation_expr <= stage1_ideal_deviation_opt + objective_fix_tolerance(stage1_ideal_deviation_opt)
+    ), "stage1_fix_ideal_deviation"
+
+    stage1_stem_violation_expr = pulp.lpSum(
+        stage1_stem_shortfall[order_position] + stage1_stem_overrun[order_position]
+        for order_position in range(n_orders)
+    )
+    stage1_problem.setObjective(-stage1_stem_violation_expr)
+    stage1_status_stems = solve_or_raise(
+        stage1_problem,
+        stage1_solver,
+        "No se pudo minimizar la desviacion de tallos por prioridad",
+        integer_vars=list(stage1_b.values()) + list(stage1_fulfilled_by_date.values()),
+        allow_feasible_incumbent=True,
+    )
+    stage1_stem_violation_opt = float(pulp.value(stage1_stem_violation_expr) or 0.0)
+    stage1_problem += (
+        stage1_stem_violation_expr <= stage1_stem_violation_opt + objective_fix_tolerance(stage1_stem_violation_opt)
+    ), "stage1_fix_stem_violation"
+
     stage1_problem.setObjective(fulfilled_ideal_expr)
     stage1_status = solve_or_raise(
         stage1_problem,
@@ -517,14 +758,20 @@ def solve_pipeline(
         order_position for order_position in range(n_orders) if int(fulfilled_bunches[order_position]) > 0
     ]
     stage2_status_pref = "No aplica"
+    stage2_status_macro = "No aplica"
+    stage2_status_recipe = "No aplica"
     stage2_status_overweight = "No aplica"
     stage2_status_ideal = "No aplica"
+    stage2_status_stems = "No aplica"
     stage2_status_extra = "No aplica"
     stage2_status_total = "No aplica"
     stage2_status_weight = "No aplica"
     preferred_violation_opt = 0.0
+    macro_violation_opt = 0.0
+    recipe_gap_opt = 0.0
     overweight_opt = 0.0
     ideal_deviation_opt = 0.0
+    stem_violation_opt = 0.0
     extra_grades_opt = 0.0
     total_grades_opt = 0.0
 
@@ -533,6 +780,9 @@ def solve_pipeline(
     slack_low_values = np.zeros(n_orders, dtype=float)
     slack_high_values = np.zeros(n_orders, dtype=float)
     extra_grades_values = np.zeros(n_orders, dtype=float)
+    stem_shortfall_values = np.zeros(n_orders, dtype=float)
+    stem_overrun_values = np.zeros(n_orders, dtype=float)
+    recipe_gap_values = np.zeros(n_orders, dtype=float)
 
     if active_order_positions:
         stage2_solver = build_cbc_solver(STAGE2_TIME_LIMIT_SECONDS)
@@ -560,6 +810,18 @@ def solve_pipeline(
             order_position: pulp.LpVariable(f"stage2_stems_{order_position}", lowBound=0)
             for order_position in active_order_positions
         }
+        stage2_stem_shortfall = {
+            order_position: pulp.LpVariable(f"stage2_stem_shortfall_{order_position}", lowBound=0)
+            for order_position in active_order_positions
+        }
+        stage2_stem_overrun = {
+            order_position: pulp.LpVariable(f"stage2_stem_overrun_{order_position}", lowBound=0)
+            for order_position in active_order_positions
+        }
+        stage2_recipe_stem_gap = {
+            order_position: pulp.LpVariable(f"stage2_recipe_stem_gap_{order_position}", lowBound=0)
+            for order_position in active_order_positions
+        }
         stage2_weights = {
             order_position: pulp.LpVariable(f"stage2_weight_{order_position}", lowBound=0)
             for order_position in active_order_positions
@@ -584,9 +846,30 @@ def solve_pipeline(
             order_position: pulp.LpVariable(f"stage2_extra_grades_{order_position}", lowBound=0)
             for order_position in active_order_positions
         }
+        stage2_macro_low = pulp.LpVariable("stage2_macro_low", lowBound=0)
+        stage2_macro_high = pulp.LpVariable("stage2_macro_high", lowBound=0)
 
         for order_position in active_order_positions:
             fixed_bunches = int(fulfilled_bunches[order_position])
+            order_shortfall_flex = stem_shortfall_flex_per_bunch(orders.loc[order_position, SKU_COLUMN])
+            order_overrun_flex = stem_overrun_flex_per_bunch(orders.loc[order_position, SKU_COLUMN])
+            dynamic_min_weight, dynamic_max_weight = dynamic_weight_bounds(
+                float(orders.loc[order_position, "peso_ideal_bunch"])
+            )
+            preferred_recipe_stems, _ = best_recipe_signature(
+                normalize_label(orders.loc[order_position, SKU_COLUMN]),
+                float(orders.loc[order_position, "peso_ideal_bunch"]),
+                int(orders.loc[order_position, "tallos_min"]),
+                int(orders.loc[order_position, "tallos_max"]),
+                int(orders.loc[order_position, "max_grados_objetivo"]),
+                tuple(
+                    (
+                        int(availability.loc[grade_position, "grado"]),
+                        float(availability.loc[grade_position, "peso_tallo_seed"]),
+                    )
+                    for grade_position in active_grade_positions
+                ),
+            )
             stage2_problem += stage2_stems[order_position] == pulp.lpSum(
                 stage2_x[order_position, grade_position] for grade_position in active_grade_positions
             ), f"stage2_stems_balance_{order_position}"
@@ -595,19 +878,37 @@ def solve_pipeline(
                 for grade_position in active_grade_positions
             ), f"stage2_weight_balance_{order_position}"
             stage2_problem += (
-                stage2_stems[order_position] >= float(orders.loc[order_position, "tallos_min"]) * fixed_bunches
-            ), f"stage2_min_stems_{order_position}"
+                stage2_stems[order_position] + stage2_stem_shortfall[order_position]
+                >= float(orders.loc[order_position, "tallos_min"]) * fixed_bunches
+            ), f"stage2_min_stems_soft_{order_position}"
             stage2_problem += (
-                stage2_stems[order_position] <= float(orders.loc[order_position, "tallos_max"]) * fixed_bunches
-            ), f"stage2_max_stems_{order_position}"
+                stage2_stems[order_position] - stage2_stem_overrun[order_position]
+                <= float(orders.loc[order_position, "tallos_max"]) * fixed_bunches
+            ), f"stage2_max_stems_soft_{order_position}"
+            stage2_problem += (
+                stage2_stem_shortfall[order_position]
+                <= order_shortfall_flex * fixed_bunches
+            ), f"stage2_min_stems_soft_cap_{order_position}"
+            stage2_problem += (
+                stage2_stem_overrun[order_position]
+                <= order_overrun_flex * fixed_bunches
+            ), f"stage2_max_stems_soft_cap_{order_position}"
+            stage2_problem += (
+                stage2_recipe_stem_gap[order_position]
+                >= stage2_stems[order_position] - preferred_recipe_stems * fixed_bunches
+            ), f"stage2_recipe_gap_high_{order_position}"
+            stage2_problem += (
+                stage2_recipe_stem_gap[order_position]
+                >= preferred_recipe_stems * fixed_bunches - stage2_stems[order_position]
+            ), f"stage2_recipe_gap_low_{order_position}"
             stage2_problem += (
                 stage2_slack_low[order_position]
-                >= float(orders.loc[order_position, "peso_min_objetivo"]) * fixed_bunches - stage2_weights[order_position]
+                >= dynamic_min_weight * fixed_bunches - stage2_weights[order_position]
             ), f"stage2_soft_low_{order_position}"
             stage2_problem += (
                 stage2_slack_high[order_position]
                 >= stage2_weights[order_position]
-                - float(orders.loc[order_position, "peso_max_objetivo"]) * fixed_bunches
+                - dynamic_max_weight * fixed_bunches
             ), f"stage2_soft_high_{order_position}"
             stage2_problem += (
                 stage2_over_ideal[order_position]
@@ -649,6 +950,13 @@ def solve_pipeline(
             stage2_over_ideal[order_position] + stage2_under_ideal[order_position]
             for order_position in active_order_positions
         )
+        stem_violation_expr = pulp.lpSum(
+            stage2_stem_shortfall[order_position] + stage2_stem_overrun[order_position]
+            for order_position in active_order_positions
+        )
+        recipe_gap_expr = pulp.lpSum(
+            stage2_recipe_stem_gap[order_position] for order_position in active_order_positions
+        )
         extra_grades_expr = pulp.lpSum(stage2_extra_grades[order_position] for order_position in active_order_positions)
         total_grades_expr = pulp.lpSum(
             stage2_u[order_position, grade_position]
@@ -656,19 +964,32 @@ def solve_pipeline(
             for grade_position in active_grade_positions
         )
         actual_weight_expr = pulp.lpSum(stage2_weights[order_position] for order_position in active_order_positions)
+        resolved_ideal_total = float(
+            sum(
+                fulfilled_bunches[order_position] * float(orders.loc[order_position, "peso_ideal_bunch"])
+                for order_position in active_order_positions
+            )
+        )
+        stage2_problem += (
+            stage2_macro_low >= MACRO_WEIGHT_MIN_RATIO * resolved_ideal_total - actual_weight_expr
+        ), "stage2_macro_low_balance"
+        stage2_problem += (
+            stage2_macro_high >= actual_weight_expr - MACRO_WEIGHT_MAX_RATIO * resolved_ideal_total
+        ), "stage2_macro_high_balance"
+        macro_violation_expr = stage2_macro_low + stage2_macro_high
 
-        stage2_problem.setObjective(preferred_violation_expr)
-        stage2_status_pref = solve_or_raise(
+        stage2_problem.setObjective(macro_violation_expr)
+        stage2_status_macro = solve_or_raise(
             stage2_problem,
             stage2_solver,
-            "No se pudo minimizar la desviacion objetivo por pedido",
+            "No se pudo minimizar la desviacion macro de peso",
             integer_vars=list(stage2_u.values()),
             allow_feasible_incumbent=True,
         )
-        preferred_violation_opt = float(pulp.value(preferred_violation_expr) or 0.0)
+        macro_violation_opt = float(pulp.value(macro_violation_expr) or 0.0)
         stage2_problem += (
-            preferred_violation_expr <= preferred_violation_opt + objective_fix_tolerance(preferred_violation_opt)
-        ), "stage2_fix_preferred_violation"
+            macro_violation_expr <= macro_violation_opt + objective_fix_tolerance(macro_violation_opt)
+        ), "stage2_fix_macro_violation"
 
         stage2_problem.setObjective(overweight_expr)
         stage2_status_overweight = solve_or_raise(
@@ -696,6 +1017,57 @@ def solve_pipeline(
             ideal_deviation_expr <= ideal_deviation_opt + objective_fix_tolerance(ideal_deviation_opt)
         ), "stage2_fix_ideal_deviation"
 
+        stage2_problem.setObjective(recipe_gap_expr)
+        stage2_status_recipe = solve_or_raise(
+            stage2_problem,
+            stage2_solver,
+            "No se pudo minimizar la desviacion temprana de receta por pedido",
+            integer_vars=list(stage2_u.values()),
+            allow_feasible_incumbent=True,
+        )
+        recipe_gap_opt = float(pulp.value(recipe_gap_expr) or 0.0)
+        stage2_problem += (
+            recipe_gap_expr <= recipe_gap_opt + objective_fix_tolerance(recipe_gap_opt)
+        ), "stage2_fix_recipe_gap"
+
+        stage2_problem.setObjective(preferred_violation_expr)
+        stage2_status_pref = solve_or_raise(
+            stage2_problem,
+            stage2_solver,
+            "No se pudo minimizar la desviacion objetivo por pedido",
+            integer_vars=list(stage2_u.values()),
+            allow_feasible_incumbent=True,
+        )
+        preferred_violation_opt = float(pulp.value(preferred_violation_expr) or 0.0)
+        stage2_problem += (
+            preferred_violation_expr <= preferred_violation_opt + objective_fix_tolerance(preferred_violation_opt)
+        ), "stage2_fix_preferred_violation"
+
+        stage2_problem.setObjective(actual_weight_expr)
+        stage2_status_weight = solve_or_raise(
+            stage2_problem,
+            build_cbc_solver(),
+            "No se pudo minimizar el peso final real",
+        )
+
+        actual_weight_opt = float(pulp.value(actual_weight_expr) or 0.0)
+        stage2_problem += (
+            actual_weight_expr <= actual_weight_opt + objective_fix_tolerance(actual_weight_opt)
+        ), "stage2_fix_actual_weight"
+
+        stage2_problem.setObjective(stem_violation_expr)
+        stage2_status_stems = solve_or_raise(
+            stage2_problem,
+            stage2_solver,
+            "No se pudo minimizar la desviacion de tallos por pedido",
+            integer_vars=list(stage2_u.values()),
+            allow_feasible_incumbent=True,
+        )
+        stem_violation_opt = float(pulp.value(stem_violation_expr) or 0.0)
+        stage2_problem += (
+            stem_violation_expr <= stem_violation_opt + objective_fix_tolerance(stem_violation_opt)
+        ), "stage2_fix_stem_violation"
+
         stage2_problem.setObjective(extra_grades_expr)
         stage2_status_extra = solve_or_raise(
             stage2_problem,
@@ -718,31 +1090,15 @@ def solve_pipeline(
             allow_feasible_incumbent=True,
         )
         total_grades_opt = float(pulp.value(total_grades_expr) or 0.0)
-        fixed_grade_usage = {
-            (order_position, grade_position): int(
-                excel_round(pulp.value(stage2_u[order_position, grade_position]) or 0.0, 0)
-            )
-            for order_position in active_order_positions
-            for grade_position in active_grade_positions
-        }
-        for order_position in active_order_positions:
-            for grade_position in active_grade_positions:
-                stage2_problem += (
-                    stage2_u[order_position, grade_position] == fixed_grade_usage[order_position, grade_position]
-                ), f"stage2_fix_usage_{order_position}_{grade_position}"
-
-        stage2_problem.setObjective(actual_weight_expr)
-        stage2_status_weight = solve_or_raise(
-            stage2_problem,
-            build_cbc_solver(),
-            "No se pudo minimizar el peso final real",
-        )
 
         for order_position in active_order_positions:
             weights_used[order_position] = float(pulp.value(stage2_weights[order_position]) or 0.0)
             slack_low_values[order_position] = float(pulp.value(stage2_slack_low[order_position]) or 0.0)
             slack_high_values[order_position] = float(pulp.value(stage2_slack_high[order_position]) or 0.0)
             extra_grades_values[order_position] = float(pulp.value(stage2_extra_grades[order_position]) or 0.0)
+            stem_shortfall_values[order_position] = float(pulp.value(stage2_stem_shortfall[order_position]) or 0.0)
+            stem_overrun_values[order_position] = float(pulp.value(stage2_stem_overrun[order_position]) or 0.0)
+            recipe_gap_values[order_position] = float(pulp.value(stage2_recipe_stem_gap[order_position]) or 0.0)
             for grade_position in active_grade_positions:
                 net_matrix[order_position, grade_position] = float(
                     pulp.value(stage2_x[order_position, grade_position]) or 0.0
@@ -771,8 +1127,12 @@ def solve_pipeline(
         out=np.zeros(n_orders, dtype=float),
         where=orders["tallos_min"].to_numpy(dtype=float) > 0,
     )
-    peso_min_obj = orders["peso_min_objetivo"].to_numpy(dtype=float)
-    peso_max_obj = orders["peso_max_objetivo"].to_numpy(dtype=float)
+    dynamic_bounds = np.array(
+        [dynamic_weight_bounds(weight) for weight in orders["peso_ideal_bunch"].to_numpy(dtype=float)],
+        dtype=float,
+    )
+    peso_min_obj = dynamic_bounds[:, 0]
+    peso_max_obj = dynamic_bounds[:, 1]
     ratio_real_vs_ideal = np.divide(
         avg_weight_per_bunch,
         orders["peso_ideal_bunch"].to_numpy(dtype=float),
@@ -819,8 +1179,13 @@ def solve_pipeline(
     order_summary["sobrepeso_total"] = over_under_weight
     order_summary["grados_usados"] = grades_used
     order_summary["exceso_grados_objetivo"] = extra_grades_values
+    order_summary["desviacion_tallos_bajo"] = stem_shortfall_values
+    order_summary["desviacion_tallos_sobre"] = stem_overrun_values
+    order_summary["desviacion_tallos_receta"] = recipe_gap_values
     order_summary["desviacion_bajo_objetivo"] = slack_low_values
     order_summary["desviacion_sobre_objetivo"] = slack_high_values
+    order_summary["peso_min_dinamico"] = peso_min_obj
+    order_summary["peso_max_dinamico"] = peso_max_obj
     order_summary["dentro_rango_objetivo"] = within_objective
 
     net_tallos = pd.DataFrame(net_matrix, index=order_names, columns=grade_labels)
@@ -907,25 +1272,49 @@ def solve_pipeline(
             status == "Optimal"
             for status in (
                 stage1_status,
+                stage1_status_macro,
+                stage1_status_recipe,
+                stage1_status_overweight,
+                stage1_status_ideal,
+                stage1_status_stems,
                 stage2_status_pref,
+                stage2_status_macro,
+                stage2_status_recipe,
                 stage2_status_overweight,
                 stage2_status_ideal,
+                stage2_status_stems,
                 stage2_status_extra,
                 stage2_status_total,
                 stage2_status_weight,
             )
         )
         else "Feasible con time limit",
+        "stage1_macro_violation_opt": stage1_macro_violation_opt,
+        "stage1_recipe_gap_opt": stage1_recipe_gap_opt,
+        "stage1_overweight_opt": stage1_overweight_opt,
+        "stage1_ideal_deviation_opt": stage1_ideal_deviation_opt,
         "fulfilled_ideal_opt": fulfilled_ideal_opt,
+        "macro_violation_opt": macro_violation_opt,
+        "recipe_gap_opt": recipe_gap_opt,
         "preferred_violation_opt": preferred_violation_opt,
         "overweight_opt": overweight_opt,
         "ideal_deviation_opt": ideal_deviation_opt,
+        "stem_violation_opt": stem_violation_opt,
         "extra_grades_opt": extra_grades_opt,
         "total_grades_opt": total_grades_opt,
         "stage1_status": stage1_status,
+        "stage1_status_macro": stage1_status_macro,
+        "stage1_status_recipe": stage1_status_recipe,
+        "stage1_status_overweight": stage1_status_overweight,
+        "stage1_status_ideal": stage1_status_ideal,
+        "stage1_status_stems": stage1_status_stems,
+        "stage1_stem_violation_opt": stage1_stem_violation_opt,
         "stage2_status_pref": stage2_status_pref,
+        "stage2_status_macro": stage2_status_macro,
+        "stage2_status_recipe": stage2_status_recipe,
         "stage2_status_overweight": stage2_status_overweight,
         "stage2_status_ideal": stage2_status_ideal,
+        "stage2_status_stems": stage2_status_stems,
         "stage2_status_extra": stage2_status_extra,
         "stage2_status_total": stage2_status_total,
         "stage2_status_weight": stage2_status_weight,
