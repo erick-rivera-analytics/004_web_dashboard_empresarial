@@ -34,6 +34,7 @@ type SolverBridgeDefaults = {
 
 const DEFAULT_SETTINGS: PoscosechaClasificacionSettings = {
   desperdicio: 0.13,
+  proceso: "GV",
 };
 
 const DEFAULT_AVAILABILITY_SEEDS: PoscosechaClasificacionAvailabilitySeed[] = [
@@ -100,9 +101,13 @@ function sanitizeSettings(
   input: Partial<PoscosechaClasificacionSettings> | null | undefined,
 ): PoscosechaClasificacionSettings {
   const desperdicio = Math.min(Math.max(toNumber(input?.desperdicio, DEFAULT_SETTINGS.desperdicio), 0), 0.95);
+  const proceso = input?.proceso === "PRECLASIFICACION" || input?.proceso === "APERTURA"
+    ? input.proceso
+    : "GV";
 
   return {
     desperdicio: Math.round(desperdicio * 10000) / 10000,
+    proceso,
   };
 }
 

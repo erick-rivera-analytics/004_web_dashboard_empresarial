@@ -3,12 +3,17 @@
 import { startTransition, type ReactNode, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   BrainCircuit,
+  CalendarDays,
+  Download,
   LoaderCircle,
   Play,
+  Plus,
   RefreshCcw,
   RotateCcw,
   Search,
+  Settings2,
   TableProperties,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,8 +33,12 @@ import { fetchJson } from "@/lib/fetch-json";
 import {
   buildClasificacionAvailabilityDerived,
   buildClasificacionPrecheck,
-  getDateLabel,
 } from "@/lib/postcosecha-clasificacion-en-blanco-client";
+import type {
+  PoscosechaSkuInput,
+  PoscosechaSkuPayload,
+  PoscosechaSkuRecord,
+} from "@/lib/postcosecha-sku-types";
 import type {
   PoscosechaClasificacionAvailabilityRow,
   PoscosechaClasificacionBootData,
@@ -49,6 +58,37 @@ type PoscosechaClasificacionEnBlancoExplorerProps = {
   initialData: PoscosechaClasificacionBootData;
   initialError?: string | null;
 };
+
+type SolverProcess = "GV" | "PRECLASIFICACION" | "APERTURA";
+
+type SolverDateSlot = {
+  key: SolverDateKey;
+  origin: SolverProcess;
+};
+
+type SolverLotDates = Partial<Record<SolverDateKey, string>>;
+
+const PROCESS_OPTIONS: Array<{
+  value: SolverProcess;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "GV",
+    label: "GV",
+    description: "Resolver clasificacion en blanco para gestion de valor.",
+  },
+  {
+    value: "PRECLASIFICACION",
+    label: "PRECLASIFICACION",
+    description: "Resolver para una corrida de preclasificacion.",
+  },
+  {
+    value: "APERTURA",
+    label: "APERTURA",
+    description: "Resolver para una corrida de apertura.",
+  },
+];
 
 function formatNumber(value: number | null, digits = 2) {
   if (value === null || value === undefined) {
@@ -85,6 +125,129 @@ function toInteger(value: unknown) {
 function toFloat(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.max(parsed, 0) : 0;
+}
+
+function mapSkuRecordToFormValues(record: PoscosechaSkuRecord): PoscosechaSkuInput {
+  return {
+    sku: record.sku,
+    pesoIdealBunch: record.pesoIdealBunch,
+    tallosMin: record.tallosMin,
+    tallosMax: record.tallosMax,
+    pesoMinObjetivo: record.pesoMinObjetivo,
+    pesoMaxObjetivo: record.pesoMaxObjetivo,
+    maxGradosObjetivo: record.maxGradosObjetivo,
+    changeReason: "",
+  };
+}
+
+function buildSkuPayload(values: PoscosechaSkuInput): PoscosechaSkuInput {
+  return {
+    sku: values.sku.trim(),
+    pesoIdealBunch: toFloat(values.pesoIdealBunch),
+    tallosMin: toInteger(values.tallosMin),
+    tallosMax: toInteger(values.tallosMax),
+    pesoMinObjetivo: toFloat(values.pesoMinObjetivo),
+    pesoMaxObjetivo: toFloat(values.pesoMaxObjetivo),
+    maxGradosObjetivo: toInteger(values.maxGradosObjetivo),
+    changeReason: values.changeReason?.trim() || null,
+  };
+}
+
+function validateSkuForm(values: PoscosechaSkuInput) {
+  const payload = buildSkuPayload(values);
+  const errors: Partial<Record<keyof PoscosechaSkuInput, string>> = {};
+
+  if (!payload.sku) {
+    errors.sku = "El SKU es obligatorio.";
+  }
+  if (payload.pesoIdealBunch <= 0) {
+    errors.pesoIdealBunch = "El peso ideal debe ser mayor a cero.";
+  }
+  if (payload.tallosMin < 1) {
+    errors.tallosMin = "Los tallos minimos deben ser al menos 1.";
+  }
+  if (payload.tallosMax < payload.tallosMin) {
+    errors.tallosMax = "Los tallos maximos no pueden ser menores a los minimos.";
+  }
+  if (payload.pesoMinObjetivo <= 0) {
+    errors.pesoMinObjetivo = "El peso minimo objetivo debe ser mayor a cero.";
+  }
+  if (payload.pesoMaxObjetivo < payload.pesoMinObjetivo) {
+    errors.pesoMaxObjetivo = "El peso maximo objetivo no puede ser menor al minimo.";
+  }
+  if (payload.maxGradosObjetivo < 1) {
+    errors.maxGradosObjetivo = "El maximo de grados debe ser al menos 1.";
+  }
+
+  return errors;
+}
+
+function formatShortDate(value: string) {
+  if (!value) {
+    return "Sin fecha de lote";
+  }
+
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString("es-EC", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function buildInitialDateSlots(
+  ordersTemplate: PoscosechaClasificacionOrderRow[],
+  availabilityTemplate: PoscosechaClasificacionAvailabilityRow[],
+): SolverDateSlot[] {
+  const activeKeys = SOLVER_DATE_KEYS.filter((key) => {
+    const hasOrders = ordersTemplate.some((row) => toInteger(row[key]) > 0);
+    const hasAvailability = availabilityTemplate.some((row) => toInteger(row[key]) > 0);
+    return hasOrders || hasAvailability;
+  });
+
+  const keys = activeKeys.length > 0 ? activeKeys : [SOLVER_DATE_KEYS[0]];
+  return keys.map((key) => ({ key, origin: "GV" }));
+}
+
+function getOrderLabel(index: number) {
+  return `Orden ${index + 1}`;
+}
+
+function getAvailabilityLabel(index: number, loteFecha: string) {
+  return `${getOrderLabel(index)}${loteFecha ? ` · lote ${formatShortDate(loteFecha)}` : " · sin fecha de lote"}`;
+}
+
+function FloatingPanel({
+  title,
+  description,
+  onClose,
+  children,
+}: {
+  title: string;
+  description: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-[120] overflow-y-auto bg-slate-950/45 px-4 py-8 backdrop-blur-sm">
+      <div className="mx-auto w-full max-w-3xl rounded-[28px] border border-border/70 bg-card/96 shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-6 py-5">
+          <div className="space-y-1">
+            <h3 className="text-xl font-semibold text-foreground">{title}</h3>
+            <p className="text-sm text-muted-foreground">{description}</p>
+          </div>
+          <Button type="button" variant="ghost" className="rounded-full" onClick={onClose}>
+            Cerrar
+          </Button>
+        </div>
+        <div className="px-6 py-6">{children}</div>
+      </div>
+    </div>
+  );
 }
 
 function orderTotal(row: PoscosechaClasificacionOrderRow) {
@@ -134,12 +297,206 @@ function ResultStatusBadge({ status }: { status: string }) {
   );
 }
 
+function SkuInfoOverlay({
+  row,
+  isEditing,
+  isSaving,
+  formValues,
+  formErrors,
+  onEdit,
+  onCancelEdit,
+  onFieldChange,
+  onSubmit,
+  onClose,
+}: {
+  row: PoscosechaSkuRecord | null;
+  isEditing: boolean;
+  isSaving: boolean;
+  formValues: PoscosechaSkuInput;
+  formErrors: Partial<Record<keyof PoscosechaSkuInput, string>>;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onFieldChange: <Key extends keyof PoscosechaSkuInput>(field: Key, value: PoscosechaSkuInput[Key]) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onClose: () => void;
+}) {
+  if (!row) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 px-4 py-8 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-[28px] border border-border/70 bg-card/96 shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-6 py-5">
+          <div className="space-y-2">
+            <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.24em]">
+              Ficha SKU
+            </Badge>
+            <div>
+              <h3 className="text-2xl font-semibold text-foreground">{row.sku}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {isEditing
+                  ? "Edicion directa del SKU usando la misma logica del maestro."
+                  : "Vista informativa del SKU con acceso directo a modificacion."}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <Button type="button" variant="outline" className="rounded-full" onClick={onCancelEdit}>
+                Cancelar
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" className="rounded-full" onClick={onEdit}>
+                Modificar
+              </Button>
+            )}
+            <Button type="button" variant="ghost" className="rounded-full" onClick={onClose}>
+              Cerrar
+            </Button>
+          </div>
+        </div>
+
+        {isEditing ? (
+          <form className="space-y-5 px-6 py-6" onSubmit={onSubmit}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="sku-edit-name">SKU</Label>
+                <Input
+                  id="sku-edit-name"
+                  value={formValues.sku}
+                  onChange={(event) => onFieldChange("sku", event.target.value)}
+                />
+                {formErrors.sku ? <p className="text-xs text-destructive">{formErrors.sku}</p> : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sku-edit-peso-ideal">Peso ideal</Label>
+                <Input
+                  id="sku-edit-peso-ideal"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={formValues.pesoIdealBunch}
+                  onChange={(event) => onFieldChange("pesoIdealBunch", Number(event.target.value))}
+                />
+                {formErrors.pesoIdealBunch ? <p className="text-xs text-destructive">{formErrors.pesoIdealBunch}</p> : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sku-edit-max-grados">Max grados</Label>
+                <Input
+                  id="sku-edit-max-grados"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={formValues.maxGradosObjetivo}
+                  onChange={(event) => onFieldChange("maxGradosObjetivo", Number(event.target.value))}
+                />
+                {formErrors.maxGradosObjetivo ? <p className="text-xs text-destructive">{formErrors.maxGradosObjetivo}</p> : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sku-edit-tallos-min">Tallos min</Label>
+                <Input
+                  id="sku-edit-tallos-min"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={formValues.tallosMin}
+                  onChange={(event) => onFieldChange("tallosMin", Number(event.target.value))}
+                />
+                {formErrors.tallosMin ? <p className="text-xs text-destructive">{formErrors.tallosMin}</p> : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sku-edit-tallos-max">Tallos max</Label>
+                <Input
+                  id="sku-edit-tallos-max"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={formValues.tallosMax}
+                  onChange={(event) => onFieldChange("tallosMax", Number(event.target.value))}
+                />
+                {formErrors.tallosMax ? <p className="text-xs text-destructive">{formErrors.tallosMax}</p> : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sku-edit-peso-min">Peso min</Label>
+                <Input
+                  id="sku-edit-peso-min"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={formValues.pesoMinObjetivo}
+                  onChange={(event) => onFieldChange("pesoMinObjetivo", Number(event.target.value))}
+                />
+                {formErrors.pesoMinObjetivo ? <p className="text-xs text-destructive">{formErrors.pesoMinObjetivo}</p> : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sku-edit-peso-max">Peso max</Label>
+                <Input
+                  id="sku-edit-peso-max"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={formValues.pesoMaxObjetivo}
+                  onChange={(event) => onFieldChange("pesoMaxObjetivo", Number(event.target.value))}
+                />
+                {formErrors.pesoMaxObjetivo ? <p className="text-xs text-destructive">{formErrors.pesoMaxObjetivo}</p> : null}
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="sku-edit-reason">Motivo del cambio</Label>
+                <Input
+                  id="sku-edit-reason"
+                  value={formValues.changeReason ?? ""}
+                  onChange={(event) => onFieldChange("changeReason", event.target.value)}
+                  placeholder="Ej: ajuste directo desde solver"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button type="submit" className="rounded-full" disabled={isSaving}>
+                {isSaving ? "Guardando..." : "Guardar cambios"}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="grid gap-4 px-6 py-6 md:grid-cols-2">
+            <SummaryTile
+              label="Peso ideal"
+              value={`${formatNumber(row.pesoIdealBunch)} g`}
+              hint="Peso objetivo del bunch para este SKU."
+            />
+            <SummaryTile
+              label="Rango de peso"
+              value={`${formatNumber(row.pesoMinObjetivo)} - ${formatNumber(row.pesoMaxObjetivo)} g`}
+              hint="Limites operativos configurados para este SKU."
+            />
+            <SummaryTile
+              label="Tallos min"
+              value={formatInteger(row.tallosMin)}
+              hint="Minimo esperado de tallos por bunch."
+            />
+            <SummaryTile
+              label="Tallos max"
+              value={formatInteger(row.tallosMax)}
+              hint="Maximo esperado de tallos por bunch."
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OrdersInputTable({
   rows,
   onChange,
+  onOpenSku,
+  dateSlots,
 }: {
   rows: PoscosechaClasificacionOrderRow[];
   onChange: (skuId: string, dateKey: SolverDateKey, value: string) => void;
+  onOpenSku: (skuId: string) => void;
+  dateSlots: SolverDateSlot[];
 }) {
   return (
     <div className="max-h-[600px] overflow-auto rounded-[24px] border border-border/70">
@@ -147,9 +504,9 @@ function OrdersInputTable({
         <thead className="sticky top-0 bg-background/95 backdrop-blur">
           <tr className="border-b border-border/70 text-left">
             <th className="px-4 py-3 font-medium">SKU</th>
-            {SOLVER_DATE_KEYS.map((key) => (
-              <th key={key} className="px-3 py-3 text-center font-medium">
-                {getDateLabel(key)}
+            {dateSlots.map((slot, index) => (
+              <th key={slot.key} className="px-3 py-3 text-center font-medium">
+                {getOrderLabel(index)}
               </th>
             ))}
             <th className="px-4 py-3 text-right font-medium">Total</th>
@@ -158,15 +515,23 @@ function OrdersInputTable({
         <tbody>
           {rows.map((row) => (
             <tr key={row.skuId} className="border-b border-border/50 last:border-b-0">
-              <td className="px-4 py-3 align-middle font-medium">{row.sku}</td>
-              {SOLVER_DATE_KEYS.map((key) => (
-                <td key={key} className="px-3 py-2 text-center">
+              <td className="px-4 py-3 align-middle font-medium">
+                <button
+                  type="button"
+                  className="text-left text-foreground transition hover:text-slate-700 hover:underline"
+                  onClick={() => onOpenSku(row.skuId)}
+                >
+                  <span className="block">{row.sku}</span>
+                </button>
+              </td>
+              {dateSlots.map((slot) => (
+                <td key={slot.key} className="px-3 py-2 text-center">
                   <Input
                     type="number"
                     min={0}
                     step={1}
-                    value={row[key]}
-                    onChange={(event) => onChange(row.skuId, key, event.target.value)}
+                    value={row[slot.key]}
+                    onChange={(event) => onChange(row.skuId, slot.key, event.target.value)}
                     className="mx-auto h-9 w-20 text-right"
                   />
                 </td>
@@ -187,11 +552,15 @@ function AvailabilityInputTable({
   desperdicio,
   onDateChange,
   onWeightChange,
+  dateSlots,
+  lotDates,
 }: {
   rows: PoscosechaClasificacionAvailabilityRow[];
   desperdicio: number;
   onDateChange: (grado: number, dateKey: SolverDateKey, value: string) => void;
   onWeightChange: (grado: number, value: string) => void;
+  dateSlots: SolverDateSlot[];
+  lotDates: SolverLotDates;
 }) {
   const derivedRows = buildClasificacionAvailabilityDerived(rows, desperdicio);
   const derivedByGrade = new Map(derivedRows.map((row) => [row.grado, row]));
@@ -202,9 +571,9 @@ function AvailabilityInputTable({
         <thead className="sticky top-0 bg-background/95 backdrop-blur">
           <tr className="border-b border-border/70 text-left">
             <th className="px-4 py-3 font-medium">Grado</th>
-            {SOLVER_DATE_KEYS.map((key) => (
-              <th key={key} className="px-3 py-3 text-center font-medium">
-                {getDateLabel(key)}
+            {dateSlots.map((slot, index) => (
+              <th key={slot.key} className="px-3 py-3 text-center font-medium">
+                {getAvailabilityLabel(index, lotDates[slot.key] ?? "")}
               </th>
             ))}
             <th className="px-3 py-3 text-center font-medium">Peso tallo seed (g)</th>
@@ -219,14 +588,14 @@ function AvailabilityInputTable({
             return (
               <tr key={row.grado} className="border-b border-border/50 last:border-b-0">
                 <td className="px-4 py-3 align-middle font-medium">{row.grado}</td>
-                {SOLVER_DATE_KEYS.map((key) => (
-                  <td key={key} className="px-3 py-2 text-center">
+                {dateSlots.map((slot) => (
+                  <td key={slot.key} className="px-3 py-2 text-center">
                     <Input
                       type="number"
                       min={0}
                       step={1}
-                      value={row[key]}
-                      onChange={(event) => onDateChange(row.grado, key, event.target.value)}
+                      value={row[slot.key]}
+                      onChange={(event) => onDateChange(row.grado, slot.key, event.target.value)}
                       className="mx-auto h-9 w-20 text-right"
                     />
                   </td>
@@ -317,18 +686,41 @@ export function PoscosechaClasificacionEnBlancoExplorer({
   initialData,
   initialError,
 }: PoscosechaClasificacionEnBlancoExplorerProps) {
+  const initialDateSlots = useMemo(
+    () => buildInitialDateSlots(initialData.ordersTemplate, initialData.availabilityTemplate),
+    [initialData.availabilityTemplate, initialData.ordersTemplate],
+  );
   const [bootData, setBootData] = useState(initialData);
   const [orders, setOrders] = useState(initialData.ordersTemplate);
   const [availability, setAvailability] = useState(initialData.availabilityTemplate);
   const [settings, setSettings] = useState(initialData.settings);
+  const [dateSlots, setDateSlots] = useState<SolverDateSlot[]>(initialDateSlots);
+  const [lotDates, setLotDates] = useState<SolverLotDates>({});
   const [result, setResult] = useState<PoscosechaClasificacionResult | null>(null);
   const [search, setSearch] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
+  const [selectedSkuInfo, setSelectedSkuInfo] = useState<PoscosechaSkuRecord | null>(null);
+  const [isSkuEditing, setIsSkuEditing] = useState(false);
+  const [isSkuSaving, setIsSkuSaving] = useState(false);
+  const [skuFormValues, setSkuFormValues] = useState<PoscosechaSkuInput>({
+    sku: "",
+    pesoIdealBunch: 0,
+    tallosMin: 0,
+    tallosMax: 0,
+    pesoMinObjetivo: 0,
+    pesoMaxObjetivo: 0,
+    maxGradosObjetivo: 1,
+    changeReason: "",
+  });
+  const [skuFormErrors, setSkuFormErrors] = useState<Partial<Record<keyof PoscosechaSkuInput, string>>>({});
   const [selectedRecipeSku, setSelectedRecipeSku] = useState<string | null>(null);
   const [recipeData, setRecipeData] = useState<PoscosechaClasificacionRecipeResult | null>(null);
   const [recipeError, setRecipeError] = useState<string | null>(null);
   const [isRecipeLoading, setIsRecipeLoading] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isOrdersManagerOpen, setIsOrdersManagerOpen] = useState(false);
+  const [isLotDatesOpen, setIsLotDatesOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const filteredOrders = useMemo(() => {
@@ -366,6 +758,21 @@ export function PoscosechaClasificacionEnBlancoExplorer({
     [result],
   );
 
+  const dateSlotMeta = useMemo(
+    () =>
+      dateSlots.map((slot, index) => ({
+        ...slot,
+        orderLabel: getOrderLabel(index),
+        availabilityLabel: getAvailabilityLabel(index, lotDates[slot.key] ?? ""),
+      })),
+    [dateSlots, lotDates],
+  );
+
+  const skuMasterById = useMemo(
+    () => new Map(bootData.skuMaster.map((row) => [row.skuId, row])),
+    [bootData.skuMaster],
+  );
+
   const netStemValuesBySku = useMemo(
     () => new Map((result?.netStemMatrix.rows ?? []).map((row) => [row.sku, row.values])),
     [result],
@@ -379,6 +786,10 @@ export function PoscosechaClasificacionEnBlancoExplorer({
 
   useEffect(() => {
     if (!result) {
+      setSelectedSkuInfo(null);
+      setIsSkuEditing(false);
+      setIsSkuSaving(false);
+      setSkuFormErrors({});
       setSelectedRecipeSku(null);
       setRecipeData(null);
       setRecipeError(null);
@@ -391,6 +802,57 @@ export function PoscosechaClasificacionEnBlancoExplorer({
     setOrders(nextData.ordersTemplate);
     setAvailability(nextData.availabilityTemplate);
     setSettings(nextData.settings);
+    setDateSlots((current) => (current.length ? current : buildInitialDateSlots(nextData.ordersTemplate, nextData.availabilityTemplate)));
+    setResult(null);
+  }
+
+  function addDateSlot() {
+    setDateSlots((current) => {
+      const usedKeys = new Set(current.map((slot) => slot.key));
+      const nextKey = SOLVER_DATE_KEYS.find((key) => !usedKeys.has(key));
+
+      if (!nextKey) {
+        toast.error("Ya alcanzaste el maximo de 5 prioridades para este solver.");
+        return current;
+      }
+
+      return [...current, { key: nextKey, origin: "GV" }];
+    });
+  }
+
+  function removeDateSlot(dateKey: SolverDateKey) {
+    setDateSlots((current) => {
+      if (current.length <= 1) {
+        toast.error("Debe existir al menos una prioridad activa.");
+        return current;
+      }
+
+      return current.filter((slot) => slot.key !== dateKey);
+    });
+    setLotDates((current) => {
+      const next = { ...current };
+      delete next[dateKey];
+      return next;
+    });
+
+    startTransition(() => {
+      setOrders((current) => current.map((row) => ({ ...row, [dateKey]: 0 })));
+      setAvailability((current) => current.map((row) => ({ ...row, [dateKey]: 0 })));
+      setResult(null);
+    });
+  }
+
+  function updateLotDate(dateKey: SolverDateKey, value: string) {
+    setLotDates((current) => ({
+      ...current,
+      [dateKey]: value,
+    }));
+  }
+
+  function updateDateSlotOrigin(dateKey: SolverDateKey, origin: SolverProcess) {
+    setDateSlots((current) =>
+      current.map((slot) => (slot.key === dateKey ? { ...slot, origin } : slot)),
+    );
     setResult(null);
   }
 
@@ -399,6 +861,112 @@ export function PoscosechaClasificacionEnBlancoExplorer({
     setRecipeData(null);
     setRecipeError(null);
     setIsRecipeLoading(false);
+  }
+
+  function openSkuInfo(skuId: string) {
+    const skuRecord = skuMasterById.get(skuId);
+    if (skuRecord) {
+      setSelectedSkuInfo(skuRecord);
+      setIsSkuEditing(false);
+      setSkuFormValues(mapSkuRecordToFormValues(skuRecord));
+      setSkuFormErrors({});
+      return;
+    }
+
+    toast.error("No se encontro la ficha del SKU seleccionado.");
+  }
+
+  function closeSkuInfoOverlay() {
+    setSelectedSkuInfo(null);
+    setIsSkuEditing(false);
+    setIsSkuSaving(false);
+    setSkuFormErrors({});
+  }
+
+  function openSkuEditMode() {
+    if (!selectedSkuInfo) {
+      return;
+    }
+    setIsSkuEditing(true);
+    setSkuFormValues(mapSkuRecordToFormValues(selectedSkuInfo));
+    setSkuFormErrors({});
+  }
+
+  function cancelSkuEditMode() {
+    if (selectedSkuInfo) {
+      setSkuFormValues(mapSkuRecordToFormValues(selectedSkuInfo));
+    }
+    setIsSkuEditing(false);
+    setSkuFormErrors({});
+  }
+
+  function updateSkuField<Key extends keyof PoscosechaSkuInput>(
+    field: Key,
+    value: PoscosechaSkuInput[Key],
+  ) {
+    setSkuFormValues((current) => ({
+      ...current,
+      [field]: value,
+    }));
+    setSkuFormErrors((current) => ({
+      ...current,
+      [field]: undefined,
+    }));
+  }
+
+  async function handleSkuSave(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedSkuInfo) {
+      return;
+    }
+
+    const nextErrors = validateSkuForm(skuFormValues);
+    setSkuFormErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      toast.error("Revisa los campos del SKU antes de guardar.");
+      return;
+    }
+
+    setIsSkuSaving(true);
+
+    try {
+      const payload = buildSkuPayload(skuFormValues);
+      const response = await fetchJson<PoscosechaSkuPayload>(
+        `/api/postcosecha/administrar-maestros/skus/${encodeURIComponent(selectedSkuInfo.skuId)}`,
+        "No se pudo actualizar el SKU.",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      const updatedSku = response.data;
+
+      setBootData((current) => ({
+        ...current,
+        skuMaster: current.skuMaster.map((item) => (item.skuId === updatedSku.skuId ? updatedSku : item)),
+        ordersTemplate: current.ordersTemplate.map((item) =>
+          item.skuId === updatedSku.skuId ? { ...item, sku: updatedSku.sku } : item,
+        ),
+      }));
+      setOrders((current) =>
+        current.map((item) => (item.skuId === updatedSku.skuId ? { ...item, sku: updatedSku.sku } : item)),
+      );
+      setSelectedSkuInfo(updatedSku);
+      setSkuFormValues(mapSkuRecordToFormValues(updatedSku));
+      setIsSkuEditing(false);
+      setResult(null);
+      toast.success("SKU actualizado correctamente desde el solver.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el SKU.");
+    } finally {
+      setIsSkuSaving(false);
+    }
   }
 
   async function reloadBase() {
@@ -555,6 +1123,163 @@ export function PoscosechaClasificacionEnBlancoExplorer({
     }
   }
 
+  async function handleExportPdf() {
+    if (!result) {
+      return;
+    }
+
+    setIsExportingPdf(true);
+
+    try {
+      const resolvedRows = result.orderRows.filter((row) => row.pedidoResuelto > 0);
+      const recipeResponses = await Promise.all(
+        resolvedRows.map(async (row) => {
+          const netStemValues = netStemValuesBySku.get(row.sku);
+          if (!netStemValues) {
+            return null;
+          }
+
+          const recipeInput = buildRecipeInput(row, netStemValues, availability);
+          if (!recipeInput) {
+            return null;
+          }
+
+          const response = await fetchJson<PoscosechaClasificacionRecipePayload>(
+            "/api/postcosecha/planificacion/solver/clasificacion-en-blanco/receta",
+            `No se pudo construir la receta de ${row.sku}.`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(recipeInput),
+            },
+          );
+
+          return {
+            sku: row.sku,
+            data: response.data,
+          };
+        }),
+      );
+
+      const recipes = recipeResponses.filter((item): item is { sku: string; data: PoscosechaClasificacionRecipeResult } => Boolean(item));
+      const popup = window.open("", "_blank", "width=1200,height=900");
+
+      if (!popup) {
+        throw new Error("No se pudo abrir la vista de impresion para exportar el PDF.");
+      }
+
+      const summaryRowsHtml = result.orderRows
+        .map(
+          (row) => `
+            <tr>
+              <td>${row.sku}</td>
+              <td>${row.estadoPeso}</td>
+              <td class="num">${formatInteger(row.pedidoTotal)}</td>
+              <td class="num">${formatInteger(row.pedidoResuelto)}</td>
+              <td class="num">${formatNumber(row.pesoIdealPedido)}</td>
+              <td class="num">${formatNumber(row.pesoRealTotal)}</td>
+              <td class="num">${formatPercent(row.sobrepesoPct)}</td>
+            </tr>`,
+        )
+        .join("");
+
+      const recipeSectionsHtml = recipes
+        .map(
+          ({ sku, data }) => `
+            <section class="recipe-block">
+              <h3>${sku}</h3>
+              <p class="muted">
+                Bunches resueltos: ${formatInteger(data.summary.bunchesResueltos)} |
+                Peso promedio real: ${formatNumber(data.summary.pesoPromedioReal)} g |
+                Estado: ${data.summary.status}
+              </p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Receta</th>
+                    <th class="num">Cantidad</th>
+                    <th class="num">Tallos/bunch</th>
+                    <th class="num">Peso/bunch</th>
+                    <th class="num">Dif. ideal</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${data.rows
+                    .map(
+                      (recipe) => `
+                        <tr>
+                          <td>${recipe.composicion.map((item) => `${item.grado}x${item.tallos}`).join(" + ")}</td>
+                          <td class="num">${formatInteger(recipe.cantidad)}</td>
+                          <td class="num">${formatInteger(recipe.tallosPorBunch)}</td>
+                          <td class="num">${formatNumber(recipe.pesoPorBunch)}</td>
+                          <td class="num">${formatNumber(recipe.difIdeal)}</td>
+                          <td>${recipe.estadoPeso}</td>
+                        </tr>`,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </section>`,
+        )
+        .join("");
+
+      popup.document.write(`
+        <!DOCTYPE html>
+        <html lang="es">
+          <head>
+            <meta charset="utf-8" />
+            <title>Clasificacion en blanco</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+              h1, h2, h3 { margin: 0 0 12px; }
+              .muted { color: #6b7280; margin-bottom: 16px; }
+              .pill { display: inline-block; border: 1px solid #d1d5db; border-radius: 999px; padding: 6px 12px; margin-right: 8px; font-size: 12px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+              th, td { border: 1px solid #e5e7eb; padding: 8px 10px; font-size: 12px; vertical-align: top; }
+              th { background: #f8fafc; text-align: left; }
+              .num { text-align: right; }
+              .recipe-block { margin-top: 24px; page-break-inside: avoid; }
+            </style>
+          </head>
+          <body>
+            <h1>Clasificacion en blanco</h1>
+            <p class="muted">Proceso: ${settings.proceso ?? "GV"}</p>
+            <div>
+              ${dateSlotMeta.map((slot) => `<span class="pill">${slot.orderLabel}: ${lotDates[slot.key] ? formatShortDate(lotDates[slot.key] ?? "") : "Sin fecha de lote"}</span>`).join("")}
+            </div>
+            <h2 style="margin-top: 24px;">Resumen macro</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Estado</th>
+                  <th class="num">Pedido</th>
+                  <th class="num">Resuelto</th>
+                  <th class="num">Peso ideal pedido</th>
+                  <th class="num">Peso real total</th>
+                  <th class="num">Sobrepeso %</th>
+                </tr>
+              </thead>
+              <tbody>${summaryRowsHtml}</tbody>
+            </table>
+            <h2 style="margin-top: 24px;">Recetas por orden</h2>
+            ${recipeSectionsHtml || "<p class='muted'>No hubo recetas disponibles para exportar.</p>"}
+          </body>
+        </html>
+      `);
+      popup.document.close();
+      popup.focus();
+      popup.print();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo exportar el PDF.");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Card className="starter-panel border-border/70 bg-card/84">
@@ -576,8 +1301,8 @@ export function PoscosechaClasificacionEnBlancoExplorer({
                 <CardTitle className="text-2xl">Clasificacion en blanco</CardTitle>
                 <CardDescription className="max-w-4xl text-sm leading-relaxed">
                   Esta vista usa el maestro activo de SKU de postcosecha como fuente oficial y
-                  ejecuta el solver real para resolver bunches por fecha, mezcla de grados y tabla
-                  final en mallas.
+                  ejecuta el solver real para resolver bunches por prioridad, mezcla de grados y
+                  tabla final en mallas.
                 </CardDescription>
               </div>
             </div>
@@ -608,6 +1333,11 @@ export function PoscosechaClasificacionEnBlancoExplorer({
               label="Desperdicio"
               value={formatPercent(settings.desperdicio)}
               hint="Parametro global usado por el solver."
+            />
+            <SummaryTile
+              label="Proceso"
+              value={settings.proceso ?? "GV"}
+              hint="Modo operativo seleccionado para esta corrida."
             />
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -646,11 +1376,15 @@ export function PoscosechaClasificacionEnBlancoExplorer({
               <div className="space-y-2">
                 <CardTitle className="text-lg">Pedidos por SKU</CardTitle>
                 <CardDescription>
-                  Captura manual de bunches por fecha. La base siempre nace desde el maestro activo
-                  de SKU.
+                  Captura manual de bunches por prioridad de orden. La base siempre nace desde el
+                  maestro activo de SKU.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsOrdersManagerOpen(true)}>
+                  <Settings2 className="size-4" />
+                  Administrar ordenes
+                </Button>
                 <Button type="button" variant="outline" onClick={resetOrders}>
                   <RotateCcw className="size-4" />
                   Limpiar pedidos
@@ -672,11 +1406,24 @@ export function PoscosechaClasificacionEnBlancoExplorer({
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-border/70 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2">
+                <span>Proceso activo: <strong>{settings.proceso ?? "GV"}</strong></span>
+                <span>Ordenes activas: <strong>{dateSlots.length}</strong></span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {dateSlotMeta.map((slot) => (
+                  <Badge key={slot.key} variant="outline" className="rounded-full px-3 py-1">
+                    {slot.orderLabel} · {slot.origin}
+                  </Badge>
+                ))}
+              </div>
+            </div>
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
               <span>Mostrando {filteredOrders.length} de {orders.length} SKU.</span>
               <span>{formatInteger(ordersWithCapture)} SKU con pedido activo.</span>
             </div>
-            <OrdersInputTable rows={filteredOrders} onChange={updateOrderValue} />
+            <OrdersInputTable rows={filteredOrders} onChange={updateOrderValue} onOpenSku={openSkuInfo} dateSlots={dateSlots} />
           </CardContent>
         </Card>
 
@@ -686,10 +1433,14 @@ export function PoscosechaClasificacionEnBlancoExplorer({
               <div className="space-y-2">
                 <CardTitle className="text-lg">Disponibilidad por grado</CardTitle>
                 <CardDescription>
-                  Captura manual de mallas por fecha y peso tallo seed en gramos para cada grado.
+                  Captura manual de mallas por prioridad y peso tallo seed en gramos para cada grado.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsLotDatesOpen(true)}>
+                  <CalendarDays className="size-4" />
+                  Fechas de lote
+                </Button>
                 <Button type="button" variant="outline" onClick={resetAvailability}>
                   <RotateCcw className="size-4" />
                   Restaurar base
@@ -729,6 +1480,8 @@ export function PoscosechaClasificacionEnBlancoExplorer({
               desperdicio={settings.desperdicio}
               onDateChange={updateAvailabilityDate}
               onWeightChange={updateAvailabilityWeight}
+              dateSlots={dateSlots}
+              lotDates={lotDates}
             />
           </CardContent>
         </Card>
@@ -779,13 +1532,17 @@ export function PoscosechaClasificacionEnBlancoExplorer({
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              El solver prioriza Fecha 1, luego Fecha 2 y asi sucesivamente antes de optimizar peso y
-              uso de grados.
+              El solver prioriza Orden 1, luego Orden 2 y asi sucesivamente antes de optimizar peso y
+              uso de grados, respetando el proceso seleccionado.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="outline" onClick={() => setResult(null)} disabled={!result}>
                 <TableProperties className="size-4" />
                 Limpiar resultados
+              </Button>
+              <Button type="button" variant="outline" onClick={() => void handleExportPdf()} disabled={!result || isExportingPdf}>
+                {isExportingPdf ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}
+                Exportar PDF
               </Button>
               <Button
                 type="button"
@@ -799,6 +1556,122 @@ export function PoscosechaClasificacionEnBlancoExplorer({
           </div>
         </CardContent>
       </Card>
+
+      {isOrdersManagerOpen ? (
+        <FloatingPanel
+          title="Administrar ordenes"
+          description="Aqui defines las prioridades activas y el origen de cada orden para la captura inicial de pedidos."
+          onClose={() => setIsOrdersManagerOpen(false)}
+        >
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label>Ordenes activas</Label>
+              <Button type="button" size="sm" variant="outline" className="rounded-full" onClick={addDateSlot}>
+                <Plus className="size-4" />
+                Agregar orden
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {dateSlotMeta.map((slot) => (
+                <div key={slot.key} className="rounded-[18px] border border-border/70 bg-card/70 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{slot.orderLabel}</p>
+                      <p className="text-xs text-muted-foreground">Se refleja como columna de captura en pedidos.</p>
+                    </div>
+                    <Button type="button" size="icon" variant="ghost" className="size-8 rounded-full" onClick={() => removeDateSlot(slot.key)}>
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`origin-${slot.key}`}>Origen</Label>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      {PROCESS_OPTIONS.map((option) => (
+                        <button
+                          key={`${slot.key}-${option.value}`}
+                          id={`origin-${slot.key}`}
+                          type="button"
+                          className={cn(
+                            "rounded-[18px] border px-4 py-3 text-left transition",
+                            slot.origin === option.value
+                              ? "border-slate-900 bg-slate-900 text-white"
+                              : "border-border/70 bg-card/80 hover:border-slate-400",
+                          )}
+                          onClick={() => updateDateSlotOrigin(slot.key, option.value)}
+                        >
+                          <span className="block text-sm font-semibold">{option.label}</span>
+                          <span className={cn("mt-1 block text-xs", slot.origin === option.value ? "text-white/80" : "text-muted-foreground")}>
+                            {option.description}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </FloatingPanel>
+      ) : null}
+
+      {isLotDatesOpen ? (
+        <FloatingPanel
+          title="Fechas de lote"
+          description="Aqui asignas la fecha real del lote para cada orden activa y defines el proceso global del solver."
+          onClose={() => setIsLotDatesOpen(false)}
+        >
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <Label>Proceso del solver</Label>
+              <div className="grid gap-2 md:grid-cols-3">
+                {PROCESS_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={cn(
+                      "rounded-[20px] border px-4 py-3 text-left transition",
+                      settings.proceso === option.value
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-border/70 bg-card/80 hover:border-slate-400",
+                    )}
+                    onClick={() => {
+                      setSettings((current) => ({ ...current, proceso: option.value }));
+                      setResult(null);
+                    }}
+                  >
+                    <span className="block text-sm font-semibold">{option.label}</span>
+                    <span className={cn("mt-1 block text-xs", settings.proceso === option.value ? "text-white/80" : "text-muted-foreground")}>
+                      {option.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+            {dateSlotMeta.map((slot) => (
+              <div key={slot.key} className="rounded-[18px] border border-border/70 bg-card/70 p-4">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">{slot.orderLabel}</p>
+                    <p className="text-xs text-muted-foreground">Se muestra en Disponibilidad por grado como referencia del lote.</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`lote-${slot.key}`}>Fecha del lote</Label>
+                  <Input
+                    id={`lote-${slot.key}`}
+                    type="date"
+                    value={lotDates[slot.key] ?? ""}
+                    onChange={(event) => updateLotDate(slot.key, event.target.value)}
+                  />
+                </div>
+              </div>
+            ))}
+            </div>
+          </div>
+        </FloatingPanel>
+      ) : null}
 
       {result ? (
         <>
@@ -851,15 +1724,16 @@ export function PoscosechaClasificacionEnBlancoExplorer({
           </div>
 
           <SimpleTableCard
-            title="Prioridad de cumplimiento por fecha"
-            description="Secuencia de la etapa interna de resolucion de pedidos."
+            title="Prioridad de cumplimiento por orden"
+            description="Secuencia de la etapa interna de resolucion de pedidos segun el orden activo."
             table={(
               <div className="overflow-x-auto rounded-[24px] border border-border/70">
                 <table className="min-w-[720px] w-full text-sm">
                   <thead className="bg-background/95">
                     <tr className="border-b border-border/70 text-left">
                       <th className="px-4 py-3 font-medium">Prioridad</th>
-                      <th className="px-4 py-3 font-medium">Fecha</th>
+                      <th className="px-4 py-3 font-medium">Orden</th>
+                      <th className="px-4 py-3 font-medium">Fecha lote</th>
                       <th className="px-4 py-3 text-right font-medium">Pedido</th>
                       <th className="px-4 py-3 text-right font-medium">Resuelto</th>
                       <th className="px-4 py-3 text-right font-medium">No realizado</th>
@@ -870,7 +1744,8 @@ export function PoscosechaClasificacionEnBlancoExplorer({
                     {result.priorityRows.map((row) => (
                       <tr key={row.prioridad} className="border-b border-border/50 last:border-b-0">
                         <td className="px-4 py-3">{row.prioridad}</td>
-                        <td className="px-4 py-3 font-medium">{row.fecha}</td>
+                        <td className="px-4 py-3 font-medium">{getOrderLabel(Math.max(row.prioridad - 1, 0))}</td>
+                        <td className="px-4 py-3">{lotDates[dateSlotMeta[row.prioridad - 1]?.key ?? "fecha_1"] ? formatShortDate(lotDates[dateSlotMeta[row.prioridad - 1]?.key ?? "fecha_1"] ?? "") : "-"}</td>
                         <td className="px-4 py-3 text-right">{formatInteger(row.pedido)}</td>
                         <td className="px-4 py-3 text-right">{formatInteger(row.resuelto)}</td>
                         <td className="px-4 py-3 text-right">{formatInteger(row.noRealizado)}</td>
@@ -1071,6 +1946,19 @@ export function PoscosechaClasificacionEnBlancoExplorer({
           onClose={closeRecipeOverlay}
         />
       ) : null}
+
+      <SkuInfoOverlay
+        row={selectedSkuInfo}
+        isEditing={isSkuEditing}
+        isSaving={isSkuSaving}
+        formValues={skuFormValues}
+        formErrors={skuFormErrors}
+        onEdit={openSkuEditMode}
+        onCancelEdit={cancelSkuEditMode}
+        onFieldChange={updateSkuField}
+        onSubmit={handleSkuSave}
+        onClose={closeSkuInfoOverlay}
+      />
     </div>
   );
 }

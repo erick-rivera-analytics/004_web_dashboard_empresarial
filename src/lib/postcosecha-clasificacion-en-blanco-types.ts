@@ -12,6 +12,7 @@ export type SolverDateKey = (typeof SOLVER_DATE_KEYS)[number];
 
 export type PoscosechaClasificacionSettings = {
   desperdicio: number;
+  proceso?: "GV" | "PRECLASIFICACION" | "APERTURA";
 };
 
 export type PoscosechaClasificacionOrderRow = {

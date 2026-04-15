@@ -104,11 +104,14 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    scrollbar-width: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
 
   *::-webkit-scrollbar {
-    display: none;
+    display: block;
+    width: 8px;
+    height: 8px;
   }
 
   /* Scrollbar visible para tablas y contenedores horizontales */
@@ -144,6 +147,7 @@
     @apply min-h-screen bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-y: auto;
   }
 }
 
