@@ -3,7 +3,6 @@
 import { startTransition, type ReactNode, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   BrainCircuit,
-  CalendarDays,
   Download,
   LoaderCircle,
   Play,
@@ -11,7 +10,7 @@ import {
   RefreshCcw,
   RotateCcw,
   Search,
-  Settings2,
+  SlidersHorizontal,
   TableProperties,
   Trash2,
 } from "lucide-react";
@@ -42,16 +41,22 @@ import type {
 import type {
   PoscosechaClasificacionAvailabilityRow,
   PoscosechaClasificacionBootData,
+  PoscosechaClasificacionLotSlot,
   PoscosechaClasificacionOrderRow,
+  PoscosechaClasificacionOrderOrigin,
+  PoscosechaClasificacionOrderSlot,
   PoscosechaClasificacionRecipeInput,
   PoscosechaClasificacionRecipePayload,
   PoscosechaClasificacionRecipeResult,
-  PoscosechaClasificacionResult,
   PoscosechaClasificacionResultOrderRow,
+  PoscosechaClasificacionRunMode,
   PoscosechaClasificacionRunPayload,
   SolverDateKey,
 } from "@/lib/postcosecha-clasificacion-en-blanco-types";
-import { SOLVER_DATE_KEYS } from "@/lib/postcosecha-clasificacion-en-blanco-types";
+import {
+  POSCOSECHA_CLASIFICACION_RUN_MODES,
+  SOLVER_DATE_KEYS,
+} from "@/lib/postcosecha-clasificacion-en-blanco-types";
 import { cn } from "@/lib/utils";
 
 type PoscosechaClasificacionEnBlancoExplorerProps = {
@@ -59,36 +64,240 @@ type PoscosechaClasificacionEnBlancoExplorerProps = {
   initialError?: string | null;
 };
 
-type SolverProcess = "GV" | "PRECLASIFICACION" | "APERTURA";
-
-type SolverDateSlot = {
-  key: SolverDateKey;
-  origin: SolverProcess;
-};
-
-type SolverLotDates = Partial<Record<SolverDateKey, string>>;
-
-const PROCESS_OPTIONS: Array<{
-  value: SolverProcess;
+const ORDER_ORIGIN_OPTIONS: Array<{
+  value: PoscosechaClasificacionOrderOrigin;
   label: string;
   description: string;
 }> = [
   {
     value: "GV",
     label: "GV",
-    description: "Resolver clasificacion en blanco para gestion de valor.",
+    description: "Disponibilidad proveniente de GV.",
   },
   {
     value: "PRECLASIFICACION",
     label: "PRECLASIFICACION",
-    description: "Resolver para una corrida de preclasificacion.",
+    description: "Disponibilidad proveniente de preclasificacion.",
   },
   {
     value: "APERTURA",
     label: "APERTURA",
-    description: "Resolver para una corrida de apertura.",
+    description: "Disponibilidad proveniente de apertura.",
   },
 ];
+
+const ORDER_RESTRICTION_OPTIONS: Array<{
+  value: PoscosechaClasificacionOrderOrigin | null;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: null,
+    label: "Sin restriccion",
+    description: "La orden puede resolverse con cualquier origen disponible.",
+  },
+  {
+    value: "GV",
+    label: "GV",
+    description: "Usa GV como origen preferido o estricto segun el tipo elegido.",
+  },
+  {
+    value: "APERTURA",
+    label: "APERTURA",
+    description: "Usa apertura como origen preferido o estricto segun el tipo elegido.",
+  },
+  {
+    value: "PRECLASIFICACION",
+    label: "PRECLASIFICACION",
+    description: "Usa preclasificacion como origen preferido o estricto segun el tipo elegido.",
+  },
+];
+
+const CLASIFICACION_DRAFT_STORAGE_KEY = "postcosecha_clasificacion_en_blanco_draft_v1";
+const CLASIFICACION_RESULT_STORAGE_KEY = "postcosecha_clasificacion_en_blanco_result_v1";
+
+type PoscosechaClasificacionDraftSnapshot = {
+  version: 1;
+  orders: PoscosechaClasificacionOrderRow[];
+  availability: PoscosechaClasificacionAvailabilityRow[];
+  settings: PoscosechaClasificacionBootData["settings"];
+  orderSlots: PoscosechaClasificacionOrderSlot[];
+  lotSlots: PoscosechaClasificacionLotSlot[];
+};
+
+type PoscosechaClasificacionResultSnapshot = {
+  version: 1;
+  resultBundle: PoscosechaClasificacionRunPayload["data"] | null;
+  activeMode: PoscosechaClasificacionRunMode | null;
+  isResultStale: boolean;
+};
+
+function readDraftSnapshot(): PoscosechaClasificacionDraftSnapshot | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(CLASIFICACION_DRAFT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<PoscosechaClasificacionDraftSnapshot> | null;
+    if (!parsed || parsed.version !== 1) {
+      return null;
+    }
+
+    return {
+      version: 1,
+      orders: Array.isArray(parsed.orders) ? parsed.orders : [],
+      availability: Array.isArray(parsed.availability) ? parsed.availability : [],
+      settings: parsed.settings ?? { desperdicio: 0.13 },
+      orderSlots: Array.isArray(parsed.orderSlots) ? parsed.orderSlots : [],
+      lotSlots: Array.isArray(parsed.lotSlots) ? parsed.lotSlots : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeDraftSnapshot(snapshot: PoscosechaClasificacionDraftSnapshot) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(CLASIFICACION_DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+}
+
+function readResultSnapshot(): PoscosechaClasificacionResultSnapshot | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(CLASIFICACION_RESULT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<PoscosechaClasificacionResultSnapshot> | null;
+    if (!parsed || parsed.version !== 1) {
+      return null;
+    }
+
+    return {
+      version: 1,
+      resultBundle: parsed.resultBundle ?? null,
+      activeMode: parsed.activeMode ?? null,
+      isResultStale: Boolean(parsed.isResultStale),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeResultSnapshot(snapshot: PoscosechaClasificacionResultSnapshot) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(CLASIFICACION_RESULT_STORAGE_KEY, JSON.stringify(snapshot));
+}
+
+function mergeDraftOrders(
+  baseRows: PoscosechaClasificacionOrderRow[],
+  draftRows: PoscosechaClasificacionOrderRow[],
+) {
+  const draftBySkuId = new Map(draftRows.map((row) => [row.skuId, row]));
+  return baseRows.map((row) => {
+    const draft = draftBySkuId.get(row.skuId);
+    if (!draft) {
+      return row;
+    }
+
+    return {
+      ...row,
+      ...Object.fromEntries(SOLVER_DATE_KEYS.map((key) => [key, Math.max(toInteger(draft[key]), 0)])),
+    };
+  });
+}
+
+function mergeDraftAvailability(
+  baseRows: PoscosechaClasificacionAvailabilityRow[],
+  draftRows: PoscosechaClasificacionAvailabilityRow[],
+) {
+  const draftByGrade = new Map(draftRows.map((row) => [row.grado, row]));
+  return baseRows.map((row) => {
+    const draft = draftByGrade.get(row.grado);
+    if (!draft) {
+      return row;
+    }
+
+    return {
+      ...row,
+      pesoTalloSeed: Math.max(toFloat(draft.pesoTalloSeed), 0),
+      ...Object.fromEntries(SOLVER_DATE_KEYS.map((key) => [key, Math.max(toInteger(draft[key]), 0)])),
+    };
+  });
+}
+
+function mergeDraftOrderSlots(
+  baseSlots: PoscosechaClasificacionOrderSlot[],
+  draftSlots: PoscosechaClasificacionOrderSlot[],
+) : PoscosechaClasificacionOrderSlot[] {
+  const merged: PoscosechaClasificacionOrderSlot[] = draftSlots
+    .filter((slot): slot is PoscosechaClasificacionOrderSlot => SOLVER_DATE_KEYS.includes(slot.key))
+    .map((slot) => ({
+      key: slot.key,
+      restriction: slot.restriction ?? null,
+      restrictionMode: slot.restrictionMode === "STRICT" ? "STRICT" : "SOFT",
+    }));
+
+  return merged.length ? merged : baseSlots;
+}
+
+function mergeDraftLotSlots(
+  baseSlots: PoscosechaClasificacionLotSlot[],
+  draftSlots: PoscosechaClasificacionLotSlot[],
+) : PoscosechaClasificacionLotSlot[] {
+  const merged: PoscosechaClasificacionLotSlot[] = draftSlots
+    .filter((slot): slot is PoscosechaClasificacionLotSlot => SOLVER_DATE_KEYS.includes(slot.key))
+    .map((slot) => ({
+      key: slot.key,
+      lotDate: typeof slot.lotDate === "string" && slot.lotDate.trim().length ? slot.lotDate : null,
+      origin: slot.origin === "APERTURA" || slot.origin === "PRECLASIFICACION" ? slot.origin : "GV",
+    }));
+
+  return merged.length ? merged : baseSlots;
+}
+
+function buildHydratedDraftState(
+  bootData: PoscosechaClasificacionBootData,
+  draft: PoscosechaClasificacionDraftSnapshot | null,
+) {
+  const baseOrderSlots = buildInitialOrderSlots(bootData.orderSlots ?? bootData.dateSlots);
+  const baseLotSlots = buildInitialLotSlots(bootData.lotSlots ?? bootData.dateSlots);
+
+  if (!draft) {
+    return {
+      orders: bootData.ordersTemplate,
+      availability: bootData.availabilityTemplate,
+      settings: bootData.settings,
+      orderSlots: baseOrderSlots,
+      lotSlots: baseLotSlots,
+    };
+  }
+
+  return {
+    orders: mergeDraftOrders(bootData.ordersTemplate, draft.orders),
+    availability: mergeDraftAvailability(bootData.availabilityTemplate, draft.availability),
+    settings: {
+      desperdicio: Math.max(toFloat(draft.settings?.desperdicio ?? bootData.settings.desperdicio), 0),
+    },
+    orderSlots: mergeDraftOrderSlots(baseOrderSlots, draft.orderSlots),
+    lotSlots: mergeDraftLotSlots(baseLotSlots, draft.lotSlots),
+  };
+}
 
 function formatNumber(value: number | null, digits = 2) {
   if (value === null || value === undefined) {
@@ -115,6 +324,49 @@ function formatPercent(value: number | null) {
   }
 
   return `${(value * 100).toFixed(1)}%`;
+}
+
+function buildTimestampLabel(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+
+  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+}
+
+function handleCaptureInputTab(event: React.KeyboardEvent<HTMLInputElement>) {
+  if (event.key !== "Tab") {
+    return;
+  }
+
+  const currentInput = event.currentTarget;
+  const captureContainer = currentInput.closest("[data-capture-scope='true']");
+  if (!captureContainer) {
+    return;
+  }
+
+  const inputs = Array.from(
+    captureContainer.querySelectorAll<HTMLInputElement>("input[data-capture-input='true']"),
+  );
+  const currentIndex = inputs.indexOf(currentInput);
+
+  if (currentIndex === -1) {
+    return;
+  }
+
+  const nextIndex = event.shiftKey ? currentIndex - 1 : currentIndex + 1;
+  const nextInput = inputs[nextIndex];
+
+  if (!nextInput) {
+    return;
+  }
+
+  event.preventDefault();
+  nextInput.focus();
+  nextInput.select();
 }
 
 function toInteger(value: unknown) {
@@ -184,7 +436,7 @@ function validateSkuForm(values: PoscosechaSkuInput) {
 
 function formatShortDate(value: string) {
   if (!value) {
-    return "Sin fecha de lote";
+    return "Sin fecha";
   }
 
   const parsed = new Date(`${value}T00:00:00`);
@@ -199,26 +451,32 @@ function formatShortDate(value: string) {
   });
 }
 
-function buildInitialDateSlots(
-  ordersTemplate: PoscosechaClasificacionOrderRow[],
-  availabilityTemplate: PoscosechaClasificacionAvailabilityRow[],
-): SolverDateSlot[] {
-  const activeKeys = SOLVER_DATE_KEYS.filter((key) => {
-    const hasOrders = ordersTemplate.some((row) => toInteger(row[key]) > 0);
-    const hasAvailability = availabilityTemplate.some((row) => toInteger(row[key]) > 0);
-    return hasOrders || hasAvailability;
-  });
+function buildInitialOrderSlots(
+  initialSlots: PoscosechaClasificacionOrderSlot[] | undefined,
+): PoscosechaClasificacionOrderSlot[] {
+  if (initialSlots && initialSlots.length > 0) {
+    return initialSlots;
+  }
 
-  const keys = activeKeys.length > 0 ? activeKeys : [SOLVER_DATE_KEYS[0]];
-  return keys.map((key) => ({ key, origin: "GV" }));
+  return [{ key: SOLVER_DATE_KEYS[0], restriction: null, restrictionMode: "SOFT" }];
+}
+
+function buildInitialLotSlots(
+  initialSlots: PoscosechaClasificacionLotSlot[] | undefined,
+): PoscosechaClasificacionLotSlot[] {
+  if (initialSlots && initialSlots.length > 0) {
+    return initialSlots;
+  }
+
+  return [{ key: SOLVER_DATE_KEYS[0], lotDate: null, origin: "GV" }];
 }
 
 function getOrderLabel(index: number) {
   return `Orden ${index + 1}`;
 }
 
-function getAvailabilityLabel(index: number, loteFecha: string) {
-  return `${getOrderLabel(index)}${loteFecha ? ` · lote ${formatShortDate(loteFecha)}` : " · sin fecha de lote"}`;
+function getAvailabilityLabel(origin: PoscosechaClasificacionOrderOrigin, loteFecha: string) {
+  return `${origin} - ${loteFecha ? formatShortDate(loteFecha) : "sin fecha"}`;
 }
 
 function FloatingPanel({
@@ -240,8 +498,8 @@ function FloatingPanel({
             <h3 className="text-xl font-semibold text-foreground">{title}</h3>
             <p className="text-sm text-muted-foreground">{description}</p>
           </div>
-          <Button type="button" variant="ghost" className="rounded-full" onClick={onClose}>
-            Cerrar
+          <Button type="button" variant="ghost" className="rounded-full px-3" onClick={onClose} aria-label="Cerrar">
+            X
           </Button>
         </div>
         <div className="px-6 py-6">{children}</div>
@@ -252,6 +510,26 @@ function FloatingPanel({
 
 function orderTotal(row: PoscosechaClasificacionOrderRow) {
   return SOLVER_DATE_KEYS.reduce((accumulator, key) => accumulator + toInteger(row[key]), 0);
+}
+
+function orderSlotTotal(rows: PoscosechaClasificacionOrderRow[], dateKey: SolverDateKey) {
+  return rows.reduce((accumulator, row) => accumulator + toInteger(row[dateKey]), 0);
+}
+
+function orderSlotActiveSkuCount(rows: PoscosechaClasificacionOrderRow[], dateKey: SolverDateKey) {
+  return rows.filter((row) => toInteger(row[dateKey]) > 0).length;
+}
+
+function lotSlotMallasTotal(rows: PoscosechaClasificacionAvailabilityRow[], dateKey: SolverDateKey) {
+  return rows.reduce((accumulator, row) => accumulator + toInteger(row[dateKey]), 0);
+}
+
+function lotSlotNetStemsTotal(
+  rows: PoscosechaClasificacionAvailabilityRow[],
+  dateKey: SolverDateKey,
+  desperdicio: number,
+) {
+  return rows.reduce((accumulator, row) => accumulator + Math.round(toInteger(row[dateKey]) * 20 * (1 - desperdicio)), 0);
 }
 
 function SummaryTile({
@@ -491,12 +769,12 @@ function OrdersInputTable({
   rows,
   onChange,
   onOpenSku,
-  dateSlots,
+  orderSlots,
 }: {
   rows: PoscosechaClasificacionOrderRow[];
   onChange: (skuId: string, dateKey: SolverDateKey, value: string) => void;
   onOpenSku: (skuId: string) => void;
-  dateSlots: SolverDateSlot[];
+  orderSlots: PoscosechaClasificacionOrderSlot[];
 }) {
   return (
     <div className="max-h-[600px] overflow-auto rounded-[24px] border border-border/70">
@@ -504,7 +782,7 @@ function OrdersInputTable({
         <thead className="sticky top-0 bg-background/95 backdrop-blur">
           <tr className="border-b border-border/70 text-left">
             <th className="px-4 py-3 font-medium">SKU</th>
-            {dateSlots.map((slot, index) => (
+            {orderSlots.map((slot, index) => (
               <th key={slot.key} className="px-3 py-3 text-center font-medium">
                 {getOrderLabel(index)}
               </th>
@@ -524,7 +802,7 @@ function OrdersInputTable({
                   <span className="block">{row.sku}</span>
                 </button>
               </td>
-              {dateSlots.map((slot) => (
+              {orderSlots.map((slot) => (
                 <td key={slot.key} className="px-3 py-2 text-center">
                   <Input
                     type="number"
@@ -552,15 +830,13 @@ function AvailabilityInputTable({
   desperdicio,
   onDateChange,
   onWeightChange,
-  dateSlots,
-  lotDates,
+  lotSlots,
 }: {
   rows: PoscosechaClasificacionAvailabilityRow[];
   desperdicio: number;
   onDateChange: (grado: number, dateKey: SolverDateKey, value: string) => void;
   onWeightChange: (grado: number, value: string) => void;
-  dateSlots: SolverDateSlot[];
-  lotDates: SolverLotDates;
+  lotSlots: PoscosechaClasificacionLotSlot[];
 }) {
   const derivedRows = buildClasificacionAvailabilityDerived(rows, desperdicio);
   const derivedByGrade = new Map(derivedRows.map((row) => [row.grado, row]));
@@ -571,9 +847,9 @@ function AvailabilityInputTable({
         <thead className="sticky top-0 bg-background/95 backdrop-blur">
           <tr className="border-b border-border/70 text-left">
             <th className="px-4 py-3 font-medium">Grado</th>
-            {dateSlots.map((slot, index) => (
+            {lotSlots.map((slot) => (
               <th key={slot.key} className="px-3 py-3 text-center font-medium">
-                {getAvailabilityLabel(index, lotDates[slot.key] ?? "")}
+                {getAvailabilityLabel(slot.origin, slot.lotDate ?? "")}
               </th>
             ))}
             <th className="px-3 py-3 text-center font-medium">Peso tallo seed (g)</th>
@@ -588,7 +864,7 @@ function AvailabilityInputTable({
             return (
               <tr key={row.grado} className="border-b border-border/50 last:border-b-0">
                 <td className="px-4 py-3 align-middle font-medium">{row.grado}</td>
-                {dateSlots.map((slot) => (
+                {lotSlots.map((slot) => (
                   <td key={slot.key} className="px-3 py-2 text-center">
                     <Input
                       type="number"
@@ -645,6 +921,158 @@ function SimpleTableCard({
   );
 }
 
+function OrderSlotCaptureTable({
+  rows,
+  slotKey,
+  slotLabel,
+  idealBySkuId,
+  onChange,
+  onOpenSku,
+}: {
+  rows: PoscosechaClasificacionOrderRow[];
+  slotKey: SolverDateKey;
+  slotLabel: string;
+  idealBySkuId: Map<string, number>;
+  onChange: (skuId: string, dateKey: SolverDateKey, value: string) => void;
+  onOpenSku: (skuId: string) => void;
+}) {
+  return (
+    <div data-capture-scope="true" className="max-h-[70vh] overflow-auto rounded-[24px] border border-border/70">
+      <table className="min-w-[640px] w-full text-sm">
+        <thead className="sticky top-0 bg-background/95 backdrop-blur">
+          <tr className="border-b border-border/70 text-left">
+            <th className="px-4 py-3 font-medium">SKU</th>
+            <th className="px-4 py-3 text-center font-medium">{slotLabel}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.skuId} className="border-b border-border/50 last:border-b-0">
+              <td className="px-4 py-3 align-middle">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="text-left text-foreground transition hover:text-slate-700 hover:underline"
+                  onClick={() => onOpenSku(row.skuId)}
+                >
+                  <span className="block font-medium">{row.sku}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Peso ideal: {formatNumber(idealBySkuId.get(row.skuId) ?? null, 2)} g
+                  </span>
+                </button>
+              </td>
+              <td className="px-4 py-2 text-center">
+                <Input
+                  data-capture-input="true"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={row[slotKey]}
+                  onChange={(event) => onChange(row.skuId, slotKey, event.target.value)}
+                  onKeyDown={handleCaptureInputTab}
+                  className="mx-auto h-9 w-24 text-right"
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LotSlotCaptureTable({
+  rows,
+  slotKey,
+  slotLabel,
+  onDateChange,
+}: {
+  rows: PoscosechaClasificacionAvailabilityRow[];
+  slotKey: SolverDateKey;
+  slotLabel: string;
+  onDateChange: (grado: number, dateKey: SolverDateKey, value: string) => void;
+}) {
+  return (
+    <div data-capture-scope="true" className="max-h-[70vh] overflow-auto rounded-[24px] border border-border/70">
+      <table className="min-w-[420px] w-full text-sm">
+        <thead className="sticky top-0 bg-background/95 backdrop-blur">
+          <tr className="border-b border-border/70 text-left">
+            <th className="px-4 py-3 font-medium">Grado</th>
+            <th className="px-4 py-3 text-center font-medium">{slotLabel}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.grado} className="border-b border-border/50 last:border-b-0">
+              <td className="px-4 py-3 font-medium">{row.grado}</td>
+              <td className="px-4 py-2 text-center">
+                <Input
+                  data-capture-input="true"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={row[slotKey]}
+                  onChange={(event) => onDateChange(row.grado, slotKey, event.target.value)}
+                  onKeyDown={handleCaptureInputTab}
+                  className="mx-auto h-9 w-24 text-right"
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AvailabilityWeightEditor({
+  rows,
+  onWeightChange,
+}: {
+  rows: PoscosechaClasificacionAvailabilityRow[];
+  onWeightChange: (grado: number, value: string) => void;
+}) {
+  return (
+    <div data-capture-scope="true" className="max-h-[70vh] overflow-auto rounded-[24px] border border-border/70">
+      <table className="min-w-[420px] w-full text-sm">
+        <thead className="sticky top-0 bg-background/95 backdrop-blur">
+          <tr className="border-b border-border/70 text-left">
+            <th className="px-4 py-3 font-medium">Grado</th>
+            <th className="px-4 py-3 text-center font-medium">Peso tallo seed (g)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.grado} className="border-b border-border/50 last:border-b-0">
+              <td className="px-4 py-3 font-medium">{row.grado}</td>
+              <td className="px-4 py-2 text-center">
+                <Input
+                  data-capture-input="true"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={row.pesoTalloSeed}
+                  onChange={(event) => onWeightChange(row.grado, event.target.value)}
+                  onKeyDown={handleCaptureInputTab}
+                  className="mx-auto h-9 w-28 text-right"
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function cloneOrderRows(rows: PoscosechaClasificacionOrderRow[]) {
+  return rows.map((row) => ({ ...row }));
+}
+
+function cloneAvailabilityRows(rows: PoscosechaClasificacionAvailabilityRow[]) {
+  return rows.map((row) => ({ ...row }));
+}
+
 function buildRecipeInput(
   row: PoscosechaClasificacionResultOrderRow,
   netStemValues: Record<string, number>,
@@ -686,17 +1114,23 @@ export function PoscosechaClasificacionEnBlancoExplorer({
   initialData,
   initialError,
 }: PoscosechaClasificacionEnBlancoExplorerProps) {
-  const initialDateSlots = useMemo(
-    () => buildInitialDateSlots(initialData.ordersTemplate, initialData.availabilityTemplate),
-    [initialData.availabilityTemplate, initialData.ordersTemplate],
+  const initialOrderSlots = useMemo(
+    () => buildInitialOrderSlots(initialData.orderSlots ?? initialData.dateSlots),
+    [initialData.dateSlots, initialData.orderSlots],
+  );
+  const initialLotSlots = useMemo(
+    () => buildInitialLotSlots(initialData.lotSlots ?? initialData.dateSlots),
+    [initialData.dateSlots, initialData.lotSlots],
   );
   const [bootData, setBootData] = useState(initialData);
   const [orders, setOrders] = useState(initialData.ordersTemplate);
   const [availability, setAvailability] = useState(initialData.availabilityTemplate);
   const [settings, setSettings] = useState(initialData.settings);
-  const [dateSlots, setDateSlots] = useState<SolverDateSlot[]>(initialDateSlots);
-  const [lotDates, setLotDates] = useState<SolverLotDates>({});
-  const [result, setResult] = useState<PoscosechaClasificacionResult | null>(null);
+  const [orderSlots, setOrderSlots] = useState<PoscosechaClasificacionOrderSlot[]>(initialOrderSlots);
+  const [lotSlots, setLotSlots] = useState<PoscosechaClasificacionLotSlot[]>(initialLotSlots);
+  const [resultBundle, setResultBundle] = useState<PoscosechaClasificacionRunPayload["data"] | null>(null);
+  const [activeMode, setActiveMode] = useState<PoscosechaClasificacionRunMode | null>(null);
+  const [isResultStale, setIsResultStale] = useState(false);
   const [search, setSearch] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
@@ -719,8 +1153,15 @@ export function PoscosechaClasificacionEnBlancoExplorer({
   const [recipeError, setRecipeError] = useState<string | null>(null);
   const [isRecipeLoading, setIsRecipeLoading] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [isOrdersManagerOpen, setIsOrdersManagerOpen] = useState(false);
-  const [isLotDatesOpen, setIsLotDatesOpen] = useState(false);
+  const [editingOrderSlotKey, setEditingOrderSlotKey] = useState<SolverDateKey | null>(null);
+  const [editingLotSlotKey, setEditingLotSlotKey] = useState<SolverDateKey | null>(null);
+  const [isWeightEditorOpen, setIsWeightEditorOpen] = useState(false);
+  const [draftOrderRows, setDraftOrderRows] = useState<PoscosechaClasificacionOrderRow[]>([]);
+  const [draftOrderSlot, setDraftOrderSlot] = useState<PoscosechaClasificacionOrderSlot | null>(null);
+  const [draftLotRows, setDraftLotRows] = useState<PoscosechaClasificacionAvailabilityRow[]>([]);
+  const [draftLotSlot, setDraftLotSlot] = useState<PoscosechaClasificacionLotSlot | null>(null);
+  const [draftWeightRows, setDraftWeightRows] = useState<PoscosechaClasificacionAvailabilityRow[]>([]);
+  const [hasHydratedDraft, setHasHydratedDraft] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const filteredOrders = useMemo(() => {
@@ -738,10 +1179,21 @@ export function PoscosechaClasificacionEnBlancoExplorer({
     [availability, settings.desperdicio],
   );
 
-  const precheck = useMemo(
-    () => buildClasificacionPrecheck(orders, availability, bootData.skuMaster, settings.desperdicio),
-    [availability, bootData.skuMaster, orders, settings.desperdicio],
-  );
+  const precheckModes = useMemo(() => {
+    return POSCOSECHA_CLASIFICACION_RUN_MODES.map((mode) => ({
+      mode,
+      label: mode,
+      precheck: buildClasificacionPrecheck(
+        orders,
+        availability,
+        bootData.skuMaster,
+        settings.desperdicio,
+        orderSlots,
+        lotSlots,
+        mode,
+      ),
+    }));
+  }, [availability, bootData.skuMaster, lotSlots, orderSlots, orders, settings.desperdicio]);
 
   const ordersWithCapture = useMemo(
     () => orders.filter((row) => orderTotal(row) > 0).length,
@@ -753,23 +1205,144 @@ export function PoscosechaClasificacionEnBlancoExplorer({
     [availabilityDerived],
   );
 
+  const flexiblePrecheck = useMemo(() => {
+    const masterBySkuId = new Map(bootData.skuMaster.map((record) => [record.skuId, record]));
+    const flexibleKeys = new Set(
+      orderSlots
+        .filter((slot) => !slot.restriction || slot.restrictionMode !== "STRICT")
+        .map((slot) => slot.key),
+    );
+    const lotKeys = new Set(lotSlots.map((slot) => slot.key));
+
+    let tallosPedidos = 0;
+    for (const row of orders) {
+      const masterRecord = masterBySkuId.get(row.skuId);
+      if (!masterRecord) {
+        continue;
+      }
+      const totalPedido = SOLVER_DATE_KEYS.reduce(
+        (accumulator, key) => accumulator + (flexibleKeys.has(key) ? toInteger(row[key]) : 0),
+        0,
+      );
+      tallosPedidos += totalPedido * toInteger(masterRecord.tallosMin);
+    }
+
+    const tallosDisponibles = buildClasificacionAvailabilityDerived(
+      availability.map((row) => ({
+        ...row,
+        fecha_1: lotKeys.has("fecha_1") ? row.fecha_1 : 0,
+        fecha_2: lotKeys.has("fecha_2") ? row.fecha_2 : 0,
+        fecha_3: lotKeys.has("fecha_3") ? row.fecha_3 : 0,
+        fecha_4: lotKeys.has("fecha_4") ? row.fecha_4 : 0,
+        fecha_5: lotKeys.has("fecha_5") ? row.fecha_5 : 0,
+      })),
+      settings.desperdicio,
+    ).reduce((accumulator, row) => accumulator + row.tallosNetos, 0);
+
+    const diferencia = tallosPedidos - tallosDisponibles;
+
+    return {
+      isValid: tallosPedidos > 0 && tallosDisponibles > 0,
+      tallosPedidos,
+      tallosDisponibles,
+      diferencia,
+      message:
+        tallosPedidos <= 0
+          ? "Debes ingresar pedidos flexibles mayores a cero."
+          : tallosDisponibles <= 0
+            ? "Debes ingresar disponibilidad mayor a cero."
+            : diferencia < 0
+              ? "Las ordenes no estrictas tienen disponibilidad total suficiente y aun queda saldo."
+              : "Las ordenes no estrictas consumen toda la disponibilidad y aun queda demanda pendiente.",
+    };
+  }, [availability, bootData.skuMaster, lotSlots, orderSlots, orders, settings.desperdicio]);
+
+  const estimatedWeightKpis = useMemo(() => {
+    const masterBySkuId = new Map(bootData.skuMaster.map((record) => [record.skuId, record]));
+    const totalAvailableWeight = availabilityDerived.reduce((accumulator, row) => accumulator + row.pesoTotalGestionable, 0);
+    const totalAvailableStems = availabilityDerived.reduce((accumulator, row) => accumulator + row.tallosNetos, 0);
+    const availableAvgStemWeight = totalAvailableStems > 0 ? totalAvailableWeight / totalAvailableStems : null;
+
+    let totalRequiredIdealWeight = 0;
+    let totalRequiredMinStems = 0;
+    for (const row of orders) {
+      const masterRecord = masterBySkuId.get(row.skuId);
+      if (!masterRecord) {
+        continue;
+      }
+      const totalPedido = orderTotal(row);
+      totalRequiredIdealWeight += totalPedido * toFloat(masterRecord.pesoIdealBunch);
+      totalRequiredMinStems += totalPedido * toInteger(masterRecord.tallosMin);
+    }
+
+    const requiredAvgStemWeight = totalRequiredMinStems > 0 ? totalRequiredIdealWeight / totalRequiredMinStems : null;
+    const expectedOverweightPct = availableAvgStemWeight !== null && requiredAvgStemWeight !== null
+      ? (availableAvgStemWeight / requiredAvgStemWeight) - 1
+      : null;
+    const expectedEfficiencyPct = availableAvgStemWeight !== null && requiredAvgStemWeight !== null
+      ? requiredAvgStemWeight / availableAvgStemWeight
+      : null;
+
+    return {
+      availableAvgStemWeight,
+      requiredAvgStemWeight,
+      expectedOverweightPct,
+      expectedEfficiencyPct,
+    };
+  }, [availabilityDerived, bootData.skuMaster, orders]);
+
+  const activeRun = useMemo(
+    () => resultBundle?.runs.find((run) => run.mode === activeMode) ?? resultBundle?.runs.find((run) => Boolean(run.result)) ?? null,
+    [activeMode, resultBundle],
+  );
+
+  const result = activeRun?.result ?? null;
+
   const resultOrderRowsBySku = useMemo(
     () => new Map((result?.orderRows ?? []).map((row) => [row.sku, row])),
     [result],
   );
 
-  const dateSlotMeta = useMemo(
+  const orderSlotMeta = useMemo(
     () =>
-      dateSlots.map((slot, index) => ({
+      orderSlots.map((slot, index) => ({
         ...slot,
         orderLabel: getOrderLabel(index),
-        availabilityLabel: getAvailabilityLabel(index, lotDates[slot.key] ?? ""),
+        totalBunches: orderSlotTotal(orders, slot.key),
+        activeSkus: orderSlotActiveSkuCount(orders, slot.key),
       })),
-    [dateSlots, lotDates],
+    [orderSlots, orders],
+  );
+
+  const lotSlotMeta = useMemo(
+    () =>
+      lotSlots.map((slot, index) => ({
+        ...slot,
+        lotOrderLabel: `Lote ${index + 1}`,
+        lotLabel: getAvailabilityLabel(slot.origin, slot.lotDate ?? ""),
+        totalMallas: lotSlotMallasTotal(availability, slot.key),
+        totalNetStems: lotSlotNetStemsTotal(availability, slot.key, settings.desperdicio),
+      })),
+    [availability, lotSlots, settings.desperdicio],
+  );
+
+  const activeEditingOrderSlot = useMemo(
+    () => orderSlotMeta.find((slot) => slot.key === editingOrderSlotKey) ?? null,
+    [editingOrderSlotKey, orderSlotMeta],
+  );
+
+  const activeEditingLotSlot = useMemo(
+    () => lotSlotMeta.find((slot) => slot.key === editingLotSlotKey) ?? null,
+    [editingLotSlotKey, lotSlotMeta],
   );
 
   const skuMasterById = useMemo(
     () => new Map(bootData.skuMaster.map((row) => [row.skuId, row])),
+    [bootData.skuMaster],
+  );
+
+  const skuIdealById = useMemo(
+    () => new Map(bootData.skuMaster.map((row) => [row.skuId, row.pesoIdealBunch])),
     [bootData.skuMaster],
   );
 
@@ -797,63 +1370,277 @@ export function PoscosechaClasificacionEnBlancoExplorer({
     }
   }, [result]);
 
+  useEffect(() => {
+    if (!activeEditingOrderSlot) {
+      setDraftOrderRows([]);
+      setDraftOrderSlot(null);
+      return;
+    }
+
+    setDraftOrderRows(cloneOrderRows(orders));
+    setDraftOrderSlot({
+      key: activeEditingOrderSlot.key,
+      restriction: activeEditingOrderSlot.restriction,
+      restrictionMode: activeEditingOrderSlot.restrictionMode,
+    });
+  }, [activeEditingOrderSlot, orders]);
+
+  useEffect(() => {
+    if (!activeEditingLotSlot) {
+      setDraftLotRows([]);
+      setDraftLotSlot(null);
+      return;
+    }
+
+    setDraftLotRows(cloneAvailabilityRows(availability));
+    setDraftLotSlot({
+      key: activeEditingLotSlot.key,
+      lotDate: activeEditingLotSlot.lotDate,
+      origin: activeEditingLotSlot.origin,
+    });
+  }, [activeEditingLotSlot, availability]);
+
+  useEffect(() => {
+    if (!isWeightEditorOpen) {
+      setDraftWeightRows([]);
+      return;
+    }
+
+    setDraftWeightRows(cloneAvailabilityRows(availability));
+  }, [availability, isWeightEditorOpen]);
+
+  useEffect(() => {
+    const nextDraft = readDraftSnapshot();
+    const nextResultSnapshot = readResultSnapshot();
+    if (!nextDraft) {
+      if (nextResultSnapshot) {
+        setResultBundle(nextResultSnapshot.resultBundle);
+        setActiveMode(nextResultSnapshot.activeMode);
+        setIsResultStale(nextResultSnapshot.isResultStale);
+      }
+      setHasHydratedDraft(true);
+      return;
+    }
+
+    const hydrated = buildHydratedDraftState(initialData, nextDraft);
+    setOrders(hydrated.orders);
+    setAvailability(hydrated.availability);
+    setSettings(hydrated.settings);
+    setOrderSlots(hydrated.orderSlots);
+    setLotSlots(hydrated.lotSlots);
+    setResultBundle(nextResultSnapshot?.resultBundle ?? null);
+    setActiveMode(nextResultSnapshot?.activeMode ?? null);
+    setIsResultStale(nextResultSnapshot?.isResultStale ?? false);
+    setHasHydratedDraft(true);
+  }, [initialData]);
+
+  useEffect(() => {
+    if (!hasHydratedDraft) {
+      return;
+    }
+
+    writeDraftSnapshot({
+      version: 1,
+      orders,
+      availability,
+      settings,
+      orderSlots,
+      lotSlots,
+    });
+  }, [availability, hasHydratedDraft, lotSlots, orderSlots, orders, settings]);
+
+  useEffect(() => {
+    if (!hasHydratedDraft) {
+      return;
+    }
+
+    writeResultSnapshot({
+      version: 1,
+      resultBundle,
+      activeMode,
+      isResultStale,
+    });
+  }, [activeMode, hasHydratedDraft, isResultStale, resultBundle]);
+
   function applyBootData(nextData: PoscosechaClasificacionBootData) {
+    const hydrated = buildHydratedDraftState(nextData, readDraftSnapshot());
+    const nextResultSnapshot = readResultSnapshot();
     setBootData(nextData);
-    setOrders(nextData.ordersTemplate);
-    setAvailability(nextData.availabilityTemplate);
-    setSettings(nextData.settings);
-    setDateSlots((current) => (current.length ? current : buildInitialDateSlots(nextData.ordersTemplate, nextData.availabilityTemplate)));
-    setResult(null);
+    setOrders(hydrated.orders);
+    setAvailability(hydrated.availability);
+    setSettings(hydrated.settings);
+    setOrderSlots(hydrated.orderSlots);
+    setLotSlots(hydrated.lotSlots);
+    setResultBundle(nextResultSnapshot?.resultBundle ?? null);
+    setActiveMode(nextResultSnapshot?.activeMode ?? null);
+    setIsResultStale(nextResultSnapshot?.isResultStale ?? false);
   }
 
-  function addDateSlot() {
-    setDateSlots((current) => {
+  function markResultStale() {
+    setIsResultStale((current) => current || Boolean(resultBundle));
+  }
+
+  function clearResults() {
+    setResultBundle(null);
+    setActiveMode(null);
+    setIsResultStale(false);
+  }
+
+  function addOrderSlot() {
+    setOrderSlots((current) => {
       const usedKeys = new Set(current.map((slot) => slot.key));
       const nextKey = SOLVER_DATE_KEYS.find((key) => !usedKeys.has(key));
 
       if (!nextKey) {
-        toast.error("Ya alcanzaste el maximo de 5 prioridades para este solver.");
+        toast.error("Ya alcanzaste el maximo de 5 ordenes para este solver.");
         return current;
       }
 
-      return [...current, { key: nextKey, origin: "GV" }];
+      return [...current, { key: nextKey, restriction: null, restrictionMode: "SOFT" }];
     });
   }
 
-  function removeDateSlot(dateKey: SolverDateKey) {
-    setDateSlots((current) => {
+  function removeOrderSlot(dateKey: SolverDateKey) {
+    setOrderSlots((current) => {
       if (current.length <= 1) {
-        toast.error("Debe existir al menos una prioridad activa.");
+        toast.error("Debe existir al menos una orden activa.");
         return current;
       }
 
       return current.filter((slot) => slot.key !== dateKey);
     });
-    setLotDates((current) => {
-      const next = { ...current };
-      delete next[dateKey];
-      return next;
-    });
-
     startTransition(() => {
       setOrders((current) => current.map((row) => ({ ...row, [dateKey]: 0 })));
+      markResultStale();
+    });
+  }
+
+  function addLotSlot() {
+    setLotSlots((current) => {
+      const usedKeys = new Set(current.map((slot) => slot.key));
+      const nextKey = SOLVER_DATE_KEYS.find((key) => !usedKeys.has(key));
+
+      if (!nextKey) {
+        toast.error("Ya alcanzaste el maximo de 5 fechas de lote para este solver.");
+        return current;
+      }
+
+      return [...current, { key: nextKey, lotDate: null, origin: "GV" }];
+    });
+  }
+
+  function removeLotSlot(dateKey: SolverDateKey) {
+    setLotSlots((current) => {
+      if (current.length <= 1) {
+        toast.error("Debe existir al menos una fecha de lote activa.");
+        return current;
+      }
+
+      return current.filter((slot) => slot.key !== dateKey);
+    });
+    startTransition(() => {
       setAvailability((current) => current.map((row) => ({ ...row, [dateKey]: 0 })));
-      setResult(null);
+      markResultStale();
     });
   }
 
   function updateLotDate(dateKey: SolverDateKey, value: string) {
-    setLotDates((current) => ({
-      ...current,
-      [dateKey]: value,
-    }));
+    setLotSlots((current) =>
+      current.map((slot) => (slot.key === dateKey ? { ...slot, lotDate: value || null } : slot)),
+    );
   }
 
-  function updateDateSlotOrigin(dateKey: SolverDateKey, origin: SolverProcess) {
-    setDateSlots((current) =>
+  function updateLotSlotOrigin(dateKey: SolverDateKey, origin: PoscosechaClasificacionOrderOrigin) {
+    setLotSlots((current) =>
       current.map((slot) => (slot.key === dateKey ? { ...slot, origin } : slot)),
     );
-    setResult(null);
+    markResultStale();
+  }
+
+  function updateOrderSlotRestriction(dateKey: SolverDateKey, restriction: PoscosechaClasificacionOrderOrigin | null) {
+    setOrderSlots((current) =>
+      current.map((slot) => (slot.key === dateKey ? { ...slot, restriction } : slot)),
+    );
+    markResultStale();
+  }
+
+  function updateOrderSlotRestrictionMode(dateKey: SolverDateKey, restrictionMode: "STRICT" | "SOFT") {
+    setOrderSlots((current) =>
+      current.map((slot) => (slot.key === dateKey ? { ...slot, restrictionMode } : slot)),
+    );
+    markResultStale();
+  }
+
+  function updateDraftLotDate(value: string) {
+    setDraftLotSlot((current) => (current ? { ...current, lotDate: value || null } : current));
+  }
+
+  function updateDraftLotOrigin(origin: PoscosechaClasificacionOrderOrigin) {
+    setDraftLotSlot((current) => (current ? { ...current, origin } : current));
+  }
+
+  function updateDraftOrderRestriction(restriction: PoscosechaClasificacionOrderOrigin | null) {
+    setDraftOrderSlot((current) =>
+      current
+        ? {
+            ...current,
+            restriction,
+            restrictionMode: restriction ? current.restrictionMode : "SOFT",
+          }
+        : current,
+    );
+  }
+
+  function updateDraftOrderRestrictionMode(restrictionMode: "STRICT" | "SOFT") {
+    setDraftOrderSlot((current) => (current ? { ...current, restrictionMode } : current));
+  }
+
+  function saveOrderDraft() {
+    if (!draftOrderSlot || !activeEditingOrderSlot) {
+      return;
+    }
+
+    setOrders(cloneOrderRows(draftOrderRows));
+    setOrderSlots((current) =>
+      current.map((slot) =>
+        slot.key === activeEditingOrderSlot.key
+          ? {
+              ...slot,
+              restriction: draftOrderSlot.restriction,
+              restrictionMode: draftOrderSlot.restrictionMode,
+            }
+          : slot,
+      ),
+    );
+    markResultStale();
+    setEditingOrderSlotKey(null);
+  }
+
+  function saveLotDraft() {
+    if (!draftLotSlot || !activeEditingLotSlot) {
+      return;
+    }
+
+    setAvailability(cloneAvailabilityRows(draftLotRows));
+    setLotSlots((current) =>
+      current.map((slot) =>
+        slot.key === activeEditingLotSlot.key
+          ? {
+              ...slot,
+              lotDate: draftLotSlot.lotDate,
+              origin: draftLotSlot.origin,
+            }
+          : slot,
+      ),
+    );
+    markResultStale();
+    setEditingLotSlotKey(null);
+  }
+
+  function saveWeightDraft() {
+    setAvailability(cloneAvailabilityRows(draftWeightRows));
+    markResultStale();
+    setIsWeightEditorOpen(false);
   }
 
   function closeRecipeOverlay() {
@@ -960,7 +1747,7 @@ export function PoscosechaClasificacionEnBlancoExplorer({
       setSelectedSkuInfo(updatedSku);
       setSkuFormValues(mapSkuRecordToFormValues(updatedSku));
       setIsSkuEditing(false);
-      setResult(null);
+      markResultStale();
       toast.success("SKU actualizado correctamente desde el solver.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar el SKU.");
@@ -1000,8 +1787,19 @@ export function PoscosechaClasificacionEnBlancoExplorer({
             : row,
         ),
       );
-      setResult(null);
+      markResultStale();
     });
+  }
+
+  function updateDraftOrderValue(skuId: string, dateKey: SolverDateKey, value: string) {
+    const nextValue = toInteger(value);
+    setDraftOrderRows((current) =>
+      current.map((row) =>
+        row.skuId === skuId
+          ? { ...row, [dateKey]: nextValue }
+          : row,
+      ),
+    );
   }
 
   function updateAvailabilityDate(grado: number, dateKey: SolverDateKey, value: string) {
@@ -1015,8 +1813,19 @@ export function PoscosechaClasificacionEnBlancoExplorer({
             : row,
         ),
       );
-      setResult(null);
+      markResultStale();
     });
+  }
+
+  function updateDraftAvailabilityDate(grado: number, dateKey: SolverDateKey, value: string) {
+    const nextValue = toInteger(value);
+    setDraftLotRows((current) =>
+      current.map((row) =>
+        row.grado === grado
+          ? { ...row, [dateKey]: nextValue }
+          : row,
+      ),
+    );
   }
 
   function updateAvailabilityWeight(grado: number, value: string) {
@@ -1030,19 +1839,30 @@ export function PoscosechaClasificacionEnBlancoExplorer({
             : row,
         ),
       );
-      setResult(null);
+      markResultStale();
     });
+  }
+
+  function updateDraftAvailabilityWeight(grado: number, value: string) {
+    const nextValue = Math.round(toFloat(value) * 100) / 100;
+    setDraftWeightRows((current) =>
+      current.map((row) =>
+        row.grado === grado
+          ? { ...row, pesoTalloSeed: nextValue }
+          : row,
+      ),
+    );
   }
 
   function resetOrders() {
     setOrders(bootData.ordersTemplate);
-    setResult(null);
+    markResultStale();
   }
 
   function resetAvailability() {
     setAvailability(bootData.availabilityTemplate);
     setSettings(bootData.settings);
-    setResult(null);
+    markResultStale();
   }
 
   async function handleRunSolver() {
@@ -1060,12 +1880,16 @@ export function PoscosechaClasificacionEnBlancoExplorer({
           body: JSON.stringify({
             orders,
             availability,
+            orderSlots,
+            lotSlots,
             settings,
           }),
         },
       );
 
-      setResult(payload.data);
+      setResultBundle(payload.data);
+      setActiveMode(payload.data.runs.find((run) => Boolean(run.result))?.mode ?? payload.data.runs[0]?.mode ?? null);
+      setIsResultStale(false);
       toast.success("Clasificacion en blanco se resolvio correctamente.");
     } catch (error) {
       toast.error(
@@ -1124,155 +1948,254 @@ export function PoscosechaClasificacionEnBlancoExplorer({
   }
 
   async function handleExportPdf() {
-    if (!result) {
+    if (!resultBundle?.runs.some((run) => Boolean(run.result))) {
       return;
     }
 
     setIsExportingPdf(true);
 
     try {
-      const resolvedRows = result.orderRows.filter((row) => row.pedidoResuelto > 0);
-      const recipeResponses = await Promise.all(
-        resolvedRows.map(async (row) => {
-          const netStemValues = netStemValuesBySku.get(row.sku);
-          if (!netStemValues) {
+      const resolvedRuns = resultBundle.runs.filter((run) => Boolean(run.result));
+      const runSections = await Promise.all(
+        resolvedRuns.map(async (run) => {
+          const runResult = run.result;
+          if (!runResult) {
             return null;
           }
 
-          const recipeInput = buildRecipeInput(row, netStemValues, availability);
-          if (!recipeInput) {
-            return null;
-          }
+          const runOrderRowsBySku = new Map(runResult.orderRows.map((row) => [row.sku, row]));
+          const runNetStemValuesBySku = new Map(runResult.netStemMatrix.rows.map((row) => [row.sku, row.values]));
+          const resolvedRows = runResult.orderRows.filter((row) => row.pedidoResuelto > 0);
 
-          const response = await fetchJson<PoscosechaClasificacionRecipePayload>(
-            "/api/postcosecha/planificacion/solver/clasificacion-en-blanco/receta",
-            `No se pudo construir la receta de ${row.sku}.`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(recipeInput),
-            },
+          const recipeResponses = await Promise.all(
+            resolvedRows.map(async (row) => {
+              const netStemValues = runNetStemValuesBySku.get(row.sku);
+              if (!netStemValues) {
+                return {
+                  sku: row.sku,
+                  data: null,
+                  error: "No se encontro la matriz neta de tallos para este SKU.",
+                };
+              }
+
+              const recipeInput = buildRecipeInput(row, netStemValues, availability);
+              if (!recipeInput) {
+                return {
+                  sku: row.sku,
+                  data: null,
+                  error: "No hubo datos suficientes para construir la receta.",
+                };
+              }
+
+              try {
+                const response = await fetchJson<PoscosechaClasificacionRecipePayload>(
+                  "/api/postcosecha/planificacion/solver/clasificacion-en-blanco/receta",
+                  `No se pudo construir la receta de ${row.sku}.`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(recipeInput),
+                  },
+                );
+
+                return {
+                  sku: row.sku,
+                  data: response.data,
+                  error: null,
+                };
+              } catch (error) {
+                return {
+                  sku: row.sku,
+                  data: null,
+                  error: error instanceof Error ? error.message : "No se pudo construir la receta.",
+                };
+              }
+            }),
           );
 
           return {
-            sku: row.sku,
-            data: response.data,
+            run,
+            runResult,
+            runOrderRowsBySku,
+            recipes: recipeResponses.filter((item): item is { sku: string; data: PoscosechaClasificacionRecipeResult; error: null } => Boolean(item.data)),
+            omittedRecipes: recipeResponses.filter((item) => !item.data),
           };
         }),
       );
 
-      const recipes = recipeResponses.filter((item): item is { sku: string; data: PoscosechaClasificacionRecipeResult } => Boolean(item));
-      const popup = window.open("", "_blank", "width=1200,height=900");
+      const sections = runSections.filter((item): item is NonNullable<typeof item> => Boolean(item));
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "pt",
+        format: "a4",
+      });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      const usableWidth = pageWidth - margin * 2;
+      let y = margin;
 
-      if (!popup) {
-        throw new Error("No se pudo abrir la vista de impresion para exportar el PDF.");
-      }
+      const ensureSpace = (needed = 24) => {
+        if (y + needed > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+      };
 
-      const summaryRowsHtml = result.orderRows
-        .map(
-          (row) => `
-            <tr>
-              <td>${row.sku}</td>
-              <td>${row.estadoPeso}</td>
-              <td class="num">${formatInteger(row.pedidoTotal)}</td>
-              <td class="num">${formatInteger(row.pedidoResuelto)}</td>
-              <td class="num">${formatNumber(row.pesoIdealPedido)}</td>
-              <td class="num">${formatNumber(row.pesoRealTotal)}</td>
-              <td class="num">${formatPercent(row.sobrepesoPct)}</td>
-            </tr>`,
-        )
-        .join("");
+      const addLine = (text: string, opts?: { size?: number; bold?: boolean; muted?: boolean; indent?: number }) => {
+        const size = opts?.size ?? 10;
+        const indent = opts?.indent ?? 0;
+        doc.setFont("helvetica", opts?.bold ? "bold" : "normal");
+        doc.setFontSize(size);
+        doc.setTextColor(opts?.muted ? 107 : 17, opts?.muted ? 114 : 17, opts?.muted ? 128 : 24);
+        const lines = doc.splitTextToSize(text, usableWidth - indent);
+        ensureSpace(lines.length * (size + 3) + 4);
+        doc.text(lines, margin + indent, y);
+        y += lines.length * (size + 3) + 4;
+      };
 
-      const recipeSectionsHtml = recipes
-        .map(
-          ({ sku, data }) => `
-            <section class="recipe-block">
-              <h3>${sku}</h3>
-              <p class="muted">
-                Bunches resueltos: ${formatInteger(data.summary.bunchesResueltos)} |
-                Peso promedio real: ${formatNumber(data.summary.pesoPromedioReal)} g |
-                Estado: ${data.summary.status}
-              </p>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Receta</th>
-                    <th class="num">Cantidad</th>
-                    <th class="num">Tallos/bunch</th>
-                    <th class="num">Peso/bunch</th>
-                    <th class="num">Dif. ideal</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${data.rows
-                    .map(
-                      (recipe) => `
-                        <tr>
-                          <td>${recipe.composicion.map((item) => `${item.grado}x${item.tallos}`).join(" + ")}</td>
-                          <td class="num">${formatInteger(recipe.cantidad)}</td>
-                          <td class="num">${formatInteger(recipe.tallosPorBunch)}</td>
-                          <td class="num">${formatNumber(recipe.pesoPorBunch)}</td>
-                          <td class="num">${formatNumber(recipe.difIdeal)}</td>
-                          <td>${recipe.estadoPeso}</td>
-                        </tr>`,
-                    )
-                    .join("")}
-                </tbody>
-              </table>
-            </section>`,
-        )
-        .join("");
+      const addRule = () => {
+        ensureSpace(12);
+        doc.setDrawColor(229, 231, 235);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 12;
+      };
 
-      popup.document.write(`
-        <!DOCTYPE html>
-        <html lang="es">
-          <head>
-            <meta charset="utf-8" />
-            <title>Clasificacion en blanco</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
-              h1, h2, h3 { margin: 0 0 12px; }
-              .muted { color: #6b7280; margin-bottom: 16px; }
-              .pill { display: inline-block; border: 1px solid #d1d5db; border-radius: 999px; padding: 6px 12px; margin-right: 8px; font-size: 12px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-              th, td { border: 1px solid #e5e7eb; padding: 8px 10px; font-size: 12px; vertical-align: top; }
-              th { background: #f8fafc; text-align: left; }
-              .num { text-align: right; }
-              .recipe-block { margin-top: 24px; page-break-inside: avoid; }
-            </style>
-          </head>
-          <body>
-            <h1>Clasificacion en blanco</h1>
-            <p class="muted">Proceso: ${settings.proceso ?? "GV"}</p>
-            <div>
-              ${dateSlotMeta.map((slot) => `<span class="pill">${slot.orderLabel}: ${lotDates[slot.key] ? formatShortDate(lotDates[slot.key] ?? "") : "Sin fecha de lote"}</span>`).join("")}
-            </div>
-            <h2 style="margin-top: 24px;">Resumen macro</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>SKU</th>
-                  <th>Estado</th>
-                  <th class="num">Pedido</th>
-                  <th class="num">Resuelto</th>
-                  <th class="num">Peso ideal pedido</th>
-                  <th class="num">Peso real total</th>
-                  <th class="num">Sobrepeso %</th>
-                </tr>
-              </thead>
-              <tbody>${summaryRowsHtml}</tbody>
-            </table>
-            <h2 style="margin-top: 24px;">Recetas por orden</h2>
-            ${recipeSectionsHtml || "<p class='muted'>No hubo recetas disponibles para exportar.</p>"}
-          </body>
-        </html>
-      `);
-      popup.document.close();
-      popup.focus();
-      popup.print();
+      const addSectionTitle = (text: string) => {
+        ensureSpace(24);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(17, 24, 39);
+        doc.text(text, margin, y);
+        y += 18;
+      };
+
+      const addTable = (headers: string[], rows: string[][], widths: number[]) => {
+        const rowHeight = 18;
+        ensureSpace(rowHeight * 2);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(17, 24, 39);
+
+        let x = margin;
+        headers.forEach((header, index) => {
+          doc.text(header, x + 4, y);
+          x += widths[index] ?? 80;
+        });
+        y += rowHeight - 4;
+        doc.setDrawColor(209, 213, 219);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 10;
+
+        doc.setFont("helvetica", "normal");
+        rows.forEach((row) => {
+          const wrapped = row.map((cell, index) => doc.splitTextToSize(cell, (widths[index] ?? 80) - 8));
+          const maxLines = Math.max(...wrapped.map((cell) => cell.length), 1);
+          ensureSpace(maxLines * 11 + 8);
+          let cellX = margin;
+          wrapped.forEach((cell, index) => {
+            doc.text(cell, cellX + 4, y);
+            cellX += widths[index] ?? 80;
+          });
+          y += maxLines * 11 + 6;
+          doc.setDrawColor(243, 244, 246);
+          doc.line(margin, y, pageWidth - margin, y);
+          y += 8;
+        });
+      };
+
+      addLine("Clasificacion en blanco", { size: 18, bold: true });
+      addLine("Orden de trabajo consolidada por origen resuelto", { muted: true });
+      addLine(
+        `Generado: ${new Date().toLocaleString("es-EC")} | Archivo: clasificacion_en_blanco_${buildTimestampLabel()}.pdf`,
+        { muted: true },
+      );
+      addRule();
+
+      addSectionTitle("Configuracion");
+      orderSlotMeta.forEach((slot) => {
+        addLine(
+          `${slot.orderLabel}${slot.restriction ? ` | restr. ${slot.restriction} ${slot.restrictionMode === "STRICT" ? "estricta" : "suave"}` : ""}`,
+          { size: 9 },
+        );
+      });
+      lotSlotMeta.forEach((slot) => {
+        addLine(`${slot.lotLabel} | ${slot.origin}`, { size: 9, muted: true });
+      });
+
+      addRule();
+      addSectionTitle("Resumen ejecutivo");
+      addLine(
+        `${formatInteger(sections.length)} corrida(s) con resultado. El documento consolida la resolucion completa por origen, incluyendo ordenes resueltas y sus recetas.`,
+        { size: 9, muted: true },
+      );
+
+      sections.forEach(({ run, runResult, recipes, omittedRecipes }) => {
+        addRule();
+        addSectionTitle(run.label);
+        addLine(run.originScope, { size: 9, muted: true });
+        addLine(
+          `Cumplimiento macro: ${formatPercent(runResult.stage2Summary.cumplimiento_peso_macro ?? 0)} | Sobrepeso macro: ${formatPercent(runResult.stage2Summary.sobrepeso_pct_macro ?? 0)} | Peso real total: ${formatNumber(runResult.stage2Summary.peso_real_total ?? 0)} g`,
+          { size: 9, muted: true },
+        );
+
+        addTable(
+          ["SKU", "Estado", "Pedido", "Resuelto", "Peso ideal", "Peso real", "Sobrepeso"],
+          runResult.orderRows
+            .filter((row) => row.pedidoResuelto > 0)
+            .map((row) => [
+              row.sku,
+              row.estadoPeso,
+              formatInteger(row.pedidoTotal),
+              formatInteger(row.pedidoResuelto),
+              formatNumber(row.pesoIdealPedido),
+              formatNumber(row.pesoRealTotal),
+              formatPercent(row.sobrepesoPct),
+            ]),
+          [110, 90, 55, 60, 70, 70, 60],
+        );
+
+        addLine("Combinaciones de tallos por SKU resuelto", { size: 10, bold: true });
+        if (recipes.length === 0) {
+          addLine("No hubo recetas disponibles para esta corrida.", { muted: true });
+        }
+
+        recipes.forEach(({ sku, data }) => {
+          addRule();
+          addLine(sku, { size: 12, bold: true });
+          addLine(
+            `Bunches resueltos: ${formatInteger(data.summary.bunchesResueltos)} | Peso promedio real: ${formatNumber(data.summary.pesoPromedioReal)} g | Estado: ${data.summary.status}`,
+            { size: 9, muted: true },
+          );
+          addTable(
+            ["Receta", "Cant.", "Tallos", "Peso", "Dif.", "Estado"],
+            data.rows.map((recipe) => [
+              recipe.composicion.map((item) => `${item.grado}x${item.tallos}`).join(" + "),
+              formatInteger(recipe.cantidad),
+              formatInteger(recipe.tallosPorBunch),
+              formatNumber(recipe.pesoPorBunch),
+              formatNumber(recipe.difIdeal),
+              recipe.estadoPeso,
+            ]),
+            [200, 45, 55, 55, 50, 95],
+          );
+        });
+
+        if (omittedRecipes.length > 0) {
+          addLine("SKUs sin receta exportada", { size: 10, bold: true });
+          addTable(
+            ["SKU", "Motivo"],
+            omittedRecipes.map((item) => [item.sku, item.error ?? "Sin detalle"]),
+            [140, usableWidth - 140],
+          );
+        }
+      });
+
+      const filename = `clasificacion_en_blanco_${buildTimestampLabel()}.pdf`;
+      doc.save(filename);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo exportar el PDF.");
     } finally {
@@ -1335,9 +2258,9 @@ export function PoscosechaClasificacionEnBlancoExplorer({
               hint="Parametro global usado por el solver."
             />
             <SummaryTile
-              label="Proceso"
-              value={settings.proceso ?? "GV"}
-              hint="Modo operativo seleccionado para esta corrida."
+              label="Resolucion"
+              value="3"
+              hint="Matrices: GV, Apertura y Preclasificacion."
             />
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1381,9 +2304,8 @@ export function PoscosechaClasificacionEnBlancoExplorer({
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsOrdersManagerOpen(true)}>
-                  <Settings2 className="size-4" />
-                  Administrar ordenes
+                <Button type="button" variant="outline" className="rounded-full" onClick={addOrderSlot}>
+                  <Plus className="size-4" />
                 </Button>
                 <Button type="button" variant="outline" onClick={resetOrders}>
                   <RotateCcw className="size-4" />
@@ -1391,39 +2313,57 @@ export function PoscosechaClasificacionEnBlancoExplorer({
                 </Button>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="solver-sku-search">Buscar SKU</Label>
-              <div className="relative max-w-sm">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="solver-sku-search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Filtra por nombre de SKU"
-                  className="pl-9"
-                />
-              </div>
-            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-border/70 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
               <div className="flex flex-wrap items-center gap-2">
-                <span>Proceso activo: <strong>{settings.proceso ?? "GV"}</strong></span>
-                <span>Ordenes activas: <strong>{dateSlots.length}</strong></span>
+                <span>Resolucion: <strong>GV / APERTURA / PRECLASIFICACION</strong></span>
+                <span>Ordenes activas: <strong>{orderSlots.length}</strong></span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {dateSlotMeta.map((slot) => (
+                {orderSlotMeta.map((slot) => (
                   <Badge key={slot.key} variant="outline" className="rounded-full px-3 py-1">
-                    {slot.orderLabel} · {slot.origin}
+                    {slot.orderLabel}{slot.restriction ? ` | restr. ${slot.restriction} ${slot.restrictionMode === "STRICT" ? "estricta" : "suave"}` : ""}
                   </Badge>
                 ))}
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-              <span>Mostrando {filteredOrders.length} de {orders.length} SKU.</span>
+              <span>{formatInteger(orderSlots.length)} ordenes configuradas.</span>
               <span>{formatInteger(ordersWithCapture)} SKU con pedido activo.</span>
             </div>
-            <OrdersInputTable rows={filteredOrders} onChange={updateOrderValue} onOpenSku={openSkuInfo} dateSlots={dateSlots} />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {orderSlotMeta.map((slot) => (
+                <div key={slot.key} className="rounded-[24px] border border-border/70 bg-background/80 px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{slot.orderLabel}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {slot.restriction
+                          ? `Restriccion ${slot.restriction.toLowerCase()} ${slot.restrictionMode === "STRICT" ? "estricta" : "suave"}`
+                          : "Sin restriccion de origen"}
+                      </p>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" className="rounded-full" onClick={() => setEditingOrderSlotKey(slot.key)}>
+                      Modificar
+                    </Button>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <SummaryTile
+                      label="Bunches"
+                      value={formatInteger(slot.totalBunches)}
+                      hint="Total cargado para esta orden."
+                    />
+                    <SummaryTile
+                      label="SKU activos"
+                      value={formatInteger(slot.activeSkus)}
+                      hint="SKU con pedido mayor a cero."
+                      tone={slot.activeSkus > 0 ? "positive" : "default"}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
@@ -1433,13 +2373,15 @@ export function PoscosechaClasificacionEnBlancoExplorer({
               <div className="space-y-2">
                 <CardTitle className="text-lg">Disponibilidad por grado</CardTitle>
                 <CardDescription>
-                  Captura manual de mallas por prioridad y peso tallo seed en gramos para cada grado.
+                  Captura manual de mallas por prioridad. El peso tallo seed se edita de forma global por grado.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsLotDatesOpen(true)}>
-                  <CalendarDays className="size-4" />
-                  Fechas de lote
+                <Button type="button" variant="outline" className="rounded-full" onClick={() => setIsWeightEditorOpen(true)}>
+                  <SlidersHorizontal className="size-4" />
+                </Button>
+                <Button type="button" variant="outline" className="rounded-full" onClick={addLotSlot}>
+                  <Plus className="size-4" />
                 </Button>
                 <Button type="button" variant="outline" onClick={resetAvailability}>
                   <RotateCcw className="size-4" />
@@ -1462,7 +2404,7 @@ export function PoscosechaClasificacionEnBlancoExplorer({
                       ...current,
                       desperdicio: Math.min(Math.max(toFloat(event.target.value), 0), 0.95),
                     }));
-                    setResult(null);
+                    markResultStale();
                   }}
                 />
               </div>
@@ -1475,14 +2417,34 @@ export function PoscosechaClasificacionEnBlancoExplorer({
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            <AvailabilityInputTable
-              rows={availability}
-              desperdicio={settings.desperdicio}
-              onDateChange={updateAvailabilityDate}
-              onWeightChange={updateAvailabilityWeight}
-              dateSlots={dateSlots}
-              lotDates={lotDates}
-            />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {lotSlotMeta.map((slot) => (
+                <div key={slot.key} className="rounded-[24px] border border-border/70 bg-background/80 px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{slot.lotOrderLabel}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{slot.lotLabel}</p>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" className="rounded-full" onClick={() => setEditingLotSlotKey(slot.key)}>
+                      Modificar
+                    </Button>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <SummaryTile
+                      label="Mallas"
+                      value={formatInteger(slot.totalMallas)}
+                      hint="Total cargado en el lote."
+                    />
+                    <SummaryTile
+                      label="Tallos netos"
+                      value={formatInteger(slot.totalNetStems)}
+                      hint="Estimado con desperdicio actual."
+                      tone={slot.totalNetStems > 0 ? "positive" : "default"}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -1491,52 +2453,83 @@ export function PoscosechaClasificacionEnBlancoExplorer({
         <CardHeader className="space-y-2">
           <CardTitle className="text-lg">Validacion previa</CardTitle>
           <CardDescription>
-            La corrida solo se habilita cuando los tallos pedidos minimos son al menos iguales a los
-            tallos disponibles netos.
+            La holgura cruza pedidos por orden con disponibilidad administrada por lote, pero ambas capturas son independientes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <SummaryTile
+              label="Holgura flexible"
+              value={formatInteger(flexiblePrecheck.diferencia)}
+              hint={`${formatInteger(flexiblePrecheck.tallosPedidos)} pedidos flexibles vs ${formatInteger(flexiblePrecheck.tallosDisponibles)} disponibles`}
+              tone={flexiblePrecheck.isValid ? "positive" : "warning"}
+            />
+            {precheckModes.map(({ mode, precheck }) => (
+              <SummaryTile
+                key={mode}
+                label={`Holgura ${mode}`}
+                value={formatInteger(precheck.diferencia)}
+                hint={`${formatInteger(precheck.tallosPedidos)} pedidos vs ${formatInteger(precheck.tallosDisponibles)} disponibles`}
+                tone={precheck.isValid ? "positive" : "warning"}
+              />
+            ))}
+          </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <SummaryTile
-              label="Tallos pedidos"
-              value={formatInteger(precheck.tallosPedidos)}
-              hint="Minimos requeridos por el maestro SKU."
+              label="Peso tallo disponible"
+              value={`${formatNumber(estimatedWeightKpis.availableAvgStemWeight, 2)} g`}
+              hint="Promedio ponderado segun disponibilidad actual."
             />
             <SummaryTile
-              label="Tallos disponibles"
-              value={formatInteger(precheck.tallosDisponibles)}
-              hint="Netos, despues del desperdicio."
+              label="Peso tallo requerido"
+              value={`${formatNumber(estimatedWeightKpis.requiredAvgStemWeight, 2)} g`}
+              hint="Referencia teorica segun peso ideal y tallos min."
             />
             <SummaryTile
-              label="Holgura captura"
-              value={formatInteger(precheck.diferencia)}
-              hint="Pedidos menos disponibilidad."
-              tone={precheck.isValid ? "positive" : "warning"}
+              label="Sobrepeso esperado"
+              value={formatPercent(estimatedWeightKpis.expectedOverweightPct)}
+              hint="Escenario macro sin optimizacion fina del solver."
+              tone={(estimatedWeightKpis.expectedOverweightPct ?? 0) > 0 ? "warning" : "positive"}
             />
             <SummaryTile
-              label="Corrida"
-              value={precheck.isValid ? "Lista" : "Bloqueada"}
-              hint={precheck.isValid ? "Ya puedes ejecutar el solver." : "Ajusta primero pedidos o disponibilidad."}
-              tone={precheck.isValid ? "positive" : "warning"}
+              label="Eficiencia estimada"
+              value={formatPercent(estimatedWeightKpis.expectedEfficiencyPct)}
+              hint="Ajuste ideal/requerido frente al tallo disponible."
+              tone={(estimatedWeightKpis.expectedEfficiencyPct ?? 0) >= 1 ? "positive" : "default"}
             />
           </div>
-          <div
-            className={cn(
-              "rounded-[24px] border px-4 py-4 text-sm",
-              precheck.isValid
-                ? "border-chart-success-bold/40 bg-chart-success-bold/10"
-                : "border-slate-400/40 bg-slate-400/10",
-            )}
-          >
-            {precheck.message}
+          <div className="space-y-2">
+            <div
+              className={cn(
+                "rounded-[24px] border px-4 py-4 text-sm",
+                flexiblePrecheck.isValid
+                  ? "border-chart-success-bold/40 bg-chart-success-bold/10"
+                  : "border-slate-400/40 bg-slate-400/10",
+              )}
+            >
+              <strong>Flexible:</strong> {flexiblePrecheck.message}
+            </div>
+            {precheckModes.map(({ mode, precheck }) => (
+              <div
+                key={mode}
+                className={cn(
+                  "rounded-[24px] border px-4 py-4 text-sm",
+                  precheck.isValid
+                    ? "border-chart-success-bold/40 bg-chart-success-bold/10"
+                    : "border-slate-400/40 bg-slate-400/10",
+                )}
+              >
+                <strong>{mode}:</strong> {precheck.message}
+              </div>
+            ))}
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              El solver prioriza Orden 1, luego Orden 2 y asi sucesivamente antes de optimizar peso y
-              uso de grados, respetando el proceso seleccionado.
+              El solver prioriza Orden 1, luego Orden 2 y asi sucesivamente. Dentro de cada orden,
+              respeta la restriccion de origen contra la disponibilidad capturada por lote.
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="outline" onClick={() => setResult(null)} disabled={!result}>
+              <Button type="button" variant="outline" onClick={clearResults} disabled={!resultBundle}>
                 <TableProperties className="size-4" />
                 Limpiar resultados
               </Button>
@@ -1547,7 +2540,7 @@ export function PoscosechaClasificacionEnBlancoExplorer({
               <Button
                 type="button"
                 onClick={() => void handleRunSolver()}
-                disabled={!precheck.isValid || isRunning}
+                disabled={!precheckModes.some((item) => item.precheck.isValid) || isRunning}
               >
                 {isRunning ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />}
                 Resolver modelo unificado
@@ -1557,117 +2550,191 @@ export function PoscosechaClasificacionEnBlancoExplorer({
         </CardContent>
       </Card>
 
-      {isOrdersManagerOpen ? (
+      {activeEditingOrderSlot ? (
         <FloatingPanel
-          title="Administrar ordenes"
-          description="Aqui defines las prioridades activas y el origen de cada orden para la captura inicial de pedidos."
-          onClose={() => setIsOrdersManagerOpen(false)}
+          title={`Capturar ${activeEditingOrderSlot.orderLabel}`}
+          description="Aqui puedes ajustar la configuracion de la orden y cargar los SKU correspondientes."
+          onClose={() => setEditingOrderSlotKey(null)}
         >
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <Label>Ordenes activas</Label>
-              <Button type="button" size="sm" variant="outline" className="rounded-full" onClick={addDateSlot}>
-                <Plus className="size-4" />
-                Agregar orden
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {dateSlotMeta.map((slot) => (
-                <div key={slot.key} className="rounded-[18px] border border-border/70 bg-card/70 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium">{slot.orderLabel}</p>
-                      <p className="text-xs text-muted-foreground">Se refleja como columna de captura en pedidos.</p>
-                    </div>
-                    <Button type="button" size="icon" variant="ghost" className="size-8 rounded-full" onClick={() => removeDateSlot(slot.key)}>
-                      <Trash2 className="size-4" />
-                    </Button>
+          <div className="space-y-4">
+            <div className="rounded-[24px] border border-border/70 bg-background/70 px-4 py-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Restriccion de optimizacion</Label>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {ORDER_RESTRICTION_OPTIONS.map((option) => (
+                      <button
+                        key={`edit-order-restriction-${activeEditingOrderSlot.key}-${option.value ?? "none"}`}
+                        type="button"
+                        className={cn(
+                          "rounded-[18px] border px-4 py-3 text-left transition",
+                          draftOrderSlot?.restriction === option.value
+                            ? "border-slate-900 bg-slate-900 text-white"
+                            : "border-border/70 bg-card/80 hover:border-slate-400",
+                        )}
+                        onClick={() => updateDraftOrderRestriction(option.value)}
+                      >
+                        <span className="block text-sm font-semibold">{option.label}</span>
+                        <span className={cn("mt-1 block text-xs", draftOrderSlot?.restriction === option.value ? "text-white/80" : "text-muted-foreground")}>
+                          {option.description}
+                        </span>
+                      </button>
+                    ))}
                   </div>
+                </div>
+                {draftOrderSlot?.restriction ? (
                   <div className="space-y-2">
-                    <Label htmlFor={`origin-${slot.key}`}>Origen</Label>
-                    <div className="grid gap-2 md:grid-cols-3">
-                      {PROCESS_OPTIONS.map((option) => (
+                    <Label>Tipo de restriccion</Label>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {[
+                        {
+                          value: "SOFT" as const,
+                          label: "Suave",
+                          description: "Permite completar la orden con otros origenes si hace falta.",
+                        },
+                        {
+                          value: "STRICT" as const,
+                          label: "Estricta",
+                          description: "La orden solo puede resolverse con el origen seleccionado.",
+                        },
+                      ].map((option) => (
                         <button
-                          key={`${slot.key}-${option.value}`}
-                          id={`origin-${slot.key}`}
+                          key={`edit-order-mode-${activeEditingOrderSlot.key}-${option.value}`}
                           type="button"
                           className={cn(
                             "rounded-[18px] border px-4 py-3 text-left transition",
-                            slot.origin === option.value
+                            draftOrderSlot?.restrictionMode === option.value
                               ? "border-slate-900 bg-slate-900 text-white"
                               : "border-border/70 bg-card/80 hover:border-slate-400",
                           )}
-                          onClick={() => updateDateSlotOrigin(slot.key, option.value)}
+                          onClick={() => updateDraftOrderRestrictionMode(option.value)}
                         >
                           <span className="block text-sm font-semibold">{option.label}</span>
-                          <span className={cn("mt-1 block text-xs", slot.origin === option.value ? "text-white/80" : "text-muted-foreground")}>
+                          <span className={cn("mt-1 block text-xs", draftOrderSlot?.restrictionMode === option.value ? "text-white/80" : "text-muted-foreground")}>
                             {option.description}
                           </span>
                         </button>
                       ))}
                     </div>
                   </div>
-                </div>
-              ))}
+                ) : null}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="solver-sku-search">Buscar SKU</Label>
+              <div className="relative max-w-sm">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="solver-sku-search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Filtra por nombre de SKU"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <OrderSlotCaptureTable
+              rows={draftOrderRows.filter((row) => {
+                const normalized = deferredSearch.trim().toLowerCase();
+                return !normalized || row.sku.toLowerCase().includes(normalized);
+              })}
+              slotKey={activeEditingOrderSlot.key}
+              slotLabel={activeEditingOrderSlot.orderLabel}
+              idealBySkuId={skuIdealById}
+              onChange={updateDraftOrderValue}
+              onOpenSku={openSkuInfo}
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setEditingOrderSlotKey(null)}>
+                Cerrar
+              </Button>
+              <Button type="button" onClick={saveOrderDraft}>
+                Guardar
+              </Button>
             </div>
           </div>
         </FloatingPanel>
       ) : null}
 
-      {isLotDatesOpen ? (
+      {activeEditingLotSlot ? (
         <FloatingPanel
-          title="Fechas de lote"
-          description="Aqui asignas la fecha real del lote para cada orden activa y defines el proceso global del solver."
-          onClose={() => setIsLotDatesOpen(false)}
+          title={`Capturar ${activeEditingLotSlot.lotOrderLabel}`}
+          description="Aqui puedes ajustar la configuracion del lote y cargar sus mallas."
+          onClose={() => setEditingLotSlotKey(null)}
         >
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <Label>Proceso del solver</Label>
-              <div className="grid gap-2 md:grid-cols-3">
-                {PROCESS_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={cn(
-                      "rounded-[20px] border px-4 py-3 text-left transition",
-                      settings.proceso === option.value
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-border/70 bg-card/80 hover:border-slate-400",
-                    )}
-                    onClick={() => {
-                      setSettings((current) => ({ ...current, proceso: option.value }));
-                      setResult(null);
-                    }}
-                  >
-                    <span className="block text-sm font-semibold">{option.label}</span>
-                    <span className={cn("mt-1 block text-xs", settings.proceso === option.value ? "text-white/80" : "text-muted-foreground")}>
-                      {option.description}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-            {dateSlotMeta.map((slot) => (
-              <div key={slot.key} className="rounded-[18px] border border-border/70 bg-card/70 p-4">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">{slot.orderLabel}</p>
-                    <p className="text-xs text-muted-foreground">Se muestra en Disponibilidad por grado como referencia del lote.</p>
-                  </div>
-                </div>
+          <div className="space-y-4">
+            <div className="rounded-[24px] border border-border/70 bg-background/70 px-4 py-4">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor={`lote-${slot.key}`}>Fecha del lote</Label>
+                  <Label htmlFor={`editing-lot-date-${activeEditingLotSlot.key}`}>Fecha del lote</Label>
                   <Input
-                    id={`lote-${slot.key}`}
+                    id={`editing-lot-date-${activeEditingLotSlot.key}`}
                     type="date"
-                    value={lotDates[slot.key] ?? ""}
-                    onChange={(event) => updateLotDate(slot.key, event.target.value)}
+                    value={draftLotSlot?.lotDate ?? ""}
+                    onChange={(event) => updateDraftLotDate(event.target.value)}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Origen del lote</Label>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    {ORDER_ORIGIN_OPTIONS.map((option) => (
+                      <button
+                        key={`edit-lot-origin-${activeEditingLotSlot.key}-${option.value}`}
+                        type="button"
+                        className={cn(
+                          "rounded-[18px] border px-4 py-3 text-left transition",
+                          draftLotSlot?.origin === option.value
+                            ? "border-slate-900 bg-slate-900 text-white"
+                            : "border-border/70 bg-card/80 hover:border-slate-400",
+                        )}
+                        onClick={() => updateDraftLotOrigin(option.value)}
+                      >
+                        <span className="block text-sm font-semibold">{option.label}</span>
+                        <span className={cn("mt-1 block text-xs", draftLotSlot?.origin === option.value ? "text-white/80" : "text-muted-foreground")}>
+                          {option.description}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            ))}
+            </div>
+            <LotSlotCaptureTable
+              rows={draftLotRows}
+              slotKey={activeEditingLotSlot.key}
+              slotLabel={draftLotSlot ? getAvailabilityLabel(draftLotSlot.origin, draftLotSlot.lotDate ?? "") : activeEditingLotSlot.lotLabel}
+              onDateChange={updateDraftAvailabilityDate}
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setEditingLotSlotKey(null)}>
+                Cerrar
+              </Button>
+              <Button type="button" onClick={saveLotDraft}>
+                Guardar
+              </Button>
+            </div>
+          </div>
+        </FloatingPanel>
+      ) : null}
+
+      {isWeightEditorOpen ? (
+        <FloatingPanel
+          title="Editar peso tallo seed"
+          description="Aqui ajustas el peso tallo seed global por grado. Este cambio aplica a todos los lotes."
+          onClose={() => setIsWeightEditorOpen(false)}
+        >
+          <div className="space-y-4">
+            <AvailabilityWeightEditor
+              rows={draftWeightRows}
+              onWeightChange={updateDraftAvailabilityWeight}
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsWeightEditorOpen(false)}>
+                Cerrar
+              </Button>
+              <Button type="button" onClick={saveWeightDraft}>
+                Guardar
+              </Button>
             </div>
           </div>
         </FloatingPanel>
@@ -1675,6 +2742,48 @@ export function PoscosechaClasificacionEnBlancoExplorer({
 
       {result ? (
         <>
+          {resultBundle ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              {resultBundle.runs.map((run) => (
+                <button
+                  key={run.mode}
+                  type="button"
+                  className={cn(
+                    "rounded-[24px] border px-4 py-4 text-left transition",
+                    activeRun?.mode === run.mode
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-border/70 bg-card/80 hover:border-slate-400",
+                  )}
+                  onClick={() => setActiveMode(run.mode)}
+                >
+                  <p className="text-xs uppercase tracking-[0.24em]">{run.label}</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {run.result ? formatPercent(run.result.stage2Summary.sobrepeso_pct_macro ?? 0) : "Sin corrida"}
+                  </p>
+                  <p className={cn("mt-2 text-xs", activeRun?.mode === run.mode ? "text-white/80" : "text-muted-foreground")}>
+                    {run.originScope}
+                  </p>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {activeRun ? (
+            <div className="rounded-[24px] border border-border/70 bg-background/60 px-4 py-4 text-sm text-muted-foreground">
+              <strong className="text-foreground">Corrida activa:</strong> {activeRun.label}. {activeRun.originScope}.{" "}
+              {activeRun.precheck.isValid
+                ? "La holgura de esta corrida permitio ejecutar el solver."
+                : "Esta corrida no fue ejecutable por su holgura actual."}
+            </div>
+          ) : null}
+
+          {resultBundle && isResultStale ? (
+            <div className="rounded-[24px] border border-amber-300/70 bg-amber-50/80 px-4 py-4 text-sm text-amber-950">
+              Estas viendo la ultima corrida disponible. La configuracion cambio despues de resolver, asi que los
+              resultados quedan como referencia hasta que vuelvas a ejecutar `Resolver modelo unificado`.
+            </div>
+          ) : null}
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <SummaryTile
               label="Peso disponible"
@@ -1725,7 +2834,7 @@ export function PoscosechaClasificacionEnBlancoExplorer({
 
           <SimpleTableCard
             title="Prioridad de cumplimiento por orden"
-            description="Secuencia de la etapa interna de resolucion de pedidos segun el orden activo."
+            description={`Secuencia de la etapa interna de resolucion de pedidos para la corrida ${activeRun?.label ?? "-"}.`}
             table={(
               <div className="overflow-x-auto rounded-[24px] border border-border/70">
                 <table className="min-w-[720px] w-full text-sm">
@@ -1733,7 +2842,6 @@ export function PoscosechaClasificacionEnBlancoExplorer({
                     <tr className="border-b border-border/70 text-left">
                       <th className="px-4 py-3 font-medium">Prioridad</th>
                       <th className="px-4 py-3 font-medium">Orden</th>
-                      <th className="px-4 py-3 font-medium">Fecha lote</th>
                       <th className="px-4 py-3 text-right font-medium">Pedido</th>
                       <th className="px-4 py-3 text-right font-medium">Resuelto</th>
                       <th className="px-4 py-3 text-right font-medium">No realizado</th>
@@ -1745,7 +2853,6 @@ export function PoscosechaClasificacionEnBlancoExplorer({
                       <tr key={row.prioridad} className="border-b border-border/50 last:border-b-0">
                         <td className="px-4 py-3">{row.prioridad}</td>
                         <td className="px-4 py-3 font-medium">{getOrderLabel(Math.max(row.prioridad - 1, 0))}</td>
-                        <td className="px-4 py-3">{lotDates[dateSlotMeta[row.prioridad - 1]?.key ?? "fecha_1"] ? formatShortDate(lotDates[dateSlotMeta[row.prioridad - 1]?.key ?? "fecha_1"] ?? "") : "-"}</td>
                         <td className="px-4 py-3 text-right">{formatInteger(row.pedido)}</td>
                         <td className="px-4 py-3 text-right">{formatInteger(row.resuelto)}</td>
                         <td className="px-4 py-3 text-right">{formatInteger(row.noRealizado)}</td>
@@ -1760,7 +2867,7 @@ export function PoscosechaClasificacionEnBlancoExplorer({
 
           <SimpleTableCard
             title="Resumen por pedido"
-            description="Lectura por SKU del resultado final y del estado de peso. Haz click en un SKU resuelto para ver su receta."
+            description={`Lectura por SKU del resultado final para ${activeRun?.label ?? "-"}. Haz click en un SKU resuelto para ver su receta.`}
             table={(
               <div className="overflow-x-auto rounded-[24px] border border-border/70">
                 <table className="min-w-[1620px] w-full text-sm">
@@ -1832,7 +2939,7 @@ export function PoscosechaClasificacionEnBlancoExplorer({
 
           <SimpleTableCard
             title="Tabla final en mallas"
-            description="Matriz SKU por grado que sale del solver redondeada a la vista operativa. Tambien puedes abrir la receta desde cada SKU."
+            description={`Matriz SKU por grado de la corrida ${activeRun?.label ?? "-"}. Tambien puedes abrir la receta desde cada SKU.`}
             table={(
               <div className="overflow-x-auto rounded-[24px] border border-border/70">
                 <table className="min-w-[960px] w-full text-sm">
@@ -1896,7 +3003,7 @@ export function PoscosechaClasificacionEnBlancoExplorer({
 
           <SimpleTableCard
             title="Disponibilidad final por grado"
-            description="Lectura de consumo, remanente y peso gestionable despues de la corrida."
+            description={`Lectura de consumo, remanente y peso gestionable despues de la corrida ${activeRun?.label ?? "-"}.`}
             table={(
               <div className="overflow-x-auto rounded-[24px] border border-border/70">
                 <table className="min-w-[1240px] w-full text-sm">

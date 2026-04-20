@@ -759,6 +759,7 @@ def solve_pipeline(
     ]
     stage2_status_pref = "No aplica"
     stage2_status_macro = "No aplica"
+    stage2_status_balance = "No aplica"
     stage2_status_recipe = "No aplica"
     stage2_status_overweight = "No aplica"
     stage2_status_ideal = "No aplica"
@@ -768,6 +769,7 @@ def solve_pipeline(
     stage2_status_weight = "No aplica"
     preferred_violation_opt = 0.0
     macro_violation_opt = 0.0
+    balance_overweight_opt = 0.0
     recipe_gap_opt = 0.0
     overweight_opt = 0.0
     ideal_deviation_opt = 0.0
@@ -848,6 +850,7 @@ def solve_pipeline(
         }
         stage2_macro_low = pulp.LpVariable("stage2_macro_low", lowBound=0)
         stage2_macro_high = pulp.LpVariable("stage2_macro_high", lowBound=0)
+        stage2_max_overweight_ratio = pulp.LpVariable("stage2_max_overweight_ratio", lowBound=0)
 
         for order_position in active_order_positions:
             fixed_bunches = int(fulfilled_bunches[order_position])
@@ -925,6 +928,12 @@ def solve_pipeline(
                 >= pulp.lpSum(stage2_u[order_position, grade_position] for grade_position in active_grade_positions)
                 - float(orders.loc[order_position, "max_grados_objetivo"])
             ), f"stage2_extra_grade_penalty_{order_position}"
+            ideal_total = float(orders.loc[order_position, "peso_ideal_bunch"]) * fixed_bunches
+            if ideal_total > 0:
+                stage2_problem += (
+                    stage2_over_ideal[order_position]
+                    <= stage2_max_overweight_ratio * ideal_total
+                ), f"stage2_max_over_ratio_{order_position}"
             for grade_position in active_grade_positions:
                 stage2_problem += (
                     stage2_x[order_position, grade_position]
@@ -977,6 +986,7 @@ def solve_pipeline(
             stage2_macro_high >= actual_weight_expr - MACRO_WEIGHT_MAX_RATIO * resolved_ideal_total
         ), "stage2_macro_high_balance"
         macro_violation_expr = stage2_macro_low + stage2_macro_high
+        balance_overweight_expr = stage2_max_overweight_ratio
 
         stage2_problem.setObjective(macro_violation_expr)
         stage2_status_macro = solve_or_raise(
@@ -990,6 +1000,19 @@ def solve_pipeline(
         stage2_problem += (
             macro_violation_expr <= macro_violation_opt + objective_fix_tolerance(macro_violation_opt)
         ), "stage2_fix_macro_violation"
+
+        stage2_problem.setObjective(balance_overweight_expr)
+        stage2_status_balance = solve_or_raise(
+            stage2_problem,
+            stage2_solver,
+            "No se pudo balancear el sobrepeso maximo por SKU",
+            integer_vars=list(stage2_u.values()),
+            allow_feasible_incumbent=True,
+        )
+        balance_overweight_opt = float(pulp.value(balance_overweight_expr) or 0.0)
+        stage2_problem += (
+            balance_overweight_expr <= balance_overweight_opt + objective_fix_tolerance(balance_overweight_opt)
+        ), "stage2_fix_balance_overweight"
 
         stage2_problem.setObjective(overweight_expr)
         stage2_status_overweight = solve_or_raise(
@@ -1279,6 +1302,7 @@ def solve_pipeline(
                 stage1_status_stems,
                 stage2_status_pref,
                 stage2_status_macro,
+                stage2_status_balance,
                 stage2_status_recipe,
                 stage2_status_overweight,
                 stage2_status_ideal,
@@ -1295,6 +1319,7 @@ def solve_pipeline(
         "stage1_ideal_deviation_opt": stage1_ideal_deviation_opt,
         "fulfilled_ideal_opt": fulfilled_ideal_opt,
         "macro_violation_opt": macro_violation_opt,
+        "balance_overweight_opt": balance_overweight_opt,
         "recipe_gap_opt": recipe_gap_opt,
         "preferred_violation_opt": preferred_violation_opt,
         "overweight_opt": overweight_opt,
@@ -1311,6 +1336,7 @@ def solve_pipeline(
         "stage1_stem_violation_opt": stage1_stem_violation_opt,
         "stage2_status_pref": stage2_status_pref,
         "stage2_status_macro": stage2_status_macro,
+        "stage2_status_balance": stage2_status_balance,
         "stage2_status_recipe": stage2_status_recipe,
         "stage2_status_overweight": stage2_status_overweight,
         "stage2_status_ideal": stage2_status_ideal,

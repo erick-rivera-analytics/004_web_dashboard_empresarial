@@ -389,3 +389,220 @@ Recomendacion productiva:
 - usar siempre un `cbc` del sistema
 - definir tambien:
   - `POSTHARVEST_SOLVER_PYTHON=/usr/bin/python3`
+
+
+Actualizacion 2026-04-20 - Alcance exacto para migracion oficial
+---------------------------------------------------------------
+En esta fase el objetivo ya no fue tocar el dashboard completo, sino mejorar solamente el modulo:
+
+- `Gestion / Poscosecha / Planificacion / Solver / Clasificacion en blanco`
+
+La instruccion para migracion oficial debe ser:
+
+- mover solo los cambios del modulo del solver
+- no mezclar otros componentes del dashboard
+- no arrastrar cambios visuales ajenos
+- no tocar otras vistas de gestion
+
+
+Cambios funcionales acumulados del modulo
+-----------------------------------------
+1. Persistencia local del trabajo del usuario
+
+Se agrego persistencia en navegador para:
+- configuracion del solver
+- pedidos por SKU
+- disponibilidad por grado
+- restricciones por orden
+- lotes cargados
+- ultima corrida resuelta
+- corrida activa
+- bandera de resultado desactualizado
+
+Objetivo:
+- evitar perder la configuracion y la ultima corrida por refresh o recarga interna del modulo
+
+
+2. Separacion correcta entre ordenes y lotes
+
+Se separo la captura en dos dominios independientes:
+
+- `Pedidos por SKU`
+- `Disponibilidad por grado`
+
+Esto evita mezclar:
+- la prioridad comercial de las ordenes
+- con la fecha y origen del lote disponible
+
+
+3. Restricciones por orden
+
+Se implemento:
+- restriccion por origen
+- modo `STRICT`
+- modo `SOFT`
+
+Con esto una orden puede:
+- exigir un origen estricto
+- o priorizar un origen pero dejar saldo a resolver con otros origenes
+
+
+4. Solver principal en dos etapas
+
+Se dejo el motor nuevamente en arquitectura de dos etapas.
+
+Importante:
+- se probo una integracion completa de receta dentro de la etapa 2
+- pero esa version se retiro porque endurecia demasiado la factibilidad y afectaba estabilidad/tiempo
+
+La version que queda para migracion oficial es:
+- dos etapas
+- mejor acopladas
+- con optimizacion mas fuerte del sobrepeso y de la recetabilidad
+
+
+5. Balance de sobrepeso entre SKU en el solver principal
+
+Se incorporo otra vez el control del peor sobrepeso relativo por SKU.
+
+Objetivo:
+- no permitir que el solver pase con un ponderado correcto pero dejando ordenes extremas
+- por ejemplo un SKU con `64.1%` de sobrepeso mientras otros quedan cerca de `5%`
+
+La secuencia objetivo del solver principal queda orientada a:
+- prioridad de cumplimiento
+- desvio macro
+- balance del peor sobrepeso relativo por SKU
+- sobrepeso total
+- desviacion total al ideal
+- receta temprana aproximada
+- uso de grados y tallos
+
+
+6. Solver de receta separado, pero mucho mas robusto
+
+El bridge de receta:
+- usa flexibilidad `min - 2` para SKU europeos permitidos
+- acepta incumbentes validos cuando CBC no logra cerrar en `Optimal`
+- tiene fallback heuristico cuando no encuentra solucion exacta
+- intenta repartir mejor el peso remanente entre bunches
+- minimiza el peor desvio individual entre recetas activas
+
+Objetivo:
+- evitar que una receta “pase” con promedio correcto pero con bunches extremos
+
+
+7. Exportacion PDF ejecutiva consolidada
+
+Antes:
+- el PDF exportaba solo la corrida activa
+
+Ahora:
+- exporta todas las corridas resueltas del bundle
+- separa claramente por origen resuelto
+- incluye un resumen ejecutivo inicial
+- lista los SKU resueltos por corrida
+- luego agrega sus recetas por SKU
+- y deja una seccion de SKU sin receta exportada cuando aplique
+
+Esto permite entregar una orden de trabajo completa, no solo una vista parcial.
+
+
+8. UX del modulo
+
+Dentro del solver quedaron integrados:
+- captura por ventanas flotantes
+- guardado por borrador
+- `Cerrar` descarta
+- `Guardar` aplica
+- botones `+` para agregar ordenes o lotes
+- editor global de `peso tallo seed`
+- tabulacion mas limpia en formularios
+- resultado persistente y marcado como desactualizado cuando cambian insumos
+
+
+Archivos que SI forman parte de la migracion oficial del solver
+---------------------------------------------------------------
+Estos son los archivos que deben considerarse como alcance oficial del modulo:
+
+- `scripts/postharvest_solver_engine.py`
+- `scripts/solver_clasificacion_en_blanco_bridge.py`
+- `src/components/dashboard/postcosecha-clasificacion-en-blanco-explorer.tsx`
+- `src/components/dashboard/postcosecha-clasificacion-en-blanco-recipe-overlay.tsx`
+- `src/lib/postcosecha-clasificacion-en-blanco.ts`
+- `src/lib/postcosecha-clasificacion-en-blanco-client.ts`
+- `src/lib/postcosecha-clasificacion-en-blanco-types.ts`
+- `docs/solver_clasificacion_en_blanco_servidor.txt`
+- `docs/registro_cambios_detallados.md`
+
+Adicionalmente:
+- `package.json`
+- `package-lock.json`
+
+Motivo:
+- el modulo ahora depende de `jspdf` para descargar PDF real
+
+
+Archivos que NO deberian entrar en la migracion oficial
+------------------------------------------------------
+No mover como parte del cambio del solver:
+
+- `.codex-runtime/`
+- `env.download`
+- `env.example`
+- `env.production.example`
+- `scripts/__pycache__/`
+
+Tampoco mezclar:
+- otras vistas del dashboard
+- otros modulos de gestion
+- cambios de negocio fuera de `Clasificacion en blanco`
+
+
+Estrategia de migracion recomendada
+-----------------------------------
+1. Aplicar solo los archivos del bloque oficial del solver
+
+2. Instalar dependencias Node si el sistema oficial aun no tiene:
+- `jspdf`
+
+3. Validar que el entorno productivo ya tenga:
+- Python 3
+- `numpy`
+- `pandas`
+- `pulp`
+- `cbc` del sistema
+
+4. Confirmar estas variables:
+- `POSTHARVEST_SOLVER_PYTHON`
+- `POSTHARVEST_CBC_PATH`
+- variables de PostgreSQL
+
+5. Probar estas rutas:
+- `/dashboard/postcosecha/planificacion/solver/clasificacion-en-blanco`
+- `GET /api/postcosecha/planificacion/solver/clasificacion-en-blanco`
+- `POST /api/postcosecha/planificacion/solver/clasificacion-en-blanco`
+- `POST /api/postcosecha/planificacion/solver/clasificacion-en-blanco/receta`
+
+6. Probar obligatoriamente tres cosas:
+- persistencia de corrida al refrescar
+- apertura de receta por SKU
+- exportacion PDF consolidada con todas las corridas resueltas
+
+
+Resumen practico para el equipo
+-------------------------------
+Si se va a migrar al sistema oficial, la consigna correcta es:
+
+- “copiar solo los cambios del modulo de Clasificacion en blanco”
+
+No es una migracion general del dashboard.
+
+El alcance tecnico de esta tanda es:
+- solver principal
+- solver de receta
+- persistencia local del modulo
+- UX del modulo
+- exportacion PDF consolidada
+
+Todo lo demas debe quedarse fuera del cambio.

@@ -118,6 +118,103 @@ Motivo:
 
 Impacto:
 - Se destrabo la compilacion del dashboard para validar el solver.
+
+## 2026-04-17 - Persistencia local y balance de sobrepeso en Clasificacion en blanco
+
+Contexto:
+- El usuario necesitaba conservar la configuracion cargada en el visualizador para repetir pruebas sin recapturar pedidos, lotes y seeds.
+- Ademas, se detectaron dos inconsistencias:
+  - algunos SKU resueltos no lograban cerrar receta final en la exportacion,
+  - el sobrepeso podia concentrarse de forma excesiva en un SKU puntual, en vez de repartirse mejor.
+
+Objetivo:
+- Guardar automaticamente el caso de prueba en el navegador local.
+- Reducir la probabilidad de recetas no exportables.
+- Castigar la concentracion extrema de sobrepeso por SKU dentro del solver.
+
+Archivos modificados:
+- `src/components/dashboard/postcosecha-clasificacion-en-blanco-explorer.tsx`
+- `src/components/dashboard/postcosecha-clasificacion-en-blanco-recipe-overlay.tsx`
+- `src/lib/postcosecha-clasificacion-en-blanco-types.ts`
+- `scripts/solver_clasificacion_en_blanco_bridge.py`
+- `scripts/postharvest_solver_engine.py`
+
+Detalle por archivo:
+
+### `src/components/dashboard/postcosecha-clasificacion-en-blanco-explorer.tsx`
+
+Accion:
+- Se agrego persistencia automatica en `localStorage`.
+
+Implementacion:
+- Se creo la llave `postcosecha_clasificacion_en_blanco_draft_v1`.
+- Se guarda automaticamente:
+  - pedidos por SKU,
+  - disponibilidad por grado,
+  - `desperdicio`,
+  - restricciones por orden,
+  - configuracion de lotes.
+- Al abrir el modulo, si existe un draft local valido, se hidrata sobre la plantilla base.
+- Al recargar la base del solver, se vuelve a aplicar el draft guardado sobre la nueva estructura para no perder el caso de prueba.
+
+Impacto:
+- Desde esta version el usuario no deberia volver a capturar todo cada vez que refresca o reabre el modulo en el mismo navegador.
+
+### `scripts/postharvest_solver_engine.py`
+
+Accion:
+- Se agrego una nueva capa de optimizacion para balancear el sobrepeso maximo por SKU.
+
+Implementacion:
+- Se introdujo la variable `stage2_max_overweight_ratio`.
+- Por cada orden activa se restringe `over_ideal <= ratio_maximo * ideal_total_resuelto`.
+- Despues de fijar la desviacion macro, el solver ahora minimiza primero ese ratio maximo antes de seguir con el sobrepeso total.
+
+Impacto:
+- Baja la probabilidad de que un SKU aislado quede extremadamente inflado mientras otros quedan mas limpios.
+- El sobrepeso tiende a repartirse de forma mas pareja entre ordenes resueltas.
+
+### `scripts/solver_clasificacion_en_blanco_bridge.py`
+
+Accion:
+- Se suavizo el armado de receta final por SKU.
+
+Implementacion:
+- Antes la receta exigia particion exacta de tallos por grado.
+- Ahora permite un residuo minimo por grado mediante variables `unassigned_*`.
+- El orden objetivo queda asi:
+  - minimizar tallos sin receta,
+  - minimizar penalidad de rango,
+  - minimizar desviacion absoluta al ideal,
+  - minimizar numero de recetas activas.
+- Se agrega en el resumen `tallosSinReceta`.
+- Si queda residuo, el estado de receta pasa a `Parcial`.
+
+Impacto:
+- Disminuyen los casos en que el PDF omitia por completo un SKU solo porque la particion exacta por grado era imposible.
+- La receta sigue priorizando bunches cerrables y cercania al peso objetivo.
+
+### `src/components/dashboard/postcosecha-clasificacion-en-blanco-recipe-overlay.tsx`
+
+Accion:
+- Se agrego visibilidad al residuo de receta.
+
+Implementacion:
+- Si `tallosSinReceta > 0`, el overlay muestra una alerta explicando que el solver priorizo cerrar bunches y peso antes que forzar una particion exacta por grado.
+
+Impacto:
+- El usuario puede distinguir entre una receta limpia y una receta parcial sin revisar logs.
+
+### `src/lib/postcosecha-clasificacion-en-blanco-types.ts`
+
+Accion:
+- Se extendio el contrato de `RecipeSummary`.
+
+Implementacion:
+- Se agrego el campo opcional `tallosSinReceta`.
+
+Impacto:
+- El frontend puede renderizar la alerta de receta parcial sin romper compatibilidad con respuestas previas.
 - No cambia la logica del solver; es un cambio de soporte del runtime UI.
 
 ### `package.json` y `package-lock.json`
@@ -910,3 +1007,288 @@ Impacto final:
   - europeos con `2` tallos hacia abajo
   - receta temprana integrada como objetivo del solver
 - esta variante dejo el macro peso practicamente en equilibrio y aumento bunches resueltos
+
+## 2026-04-16 - Clasificacion en blanco: restricciones estrictas/suaves por orden
+
+Contexto:
+- En el flujo de `Postcosecha > Planificacion > Solver > Clasificacion en blanco` se estaba refinando la captura por orden y origen.
+- La regla requerida fue separar claramente:
+  - el origen real del lote dentro de `Fechas de lote`
+  - la restriccion de optimizacion dentro de `Administrar ordenes`
+- La restriccion ahora puede ser `Suave` o `Estricta`.
+
+Archivos modificados:
+- `src/components/dashboard/postcosecha-clasificacion-en-blanco-explorer.tsx`
+- `src/lib/postcosecha-clasificacion-en-blanco.ts`
+- `src/lib/postcosecha-clasificacion-en-blanco-client.ts`
+- `src/lib/postcosecha-clasificacion-en-blanco-types.ts`
+
+Cambio 1:
+- Se agrego `restrictionMode` al slot de orden:
+  - `SOFT`
+  - `STRICT`
+
+Uso:
+- `STRICT` significa que la orden solo puede resolverse con el origen seleccionado.
+- `SOFT` significa que la orden prioriza el origen seleccionado, pero puede continuar con los siguientes origenes si queda saldo por resolver.
+
+Jerarquia aplicada:
+- `GV`
+- `APERTURA`
+- `PRECLASIFICACION`
+
+Regla concreta:
+- una orden sin restriccion entra desde `GV` y, si queda saldo, continua a `APERTURA` y luego `PRECLASIFICACION`
+- una orden con restriccion suave `GV` sigue el mismo orden `GV > APERTURA > PRECLASIFICACION`
+- una orden con restriccion suave `APERTURA` empieza en `APERTURA` y puede continuar a `PRECLASIFICACION`
+- una orden con restriccion suave `PRECLASIFICACION` solo cae en `PRECLASIFICACION`
+- una orden con restriccion estricta solo puede aparecer en la matriz del origen elegido
+
+Cambio 2:
+- Se centralizo la lista oficial de corridas en:
+  - `POSCOSECHA_CLASIFICACION_RUN_MODES`
+
+Motivo:
+- evitar que UI, prevalidacion cliente y ejecucion servidor usen listas distintas
+- mantener la secuencia unica `GV > APERTURA > PRECLASIFICACION`
+
+Cambio 3:
+- La ejecucion del solver ahora trabaja de forma secuencial.
+
+Antes:
+- cada origen podia intentar resolver la misma demanda completa de forma independiente.
+
+Ahora:
+- `GV` resuelve primero lo elegible
+- se descuenta lo resuelto de los pedidos pendientes
+- `APERTURA` recibe solo el saldo pendiente elegible
+- se vuelve a descontar lo resuelto
+- `PRECLASIFICACION` recibe el saldo final elegible
+
+Impacto:
+- evita duplicar demanda entre matrices
+- respeta mejor la prioridad de `Orden 1`, `Orden 2`, etc.
+- permite que la restriccion suave funcione como preferencia real de origen y no como bloqueo duro
+
+Cambio 4:
+- La validacion previa por modo se ajusto para mostrar holgura sin bloquear cuando existe mas disponibilidad que pedido minimo.
+
+Motivo:
+- en una corrida por origen puede existir mas tallo disponible que demanda pendiente
+- eso no debe impedir que el solver resuelva lo necesario y deje saldo sin usar
+
+Mensaje nuevo:
+- si la diferencia es negativa, la UI indica que hay mas tallos disponibles que pedidos minimos y que el solver usara lo necesario
+
+Cambio 5:
+- Se limpio la etiqueta visual principal de las ordenes.
+
+Antes:
+- podia verse como `Orden 1 | lote GV`
+
+Ahora:
+- se muestra como `Orden 1 | GV`
+- si hay restriccion, se agrega:
+  - `restr. GV suave`
+  - `restr. GV estricta`
+
+Validaciones realizadas:
+- sintaxis TypeScript focalizada con `typescript.transpileModule`
+- archivos validados:
+  - `postcosecha-clasificacion-en-blanco-explorer.tsx`
+  - `postcosecha-clasificacion-en-blanco.ts`
+  - `postcosecha-clasificacion-en-blanco-client.ts`
+  - `postcosecha-clasificacion-en-blanco-types.ts`
+
+Resultado:
+- los cuatro archivos pasaron sintaxis TypeScript sin diagnosticos
+- la ruta local respondio `200`:
+  - `http://localhost:3000/dashboard/postcosecha/planificacion/solver/clasificacion-en-blanco`
+
+Validacion no completada:
+- `npm run typecheck` sigue bloqueado por un error externo ya existente en `node_modules/csstype/index.d.ts`
+- `eslint` no pudo ejecutarse porque falta `node_modules/hermes-parser/dist/index.js`
+
+Nota de migracion:
+- si este cambio se lleva al servidor, asegurar que tambien viajen juntos los cuatro archivos listados arriba
+- no requiere cambios de base de datos
+- no requiere variables nuevas en `.env`
+
+## 2026-04-16 - Correccion: ordenes de SKU independientes de fechas de lote
+
+Contexto:
+- Se detecto que la primera implementacion seguia usando una sola estructura para dos conceptos diferentes:
+  - prioridades de pedidos por SKU
+  - fechas de lote de disponibilidad por grado
+- Eso hacia que `Orden 1` pareciera conectada a una fecha/origen de lote, cuando en realidad son capturas independientes.
+
+Correccion aplicada:
+- Se separo el modelo en dos listas:
+  - `orderSlots`
+  - `lotSlots`
+
+`orderSlots`:
+- controla las columnas de `Pedidos por SKU`
+- representa `Orden 1`, `Orden 2`, etc.
+- contiene solamente:
+  - `key`
+  - `restriction`
+  - `restrictionMode`
+- no contiene fecha de lote
+- no contiene origen real del lote
+
+`lotSlots`:
+- controla las columnas de `Disponibilidad por grado`
+- representa las fechas de lote disponibles que el usuario necesita capturar
+- contiene solamente:
+  - `key`
+  - `lotDate`
+  - `origin`
+- no contiene restriccion de optimizacion de pedidos
+
+Impacto funcional:
+- ahora el usuario puede crear `n` ordenes de SKU para capturar demanda
+- de forma independiente, puede crear `n` fechas de lote para capturar disponibilidad
+- eliminar una orden solo limpia pedidos de esa columna
+- eliminar una fecha de lote solo limpia disponibilidad de esa columna
+- ya no se asume que `Orden 1` corresponde a la primera fecha de lote
+
+Impacto en solver:
+- el solver sigue usando las columnas tecnicas `fecha_1` a `fecha_5` por compatibilidad con el motor Python
+- esas columnas ya no significan una relacion directa entre pedidos y disponibilidad
+- para pedidos, las columnas significan prioridad de orden
+- para disponibilidad, las columnas significan fecha de lote disponible
+
+Prevalidacion:
+- `buildClasificacionPrecheck` ahora recibe:
+  - `orderSlots`
+  - `lotSlots`
+- los pedidos se filtran por restriccion de orden
+- la disponibilidad se filtra por origen del lote
+
+Ejecucion:
+- `runClasificacionEnBlancoSolver` ahora sanitiza ambas listas por separado
+- mantiene compatibilidad temporal con `dateSlots` si llega un payload antiguo
+- la ejecucion secuencial por origen se conserva:
+  - `GV`
+  - `APERTURA`
+  - `PRECLASIFICACION`
+
+UI:
+- `Administrar ordenes` ya no menciona origen ni fecha de lote
+- `Fechas de lote` permite agregar/eliminar fechas de disponibilidad de manera independiente
+- la tabla de cumplimiento por orden ya no muestra una columna de `Fecha lote`, porque esa relacion no existe
+
+Validacion:
+- `npm run typecheck` paso correctamente
+- la ruta local respondio `200`:
+  - `http://localhost:3000/dashboard/postcosecha/planificacion/solver/clasificacion-en-blanco`
+
+## 2026-04-16 - Ajustes de UX y validacion para captura de pedidos/lotes
+
+Contexto:
+- Se detectaron cinco mejoras operativas en `Clasificacion en blanco`:
+  - la cabecera de disponibilidad seguia mostrando `Orden n`
+  - en captura de pedidos faltaba ver el peso ideal de referencia
+  - la restriccion `suave` seguia quedando demasiado amarrada al origen elegido
+  - la captura principal se estaba volviendo ancha e incomoda
+  - faltaban indicadores previos de peso promedio y sobrepeso esperado
+
+Cambio 1:
+- La etiqueta visual de disponibilidad por lote ahora usa el `origen` configurado.
+
+Antes:
+- `Orden 1 - 10/04/2026`
+
+Ahora:
+- `GV - 10/04/2026`
+- `APERTURA - sin fecha`
+
+Motivo:
+- en disponibilidad no estamos viendo ordenes
+- estamos viendo lotes con un origen real
+
+Cambio 2:
+- En la captura por orden, debajo de cada SKU ahora se muestra:
+  - `Peso ideal: X g`
+
+Fuente:
+- se toma del maestro activo de SKU
+
+Cambio 3:
+- La logica de restriccion `suave` se devolvio a flexible real.
+
+Regla actual:
+- si una orden tiene restriccion `STRICT`, solo entra al origen elegido
+- si una orden tiene restriccion `SOFT`, puede completarse con cualquier origen disponible
+
+Impacto:
+- los sobrantes de `GV` o `APERTURA` ya pueden caer en ordenes suaves que todavia no se completaron
+- esto evita perder tallos disponibles cuando el negocio espera reasignacion flexible
+
+Cambio 4:
+- Se agrego un nuevo validador macro:
+  - `Holgura flexible`
+
+Funcion:
+- toma todas las ordenes no estrictas
+- las compara contra toda la disponibilidad cargada
+- entrega una lectura global de saldo o faltante antes de ejecutar
+
+Uso:
+- complementa las holguras por corrida (`GV`, `APERTURA`, `PRECLASIFICACION`)
+- no reemplaza esas validaciones, pero da la lectura total del pool flexible
+
+Cambio 5:
+- Se agregaron KPIs previos de peso:
+  - `Peso tallo disponible`
+  - `Peso tallo requerido`
+  - `Sobrepeso esperado`
+  - `Eficiencia estimada`
+
+Formula base:
+- peso tallo disponible:
+  - `peso_total_gestionable / tallos_netos`
+- peso tallo requerido:
+  - `peso_ideal_total / tallos_minimos_totales`
+- sobrepeso esperado:
+  - `(peso_tallo_disponible / peso_tallo_requerido) - 1`
+- eficiencia estimada:
+  - `peso_tallo_requerido / peso_tallo_disponible`
+
+Lectura:
+- sirven como señal previa del problema antes de correr el solver
+- no sustituyen la optimizacion, pero ayudan a anticipar si el lote viene pesado o liviano
+
+Cambio 6:
+- La captura principal se paso a modo resumen + edicion en ventana.
+
+Pedidos por SKU:
+- en el principal solo se muestran tarjetas resumen por orden
+- cada tarjeta tiene:
+  - total de bunches
+  - SKU activos
+  - restriccion aplicada
+  - boton `Modificar`
+
+Disponibilidad por grado:
+- en el principal solo se muestran tarjetas resumen por lote
+- cada tarjeta tiene:
+  - lote
+  - origen y fecha
+  - mallas totales
+  - tallos netos estimados
+  - boton `Modificar`
+
+Captura fina:
+- al abrir `Modificar`, la edicion se hace en una ventana flotante
+- pedidos:
+  - una sola columna para la orden activa
+  - con filtro de SKU
+- lotes:
+  - una sola columna para el lote activo
+  - pensada para tabular verticalmente
+
+Validacion tecnica:
+- `npm run typecheck` paso correctamente
+- la ruta local siguio respondiendo `200`

@@ -163,6 +163,13 @@ export function PoscosechaClasificacionRecipeOverlay({
                 />
               </div>
 
+              {(summary.tallosSinReceta ?? 0) > 0 ? (
+                <div className="rounded-2xl border border-amber-300/70 bg-amber-50/80 px-4 py-4 text-sm text-amber-950">
+                  La receta priorizo cerrar bunches y peso antes que forzar una particion exacta por grado. Quedaron{" "}
+                  <strong>{formatInteger(summary.tallosSinReceta ?? 0)}</strong> tallos sin asignar a receta final.
+                </div>
+              ) : null}
+
               {summary.penalidadRango > 0 ? (
                 <div className="rounded-2xl border border-slate-300/70 bg-slate-50/80 px-4 py-4 text-sm text-slate-900">
                   La receta encontro una solucion factible, pero algunas combinaciones quedaron fuera del rango

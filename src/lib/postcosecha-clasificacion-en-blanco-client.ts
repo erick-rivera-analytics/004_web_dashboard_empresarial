@@ -2,11 +2,18 @@ import type { PoscosechaSkuRecord } from "@/lib/postcosecha-sku-types";
 import type {
   PoscosechaClasificacionAvailabilityDerivedRow,
   PoscosechaClasificacionAvailabilityRow,
+  PoscosechaClasificacionLotSlot,
   PoscosechaClasificacionOrderRow,
+  PoscosechaClasificacionOrderOrigin,
+  PoscosechaClasificacionOrderSlot,
   PoscosechaClasificacionPrecheck,
+  PoscosechaClasificacionRunMode,
   SolverDateKey,
 } from "@/lib/postcosecha-clasificacion-en-blanco-types";
-import { SOLVER_DATE_KEYS } from "@/lib/postcosecha-clasificacion-en-blanco-types";
+import {
+  POSCOSECHA_CLASIFICACION_RUN_MODES,
+  SOLVER_DATE_KEYS,
+} from "@/lib/postcosecha-clasificacion-en-blanco-types";
 
 function toNumber(value: unknown, fallback = 0) {
   const parsed = Number(value);
@@ -26,6 +33,31 @@ export function excelRound(value: number, digits = 0) {
 
 function sanitizeDateValue(value: unknown) {
   return Math.max(toInteger(value, 0), 0);
+}
+
+function sanitizeOrigin(value: unknown): PoscosechaClasificacionOrderOrigin {
+  return value === "APERTURA"
+    || value === "PRECLASIFICACION"
+    ? value
+    : "GV";
+}
+
+function originMatchesMode(origin: PoscosechaClasificacionOrderOrigin, mode: PoscosechaClasificacionRunMode) {
+  return origin === mode;
+}
+
+function runModePriority(mode: PoscosechaClasificacionRunMode) {
+  return POSCOSECHA_CLASIFICACION_RUN_MODES.indexOf(mode);
+}
+
+function slotCanBeSolvedByMode(
+  slot: PoscosechaClasificacionOrderSlot | undefined,
+  mode: PoscosechaClasificacionRunMode,
+) {
+  if (!slot?.restriction || slot.restrictionMode !== "STRICT") {
+    return true;
+  }
+  return slot.restriction === mode;
 }
 
 function sanitizeAvailabilityRow(
@@ -72,8 +104,21 @@ export function buildClasificacionPrecheck(
   availability: PoscosechaClasificacionAvailabilityRow[],
   skuMaster: PoscosechaSkuRecord[],
   desperdicio: number,
+  orderSlots: PoscosechaClasificacionOrderSlot[],
+  lotSlots: PoscosechaClasificacionLotSlot[],
+  mode: PoscosechaClasificacionRunMode = "GV",
 ): PoscosechaClasificacionPrecheck {
   const masterBySkuId = new Map(skuMaster.map((record) => [record.skuId, record]));
+  const orderSlotMeta = new Map(orderSlots.map((slot) => [slot.key, slot]));
+  const lotSlotMeta = new Map(lotSlots.map((slot) => [slot.key, { ...slot, origin: sanitizeOrigin(slot.origin) }]));
+  const orderEligibleKeys = SOLVER_DATE_KEYS.filter((key) => {
+    const slot = orderSlotMeta.get(key);
+    return slotCanBeSolvedByMode(slot, mode);
+  });
+  const availabilityEligibleKeys = SOLVER_DATE_KEYS.filter((key) => {
+    const slot = lotSlotMeta.get(key);
+    return slot ? originMatchesMode(slot.origin, mode) : false;
+  });
 
   let tallosPedidos = 0;
 
@@ -84,7 +129,7 @@ export function buildClasificacionPrecheck(
       continue;
     }
 
-    const totalPedido = SOLVER_DATE_KEYS.reduce(
+    const totalPedido = orderEligibleKeys.reduce(
       (accumulator, key) => accumulator + sanitizeDateValue(row[key]),
       0,
     );
@@ -93,7 +138,14 @@ export function buildClasificacionPrecheck(
   }
 
   const tallosDisponibles = buildClasificacionAvailabilityDerived(
-    availability,
+    availability.map((row) => ({
+      ...row,
+      fecha_1: availabilityEligibleKeys.includes("fecha_1") ? row.fecha_1 : 0,
+      fecha_2: availabilityEligibleKeys.includes("fecha_2") ? row.fecha_2 : 0,
+      fecha_3: availabilityEligibleKeys.includes("fecha_3") ? row.fecha_3 : 0,
+      fecha_4: availabilityEligibleKeys.includes("fecha_4") ? row.fecha_4 : 0,
+      fecha_5: availabilityEligibleKeys.includes("fecha_5") ? row.fecha_5 : 0,
+    })),
     desperdicio,
   ).reduce((accumulator, row) => accumulator + row.tallosNetos, 0);
 
@@ -119,20 +171,12 @@ export function buildClasificacionPrecheck(
     };
   }
 
-  if (diferencia < 0) {
-    return {
-      isValid: false,
-      message:
-        "No se puede ejecutar: los tallos pedidos minimos deben ser al menos iguales a los tallos disponibles.",
-      tallosPedidos,
-      tallosDisponibles,
-      diferencia,
-    };
-  }
-
   return {
     isValid: true,
-    message: "Validacion previa correcta.",
+    message:
+      diferencia < 0
+        ? "Hay mas tallos disponibles que pedidos minimos; el solver usara lo necesario y dejara saldo."
+        : "Validacion previa correcta.",
     tallosPedidos,
     tallosDisponibles,
     diferencia,
